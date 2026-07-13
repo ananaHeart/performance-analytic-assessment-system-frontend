@@ -1,126 +1,315 @@
 # Web Dashboard Documentation
 
+Last reviewed: July 12, 2026
+
 ## 1. Overview
-The web dashboard is the browser-based interface for principal and teacher users of the Performance Analytic Assessment System. It provides role-based access to management, assessment, analytics, and reporting functions while serving as the main frontend layer connected to the backend assessment services.
+
+The web dashboard is the browser-based frontend of the Performance Analytics Assessment System. It is used by principal and teacher users to manage school setup data, prepare paper-based assessments, view synchronized checking results, review analytics, and export reports.
+
+The dashboard is connected to the Spring Boot backend through REST API calls. The current production backend is deployed on Render:
+
+```text
+https://performance-analytics-assessment-system.onrender.com
+```
+
+The frontend does not hardcode the backend host. It uses the Vite environment variable `VITE_API_BASE_URL`.
 
 ## 2. Technology Stack
+
 - React
 - Vite
-- JavaScript/JSX
+- JavaScript / JSX
 - CSS
+- Lucide React icons
 - Spring Boot REST API backend
+- Render deployment target
 
-## 3. Web Dashboard Purpose
-The web dashboard serves as the operational frontend of the system. It functions as the principal management workspace, the teacher assessment setup workspace, the analytics review interface, and the report export interface. It is also the frontend channel through which backend data is displayed, managed, and submitted.
+## 3. Environment Configuration
 
-## 4. User Roles
-The web dashboard currently supports two primary user roles:
+The shared API client is located at:
+
+```text
+src/api/apiClient.js
+```
+
+It reads the backend base URL from:
+
+```env
+VITE_API_BASE_URL
+```
+
+Local development example:
+
+```env
+VITE_API_BASE_URL=http://localhost:8080
+```
+
+Production example:
+
+```env
+VITE_API_BASE_URL=https://performance-analytics-assessment-system.onrender.com
+```
+
+Supporting files:
+
+- `.env.example`
+- `.env.production`
+
+The endpoint paths remain unchanged. Only the backend host is controlled by the environment variable.
+
+## 4. Documentation and Feature Timeline
+
+The following dates are included to help explain when major frontend documentation and connected functions were prepared. Some feature dates are approximate project milestones based on recorded development history and backend/frontend handoff notes.
+
+- June 2026, third week: Frontend analytics planning and dashboard improvement direction were discussed, including Assessment Setup UI, Competency Tag Library UI, Blueprint Templates UI, Teacher Analytics UI, and trend-related analytics.
+- June 2026, fourth week: Backend analytics and export workstream was prepared, including teacher-facing intervention, student skill mastery, and student score export requirements.
+- June 30, 2026: Backend/frontend handoff notes for teacher intervention, student skill mastery, and student score export were available for frontend wiring.
+- July 9, 2026: Initial frontend documentation files existed in the frontend repository commit history.
+- July 12, 2026: Web dashboard documentation was refreshed for panel presentation.
+- July 12, 2026: Render backend deployment configuration was documented using `VITE_API_BASE_URL`.
+- July 12, 2026: Student Profile Skill Mastery documentation was updated to use `GET /api/analytics/student-skill-mastery`.
+- July 12, 2026: Teacher Intervention documentation was updated to use `GET /api/analytics/teacher-interventions`.
+- July 12, 2026: Selected assessment student score export documentation was updated to use `GET /api/export/student-scores/{testId}`.
+
+## 5. User Roles
+
+The dashboard supports two main roles:
 
 - Principal
 - Teacher
 
-The assigned role affects the screens, sidebar modules, and actions available to the logged-in user. Role-based access ensures that each user sees only the modules relevant to their responsibilities in the system.
+Role-based rendering controls what screens, navigation items, and actions are available to each user.
 
-## 5. Principal Flow
-The principal workflow is centered on school-wide management and monitoring.
+## 6. Principal Workflow
+
+The principal workflow focuses on school-level management and monitoring.
 
 - Dashboard
-  Provides a summary entry point for principal activities and access to the main administrative modules.
+  Shows school-level summary cards and recent assessment activity.
 - Teacher Approval
-  Allows the principal to review teacher registrations and decide whether accounts should be activated for system use.
+  Allows the principal to review teacher registrations and approve or reject teacher accounts.
 - Class Assignment
-  Supports the assignment of teachers to subjects, sections, grade levels, and academic years.
+  Assigns teachers to grade levels, sections, subjects, and academic years.
 - Class Records / SF1 Import
-  Provides tools for managing student records, including manual entry and SF1-based import workflows.
+  Supports student management through manual entry and SF1-based import.
 - Analytics
-  Displays school-wide and class-related analytical views based on uploaded checking results.
+  Displays school-level or class-level analytics generated from synchronized assessment results.
 - Export Reports
-  Allows report generation and download based on available analytics and test result data.
+  Allows report downloads when backend export data is available.
 
-## 6. Teacher Flow
-The teacher workflow is centered on classroom-level assessment preparation and result review.
+## 7. Teacher Workflow
+
+The teacher workflow focuses on class-level assessment setup and result review.
 
 - Dashboard
-  Provides the teacher with an entry point to the assessment and analytics functions of the system.
+  Shows teacher-related summary metrics such as total assigned students, created assessments, and recent sync activity.
+- Class Records
+  Shows the teacher's assigned classes and class-specific assessment, analytics, and student views.
 - Assessment Setup
-  Allows the teacher to select a class assignment, create a test, and define the parts of that test.
+  Allows the teacher to create assessments, add test parts, define answer keys, and map competencies or branch skills.
 - Analytics
-  Allows the teacher to review performance data derived from uploaded mobile checking results.
-- Export Reports
-  Allows the teacher to download report outputs based on available assessment analytics.
+  Shows performance summaries, least mastered skills, assessment part details, student scores, and teacher-facing intervention recommendations.
+- Student Profile
+  Shows an individual student's assessed skill mastery across checked results in the selected class.
+- Export Report
+  Downloads selected assessment student score rows through the backend export endpoint.
 
-## 7. Teacher Approval
-Teacher approval is a controlled principal-side process. The principal reviews teacher registrations, approves or rejects accounts, and determines whether the teacher becomes active in the system. Only active teachers should be used in the normal system flow, including class assignment and assessment-related operations.
+## 8. Class Assignment Model
 
-## 8. Class Assignment
-Class assignment defines the instructional ownership structure used by the system. The principal assigns a teacher to a subject, section, grade level, and academic year. Each class assignment creates or uses a class record that becomes the basis for downstream assessment setup and analytics linkage.
-
-Within the system, a class should be understood as the combination of:
+Within the dashboard, a class context should be understood as a combination of:
 
 - teacher
-- subject
+- grade level
 - section
+- subject
 - academic year
 
+Raw numeric IDs are internal implementation details. User-facing labels should use readable grade, section, subject, teacher, and academic year values.
+
 ## 9. Student Records and SF1 Import
-The principal can add student records manually or import them through the SF1 workflow. During SF1 processing, the system detects the school year and section from the uploaded file. Students are saved as profile records, while enrollments connect those students to the appropriate section and academic year. This structure supports both student identity management and class membership tracking.
+
+Student records can be managed manually or through SF1 import. The SF1 flow supports preview and confirmation before saving records. Student identity and class membership are handled separately by the backend so that student profile data can be reused across class contexts.
+
+Current student-facing frontend displays include:
+
+- student LRN
+- student name
+- grade and section
+- gender-coded profile avatar
+- skill mastery list based on backend analytics
 
 ## 10. Assessment Setup
-Assessment setup is a teacher-managed process tied to one selected class assignment. The teacher selects one class assignment and creates an assessment or test under that selected class. After the test is created, the teacher adds test parts that define the structure of the assessment.
 
-Each test part includes the following elements:
+Assessment setup is managed by the teacher under a selected class. A complete assessment can contain multiple parts.
 
-- competency
-- part label
+Each assessment part can include:
+
+- part label / order
 - part type
 - number of items
 - points per item
 - answer key
+- parent competency
+- branch skill mappings, when available
 
-Raw class IDs are internal identifiers and should not be treated as the user-facing class label. User-facing selection and display should be based on the readable class assignment information rather than internal numeric identifiers.
+The dashboard preserves part-level competency mappings so analytics can reflect different skills per part rather than only the parent assessment competency.
 
 ## 11. Analytics
-The analytics module reads uploaded mobile checking results and turns them into classroom or school-level performance views. Item analysis presents correct responses, total responses, and difficulty information. Least mastered skills identifies competency mastery patterns. Affected students highlights learners who may require additional support. Intervention support presents recommendations when such recommendation data is available from the backend.
 
-## 12. Export Reports
-The export reports module allows teacher and principal users to generate downloadable reports based on analytics data. These reports are based on uploaded test results and are intended to support classroom review, school analysis, and documentation needs.
+The analytics module displays results after the teacher checks student papers on the mobile app and synchronizes the results to the backend.
 
-## 13. API Integration
-The web dashboard integrates with the Spring Boot backend through grouped REST API functions. The main API groups currently used by the dashboard include:
+Current analytics views include:
+
+- performance summary for the selected assessment
+- least mastered skills
+- assessment part details
+- student score table for the selected assessment part
+- LMS percentage / performance label
+- teacher-facing intervention recommendation
+
+The analytics view is assessment-driven. The selected assessment controls which details, scores, LMS data, and interventions are displayed.
+
+## 12. Student Profile Skill Mastery
+
+The student profile Skill Mastery section uses:
+
+```text
+GET /api/analytics/student-skill-mastery?studentId={studentId}&classId={classId}
+```
+
+Purpose:
+
+- show all competencies assessed for the selected student
+- aggregate across checked results in the selected class
+- include mastered, developing, and needs-support skills
+- avoid using intervention endpoints for student profile mastery
+
+This is student-centered, not class-average analytics.
+
+## 13. Teacher Intervention Recommendation
+
+The teacher-facing intervention panel uses:
+
+```text
+GET /api/analytics/teacher-interventions?testId={testId}
+```
+
+Purpose:
+
+- show the selected competency or skill
+- show mastery / LMS status
+- show affected learners count
+- show recommended teaching action
+- show target group
+- show follow-up activity or quick reassessment suggestion
+
+Important rule:
+
+This is a teacher guide. It must not be written as an automated direct message to students.
+
+## 14. Export Reports
+
+The dashboard currently supports selected-assessment exports through backend endpoints.
+
+Current export endpoints used by the frontend:
+
+```text
+GET /api/export/item-analysis/{testId}
+GET /api/export/lms/{testId}
+GET /api/export/student-scores/{testId}
+```
+
+The Teacher Analytics page Export Report button uses:
+
+```text
+GET /api/export/student-scores/{testId}
+```
+
+Purpose:
+
+- export actual student score rows for the selected assessment
+- include student identity and class metadata
+- include total score, max score, percentage, performance status, and checked timestamp
+
+This is not the same as LMS export and not the same as item analysis export.
+
+## 15. API Integration Groups
+
+The frontend API client groups backend usage into these areas:
 
 - authentication
-- teacher approval
+- teacher registration and approval
+- student records
+- SF1 preview and confirm
+- sections, grade levels, teachers, subjects
 - class assignments
-- SF1 import
-- assessment setup
-- analytics
-- export reports
+- teacher assessments
+- assessment details and test parts
+- competency and branch skill mapping
+- analytics item analysis
+- LMS and intervention analytics
+- student skill mastery
+- sync activity
+- export downloads
 
-These API groups are used by the frontend according to module purpose rather than exposing every backend endpoint directly within the documentation.
+The dashboard preserves request payloads and endpoint paths expected by the backend.
 
-## 14. Current Confirmed Working Features
-The following features are currently confirmed as working within the web dashboard flow:
+## 16. Production Deployment Notes
 
-- Login works
-- Principal dashboard/sidebar works
-- Teacher approval works
-- Class assignment works
-- SF1 import preview/confirm works
-- Teacher assessment setup works
-- Analytics reflects uploaded mobile results
-- Export report buttons are connected to backend endpoints
+The frontend is prepared for Render Static Site deployment.
 
-## 15. Known UI Improvements
-The following user interface improvements remain appropriate for future refinement:
+Render frontend settings:
 
-- Full storyboard-based UI cleanup
-- Fixed/sticky sidebar polish
-- Better mobile-inspired card layout
-- Better button flow
-- Better status badges
-- Hide raw IDs from main user-facing labels
-- Improve Assessment Setup screen spacing and guided flow
-- Improve Analytics visual presentation
+- Build command: `npm run build`
+- Publish directory: `dist`
+- Environment variable: `VITE_API_BASE_URL`
+- Production value: `https://performance-analytics-assessment-system.onrender.com`
 
-## 16. Important UI Rule for Future Refactor
-The web dashboard UI should be refactored after core features are stable. The refactor should follow the storyboard and use the theme color `#3ACF49`. The UI must not break existing API integration, sync behavior, or data integrity rules.
+The backend must allow the deployed frontend domain through CORS.
+
+## 17. Current Confirmed Working Features
+
+The following frontend features are currently documented as implemented:
+
+- login flow
+- role-based principal and teacher dashboard views
+- teacher approval
+- class assignment
+- manual student input
+- SF1 preview and confirm
+- teacher assessment setup
+- test part creation
+- answer key setup
+- competency and branch skill mapping
+- teacher analytics
+- student result table
+- teacher-facing intervention recommendation
+- student profile skill mastery
+- selected assessment student score export
+- production backend environment configuration
+
+## 18. Known Remaining Documentation Gaps
+
+The following items are not yet fully documented in this repository:
+
+- final deployed frontend URL after Render deployment
+- final screenshots of the deployed frontend pages
+- full backend technical documentation
+- full mobile app technical documentation
+- full database schema documentation
+- final panel-ready system architecture diagram
+- final user manual with screenshots for principal and teacher users
+
+These gaps are documentation gaps only. They do not necessarily mean the frontend feature is missing.
+
+## 19. UI Rule for Future Refactor
+
+Future UI cleanup should preserve:
+
+- existing API integration
+- request payload structure
+- backend endpoint structure
+- sync behavior
+- assessment and analytics data integrity
+
+The visual direction should remain a clean education dashboard using the `#3ACF49` primary accent.

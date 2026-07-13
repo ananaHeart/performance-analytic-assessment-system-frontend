@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import {
   confirmSf1,
+  createClassAssignment,
   downloadStudentScoresReport,
   getAssessmentDetails,
   getClassAssignments,
@@ -21,12 +22,21 @@ import {
   getStudentSkillMastery,
   getTeacherAssessments,
   getTeacherInterventions,
+  getTeachers,
   getSyncActivity,
   createManualStudent,
   getManualStudents,
   getSections,
+  getSubjects,
   previewSf1,
 } from '../api/apiClient'
+
+const initialAssignmentForm = {
+  teacherId: '',
+  subjectId: '',
+  sectionId: '',
+  academicYearId: '1',
+}
 
 const initialManualForm = {
   sectionId: '',
@@ -491,9 +501,12 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
   const teacherId = user?.id
   const [classAssignments, setClassAssignments] = useState([])
   const [students, setStudents] = useState([])
+  const [schoolTeachers, setSchoolTeachers] = useState([])
+  const [subjects, setSubjects] = useState([])
   const [sections, setSections] = useState([])
   const [assessments, setAssessments] = useState([])
   const [selectedClassAssignment, setSelectedClassAssignment] = useState(null)
+  const [assignmentForm, setAssignmentForm] = useState(initialAssignmentForm)
   const [manualForm, setManualForm] = useState(initialManualForm)
   const [manualClassFilters, setManualClassFilters] = useState(initialManualClassFilters)
   const [manualRows, setManualRows] = useState(() => createManualStudentRows())
@@ -515,12 +528,14 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
   const [studentsError, setStudentsError] = useState('')
   const [assessmentsError, setAssessmentsError] = useState('')
   const [studentsSuccess, setStudentsSuccess] = useState('')
+  const [assignmentMessage, setAssignmentMessage] = useState({ error: '', success: '' })
   const [manualMessage, setManualMessage] = useState({ error: '', success: '' })
   const [previewMessage, setPreviewMessage] = useState({ error: '', success: '' })
   const [confirmMessage, setConfirmMessage] = useState({ error: '', success: '' })
   const [isStudentsLoading, setIsStudentsLoading] = useState(true)
   const [isAssessmentsLoading, setIsAssessmentsLoading] = useState(true)
   const [, setIsSectionsLoading] = useState(true)
+  const [isAssignmentSubmitting, setIsAssignmentSubmitting] = useState(false)
   const [isManualSubmitting, setIsManualSubmitting] = useState(false)
   const [isPreviewLoading, setIsPreviewLoading] = useState(false)
   const [isConfirmSubmitting, setIsConfirmSubmitting] = useState(false)
@@ -899,10 +914,18 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
     setIsSectionsLoading(true)
 
     try {
-      const sectionRecords = await getSections()
+      const [sectionRecords, teacherRecords, subjectRecords] = await Promise.all([
+        getSections(),
+        getTeachers().catch(() => []),
+        getSubjects().catch(() => []),
+      ])
       setSections(sectionRecords)
+      setSchoolTeachers(teacherRecords)
+      setSubjects(subjectRecords)
     } catch {
       setSections([])
+      setSchoolTeachers([])
+      setSubjects([])
     } finally {
       setIsSectionsLoading(false)
     }
@@ -1154,6 +1177,50 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
   const handleManualFormChange = (event) => {
     const { name, value } = event.target
     setManualForm((currentForm) => ({ ...currentForm, [name]: value }))
+  }
+
+  const handleAssignmentFormChange = (event) => {
+    const { name, value } = event.target
+    setAssignmentForm((currentForm) => ({ ...currentForm, [name]: value }))
+  }
+
+  const handleAssignmentSubmit = async (event) => {
+    event.preventDefault()
+    setAssignmentMessage({ error: '', success: '' })
+
+    if (
+      !assignmentForm.teacherId ||
+      !assignmentForm.subjectId ||
+      !assignmentForm.sectionId ||
+      !assignmentForm.academicYearId.trim()
+    ) {
+      setAssignmentMessage({
+        error: 'Select teacher, subject, section, and academic year before assigning.',
+        success: '',
+      })
+      return
+    }
+
+    setIsAssignmentSubmitting(true)
+
+    try {
+      await createClassAssignment({
+        teacherId: Number(assignmentForm.teacherId),
+        subjectId: Number(assignmentForm.subjectId),
+        sectionId: Number(assignmentForm.sectionId),
+        academicYearId: Number(assignmentForm.academicYearId.trim()),
+      })
+      setAssignmentForm(initialAssignmentForm)
+      setAssignmentMessage({ error: '', success: 'Teacher assigned to class successfully.' })
+      await loadTeacherClasses()
+    } catch (submitError) {
+      setAssignmentMessage({
+        error: submitError.message || 'Unable to assign teacher to this class.',
+        success: '',
+      })
+    } finally {
+      setIsAssignmentSubmitting(false)
+    }
   }
 
   const handleManualRowChange = (rowId, fieldName, value) => {
@@ -2040,13 +2107,150 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
         <p>
           <span>Assessments</span>
           <strong>/</strong>
-          <span>Class Records</span>
+          <span>Teacher Class Assignment</span>
         </p>
-        <h2>Class Records</h2>
-        <span>Manage and track progress across all grade levels.</span>
+        <h2>Teacher Class Assignment</h2>
+        <span>Manage and assign teachers to sections and subjects for the current academic year.</span>
       </section>
 
-      <section className="principal-class-actions" aria-label="Class record tools">
+      <section className="principal-assignment-card">
+        <div className="section-toolbar">
+          <div>
+            <p className="content-card-tag">Assignment Creation Section</p>
+            <h3>Assign teacher to a class</h3>
+          </div>
+          <button type="button" className="secondary-button" onClick={() => loadTeacherClasses()}>
+            Refresh
+          </button>
+        </div>
+
+        {assignmentMessage.error ? (
+          <p className="form-message form-message-error">{assignmentMessage.error}</p>
+        ) : null}
+        {assignmentMessage.success ? (
+          <p className="form-message form-message-success">{assignmentMessage.success}</p>
+        ) : null}
+
+        <form className="principal-assignment-form" onSubmit={handleAssignmentSubmit}>
+          <label htmlFor="classAssignmentTeacherId">
+            <span>Teacher</span>
+            <select
+              id="classAssignmentTeacherId"
+              name="teacherId"
+              value={assignmentForm.teacherId}
+              onChange={handleAssignmentFormChange}
+            >
+              <option value="">Select teacher</option>
+              {schoolTeachers.map((teacher) => (
+                <option key={teacher.id} value={teacher.id}>
+                  {teacher.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label htmlFor="classAssignmentSubjectId">
+            <span>Subject</span>
+            <select
+              id="classAssignmentSubjectId"
+              name="subjectId"
+              value={assignmentForm.subjectId}
+              onChange={handleAssignmentFormChange}
+            >
+              <option value="">Select subject</option>
+              {subjects.map((subject) => (
+                <option key={subject.id} value={subject.id}>
+                  {subject.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label htmlFor="classAssignmentSectionId">
+            <span>Section</span>
+            <select
+              id="classAssignmentSectionId"
+              name="sectionId"
+              value={assignmentForm.sectionId}
+              onChange={handleAssignmentFormChange}
+            >
+              <option value="">Select section</option>
+              {sectionOptions.map((section) => (
+                <option key={section.id} value={section.id}>
+                  {section.gradeLevelName
+                    ? `${section.gradeLevelName} - ${section.name}`
+                    : section.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label htmlFor="classAssignmentAcademicYearId">
+            <span>Academic Year ID</span>
+            <input
+              id="classAssignmentAcademicYearId"
+              name="academicYearId"
+              value={assignmentForm.academicYearId}
+              onChange={handleAssignmentFormChange}
+              placeholder="Input needed"
+            />
+          </label>
+
+          <button type="submit" className="primary-button" disabled={isAssignmentSubmitting}>
+            {isAssignmentSubmitting ? 'Assigning...' : 'Assign Teacher'}
+          </button>
+        </form>
+      </section>
+
+      <section className="principal-assignment-card">
+        <div className="principal-assignment-table-header">
+          <div>
+            <p className="content-card-tag">Assignments Table</p>
+            <h3>Existing class assignments</h3>
+          </div>
+          <span>{classAssignments.length} assignment(s)</span>
+        </div>
+
+        <div className="approval-table-wrap">
+          <table className="approval-table">
+            <thead>
+              <tr>
+                <th>Teacher</th>
+                <th>Subject</th>
+                <th>Section</th>
+                <th>Academic Year</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {!classAssignments.length ? (
+                <tr>
+                  <td className="approval-empty" colSpan="5">
+                    No class assignments found.
+                  </td>
+                </tr>
+              ) : (
+                classAssignments.map((assignment, index) => (
+                  <tr key={assignment.id ?? `${assignment.teacherName}-${assignment.sectionName}-${index}`}>
+                    <td>{assignment.teacherName || 'Not assigned'}</td>
+                    <td>{assignment.subjectName || 'Not assigned'}</td>
+                    <td>
+                      {assignment.gradeLevelName || 'Grade level'} -{' '}
+                      {assignment.sectionName || 'Section'}
+                    </td>
+                    <td>{assignment.academicYear || 'Not assigned'}</td>
+                    <td>
+                      <span className="status-pill status-active">Active</span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="principal-class-actions" aria-label="Student record tools">
         <button
           type="button"
           className={`principal-smart-import-card ${
