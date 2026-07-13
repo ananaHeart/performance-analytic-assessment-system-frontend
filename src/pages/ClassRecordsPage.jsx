@@ -23,6 +23,7 @@ import {
   getTeacherAssessments,
   getTeacherInterventions,
   getTeachers,
+  getGradeLevels,
   getSyncActivity,
   createManualStudent,
   getManualStudents,
@@ -34,6 +35,7 @@ import {
 const initialAssignmentForm = {
   teacherId: '',
   subjectId: '',
+  gradeLevelId: '',
   sectionId: '',
   academicYearId: '1',
 }
@@ -84,6 +86,23 @@ function valuesMatch(leftValue, rightValue) {
   const right = normalizeMatchText(rightValue)
 
   return Boolean(left && right && left === right)
+}
+
+function sectionMatchesGrade(section, gradeLevel) {
+  if (!section || !gradeLevel) {
+    return false
+  }
+
+  if (
+    section.gradeLevelId !== null &&
+    section.gradeLevelId !== undefined &&
+    gradeLevel.id !== null &&
+    gradeLevel.id !== undefined
+  ) {
+    return String(section.gradeLevelId) === String(gradeLevel.id)
+  }
+
+  return valuesMatch(section.gradeLevelName, gradeLevel.name)
 }
 
 function getClassSectionKey(assignment) {
@@ -503,7 +522,9 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
   const [students, setStudents] = useState([])
   const [schoolTeachers, setSchoolTeachers] = useState([])
   const [subjects, setSubjects] = useState([])
+  const [schoolGradeLevels, setSchoolGradeLevels] = useState([])
   const [sections, setSections] = useState([])
+  const [assignmentSections, setAssignmentSections] = useState([])
   const [assessments, setAssessments] = useState([])
   const [selectedClassAssignment, setSelectedClassAssignment] = useState(null)
   const [assignmentForm, setAssignmentForm] = useState(initialAssignmentForm)
@@ -550,6 +571,54 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
     () => sections.filter((section) => section.id !== null && section.id !== undefined),
     [sections],
   )
+  const assignmentGradeOptions = useMemo(() => {
+    if (schoolGradeLevels.length) {
+      return schoolGradeLevels.filter((gradeLevel) => gradeLevel.id !== null && gradeLevel.id !== undefined)
+    }
+
+    const optionMap = new Map()
+
+    sectionOptions.forEach((section) => {
+      const key = section.gradeLevelId ?? section.gradeLevelName
+
+      if (!key) {
+        return
+      }
+
+      const stringKey = String(key)
+
+      if (!optionMap.has(stringKey)) {
+        optionMap.set(stringKey, {
+          id: key,
+          name: section.gradeLevelName || `Grade Level ${key}`,
+        })
+      }
+    })
+
+    return Array.from(optionMap.values())
+  }, [schoolGradeLevels, sectionOptions])
+  const selectedAssignmentGradeLevel = useMemo(
+    () =>
+      assignmentGradeOptions.find(
+        (gradeLevel) => String(gradeLevel.id) === String(assignmentForm.gradeLevelId),
+      ) ?? null,
+    [assignmentForm.gradeLevelId, assignmentGradeOptions],
+  )
+  const assignmentSectionOptions = useMemo(() => {
+    const sourceSections = assignmentForm.gradeLevelId ? assignmentSections : []
+
+    if (!selectedAssignmentGradeLevel) {
+      return []
+    }
+
+    return sourceSections.filter((section) => {
+      const hasGradeMetadata =
+        (section.gradeLevelId !== null && section.gradeLevelId !== undefined) ||
+        Boolean(section.gradeLevelName)
+
+      return hasGradeMetadata ? sectionMatchesGrade(section, selectedAssignmentGradeLevel) : true
+    })
+  }, [assignmentForm.gradeLevelId, assignmentSections, selectedAssignmentGradeLevel])
   const manualTeacherOptions = useMemo(
     () => getUniqueClassOptions(classAssignments, 'teacherId', 'teacherName'),
     [classAssignments],
@@ -914,18 +983,21 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
     setIsSectionsLoading(true)
 
     try {
-      const [sectionRecords, teacherRecords, subjectRecords] = await Promise.all([
+      const [sectionRecords, teacherRecords, subjectRecords, gradeLevelRecords] = await Promise.all([
         getSections(),
         getTeachers().catch(() => []),
         getSubjects().catch(() => []),
+        getGradeLevels().catch(() => []),
       ])
       setSections(sectionRecords)
       setSchoolTeachers(teacherRecords)
       setSubjects(subjectRecords)
+      setSchoolGradeLevels(gradeLevelRecords)
     } catch {
       setSections([])
       setSchoolTeachers([])
       setSubjects([])
+      setSchoolGradeLevels([])
     } finally {
       setIsSectionsLoading(false)
     }
@@ -1124,6 +1196,34 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
   }, [])
 
   useEffect(() => {
+    const gradeLevelId = assignmentForm.gradeLevelId
+
+    setAssignmentSections([])
+
+    if (!gradeLevelId) {
+      return
+    }
+
+    let shouldApplyResults = true
+
+    getSections({ gradeLevelId })
+      .then((sectionRecords) => {
+        if (shouldApplyResults) {
+          setAssignmentSections(sectionRecords)
+        }
+      })
+      .catch(() => {
+        if (shouldApplyResults) {
+          setAssignmentSections([])
+        }
+      })
+
+    return () => {
+      shouldApplyResults = false
+    }
+  }, [assignmentForm.gradeLevelId])
+
+  useEffect(() => {
     if (role !== 'teacher') {
       return
     }
@@ -1181,7 +1281,13 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
 
   const handleAssignmentFormChange = (event) => {
     const { name, value } = event.target
-    setAssignmentForm((currentForm) => ({ ...currentForm, [name]: value }))
+    setAssignmentForm((currentForm) => ({
+      ...currentForm,
+      [name]: value,
+      ...(name === 'teacherId' ? { subjectId: '', gradeLevelId: '', sectionId: '' } : {}),
+      ...(name === 'subjectId' ? { gradeLevelId: '', sectionId: '' } : {}),
+      ...(name === 'gradeLevelId' ? { sectionId: '' } : {}),
+    }))
   }
 
   const handleAssignmentSubmit = async (event) => {
@@ -1191,11 +1297,12 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
     if (
       !assignmentForm.teacherId ||
       !assignmentForm.subjectId ||
+      !assignmentForm.gradeLevelId ||
       !assignmentForm.sectionId ||
       !assignmentForm.academicYearId.trim()
     ) {
       setAssignmentMessage({
-        error: 'Select teacher, subject, section, and academic year before assigning.',
+        error: 'Select teacher, subject, grade level, section, and academic year before assigning.',
         success: '',
       })
       return
@@ -2119,9 +2226,35 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
             <p className="content-card-tag">Assignment Creation Section</p>
             <h3>Assign teacher to a class</h3>
           </div>
-          <button type="button" className="secondary-button" onClick={() => loadTeacherClasses()}>
-            Refresh
-          </button>
+          <div className="principal-assignment-toolbar-actions">
+            <button
+              type="button"
+              className={`principal-smart-import-card ${
+                activePrincipalTool === 'smart-import' ? 'is-active' : ''
+              }`}
+              onClick={() => setActivePrincipalTool('smart-import')}
+            >
+              <span aria-hidden="true">
+                <FileText size={18} strokeWidth={2.3} />
+              </span>
+              <strong>Smart Import (SF1)</strong>
+              <small>Import School Form Here.</small>
+            </button>
+
+            <button
+              type="button"
+              className={`principal-manual-input-card ${
+                activePrincipalTool === 'manual' ? 'is-active' : ''
+              }`}
+              onClick={() => setActivePrincipalTool('manual')}
+            >
+              Manual Input
+            </button>
+
+            <button type="button" className="secondary-button" onClick={() => loadTeacherClasses()}>
+              Refresh
+            </button>
+          </div>
         </div>
 
         {assignmentMessage.error ? (
@@ -2156,11 +2289,30 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
               name="subjectId"
               value={assignmentForm.subjectId}
               onChange={handleAssignmentFormChange}
+              disabled={!assignmentForm.teacherId}
             >
               <option value="">Select subject</option>
               {subjects.map((subject) => (
                 <option key={subject.id} value={subject.id}>
                   {subject.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label htmlFor="classAssignmentGradeLevelId">
+            <span>Grade Level</span>
+            <select
+              id="classAssignmentGradeLevelId"
+              name="gradeLevelId"
+              value={assignmentForm.gradeLevelId}
+              onChange={handleAssignmentFormChange}
+              disabled={!assignmentForm.subjectId}
+            >
+              <option value="">Select grade level</option>
+              {assignmentGradeOptions.map((gradeLevel) => (
+                <option key={gradeLevel.id} value={gradeLevel.id}>
+                  {gradeLevel.name}
                 </option>
               ))}
             </select>
@@ -2173,13 +2325,21 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
               name="sectionId"
               value={assignmentForm.sectionId}
               onChange={handleAssignmentFormChange}
+              disabled={!assignmentForm.gradeLevelId || !assignmentSectionOptions.length}
             >
-              <option value="">Select section</option>
-              {sectionOptions.map((section) => (
+              <option value="">
+                {assignmentForm.gradeLevelId
+                  ? 'Select section'
+                  : 'Select grade level first'}
+              </option>
+              {assignmentForm.gradeLevelId && !assignmentSectionOptions.length ? (
+                <option value="" disabled>
+                  No available sections for this grade level.
+                </option>
+              ) : null}
+              {assignmentSectionOptions.map((section) => (
                 <option key={section.id} value={section.id}>
-                  {section.gradeLevelName
-                    ? `${section.gradeLevelName} - ${section.name}`
-                    : section.name}
+                  {section.name}
                 </option>
               ))}
             </select>
@@ -2248,32 +2408,6 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
             </tbody>
           </table>
         </div>
-      </section>
-
-      <section className="principal-class-actions" aria-label="Student record tools">
-        <button
-          type="button"
-          className={`principal-smart-import-card ${
-            activePrincipalTool === 'smart-import' ? 'is-active' : ''
-          }`}
-          onClick={() => setActivePrincipalTool('smart-import')}
-        >
-          <span aria-hidden="true">
-            <FileText size={20} strokeWidth={2.3} />
-          </span>
-          <strong>Smart Import (SF1)</strong>
-          <small>Import School Form Here.</small>
-        </button>
-
-        <button
-          type="button"
-          className={`principal-manual-input-card ${
-            activePrincipalTool === 'manual' ? 'is-active' : ''
-          }`}
-          onClick={() => setActivePrincipalTool('manual')}
-        >
-          Manual Input
-        </button>
       </section>
 
       <section className="content-card principal-student-table-panel">

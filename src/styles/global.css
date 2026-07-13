@@ -841,6 +841,13 @@ h3 {
   background: #ffffff;
 }
 
+.principal-assignment-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .principal-smart-import-card,
 .principal-manual-input-card {
   width: auto;
@@ -857,6 +864,11 @@ h3 {
   color: #111827;
   font-size: 0.85rem;
   font-weight: 900;
+}
+
+.principal-assignment-toolbar-actions .secondary-button {
+  min-height: 42px;
+  border-radius: 8px;
 }
 
 .principal-smart-import-card {
@@ -928,7 +940,7 @@ h3 {
 
 .principal-assignment-form {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr)) minmax(180px, 0.7fr);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 16px;
   align-items: end;
 }

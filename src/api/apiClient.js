@@ -122,6 +122,12 @@ function normalizeStudentRecord(student) {
 function normalizeSectionRecord(section) {
   return {
     id: section.id ?? section.sectionId ?? section.value ?? null,
+    gradeLevelId:
+      section.gradeLevelId ??
+      section.grade_level_id ??
+      section.gradeLevel?.id ??
+      section.gradeLevel?.gradeLevelId ??
+      null,
     name:
       section.name ??
       section.sectionName ??
@@ -747,8 +753,17 @@ export async function confirmSf1(file) {
   }
 }
 
-export async function getSections() {
-  const payload = await request('/api/school-setup/sections')
+export async function getSections(filters = {}) {
+  const params = new URLSearchParams()
+
+  if (filters.gradeLevelId) {
+    params.set('gradeLevelId', filters.gradeLevelId)
+  }
+
+  const queryString = params.toString()
+  const payload = await request(
+    `/api/school-setup/sections${queryString ? `?${queryString}` : ''}`,
+  )
   return extractCollection(payload, ['sections', 'data', 'records']).map(normalizeSectionRecord)
 }
 
