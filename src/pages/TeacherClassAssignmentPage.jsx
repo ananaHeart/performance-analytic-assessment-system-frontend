@@ -14,6 +14,8 @@ const initialAssignmentForm = {
   academicYearId: '1',
 }
 
+const currentAcademicYearLabel = 'SY 2025-2026'
+
 function TeacherClassAssignmentPage() {
   const [teachers, setTeachers] = useState([])
   const [sections, setSections] = useState([])
@@ -134,8 +136,8 @@ function TeacherClassAssignmentPage() {
           <p className="content-card-tag">Create Assignment</p>
           <h3>Add a class assignment</h3>
           <p className="supporting-text">
-            Select the teacher, subject, and section, then submit the record with the academic
-            year ID.
+            Select the teacher, subject, and section, then submit the assignment for the current
+            school year.
           </p>
 
           {formError ? <p className="form-message form-message-error">{formError}</p> : null}
@@ -193,16 +195,10 @@ function TeacherClassAssignmentPage() {
               </select>
             </label>
 
-            <label className="field-group" htmlFor="assignmentAcademicYearId">
-              <span>Academic Year ID</span>
-              <input
-                id="assignmentAcademicYearId"
-                name="academicYearId"
-                value={assignmentForm.academicYearId}
-                onChange={handleFormChange}
-                placeholder="Enter academic year ID"
-              />
-            </label>
+            <div className="field-group academic-year-display" aria-label="Academic Year">
+              <span>Academic Year</span>
+              <strong>{currentAcademicYearLabel}</strong>
+            </div>
 
             <div className="form-actions">
               <button type="submit" className="primary-button" disabled={isSubmitting}>

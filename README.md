@@ -1,5 +1,10 @@
 # Performance Analytics Assessment System - Web Dashboard
 
+Document created: July 9, 2026  
+Last reviewed: July 13, 2026  
+Last updated: July 13, 2026  
+Coverage period: June 2026 to July 2026
+
 This repository contains the React + Vite web dashboard for the Performance Analytics Assessment System. It is the browser-based frontend used by principals and teachers to manage teacher approval, class assignments, student records, assessment setup, analytics, intervention recommendations, and report exports.
 
 ## Current Production Backend
@@ -13,14 +18,16 @@ https://performance-analytics-assessment-system.onrender.com
 The frontend reads the backend base URL from a Vite environment variable:
 
 ```env
-VITE_API_BASE_URL=https://performance-analytics-assessment-system.onrender.com
+VITE_API_URL=https://performance-analytics-assessment-system.onrender.com
 ```
 
 For local development, use:
 
 ```env
-VITE_API_BASE_URL=http://localhost:8080
+VITE_API_URL=http://localhost:8080
 ```
+
+`VITE_API_BASE_URL` is still supported as a legacy fallback, but `VITE_API_URL` is the primary variable.
 
 ## Local Setup
 
@@ -50,7 +57,7 @@ Use these settings when deploying the Vite frontend as a Render Static Site:
 
 - Build command: `npm run build`
 - Publish directory: `dist`
-- Environment variable: `VITE_API_BASE_URL`
+- Environment variable: `VITE_API_URL`
 - Production value: `https://performance-analytics-assessment-system.onrender.com`
 
 The backend must allow the deployed frontend URL through CORS.
@@ -62,13 +69,16 @@ The documentation files for panel review are in the `docs` folder:
 - `docs/WEB_DASHBOARD_DOCUMENTATION.md`
 - `docs/demo-checklist.md`
 - `docs/frontend-documentation-status.md`
+- `docs/gantt-chart.md`
 
 ## Documentation Timeline
 
 - July 9, 2026: Initial frontend repository documentation was present in the first frontend commit.
 - July 12, 2026: README was rewritten from the default Vite template into this project-specific frontend README.
-- July 12, 2026: Production backend configuration using `VITE_API_BASE_URL` was documented for local and Render deployment.
+- July 12, 2026: Production backend configuration using `VITE_API_URL` was documented for local and Render deployment.
 - July 12, 2026: Current web dashboard features, demo flow, and documentation status were refreshed for panel presentation.
+- July 13, 2026: Teacher class assignment flow was updated to use Teacher -> Subject -> Grade Level -> Section -> Assign with backend-returned sections.
+- July 13, 2026: Gantt chart and dated development timeline were added for panel presentation.
 
 ## Main Frontend Capabilities
 
@@ -81,4 +91,4 @@ The documentation files for panel review are in the `docs` folder:
 - Student score export for selected assessments
 - Student profile skill mastery display
 - Teacher-facing intervention recommendation panel
-- Production backend configuration through `VITE_API_BASE_URL`
+- Production backend configuration through `VITE_API_URL`

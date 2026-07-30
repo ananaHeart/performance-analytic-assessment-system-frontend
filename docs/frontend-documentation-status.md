@@ -1,6 +1,9 @@
 # Frontend Documentation Status
 
-Last reviewed: July 12, 2026
+Document created: July 12, 2026  
+Last reviewed: July 13, 2026  
+Last updated: July 13, 2026  
+Coverage period: June 2026 to July 2026
 
 ## Date Basis
 
@@ -33,7 +36,7 @@ Covered topics:
 - web dashboard overview
 - technology stack
 - environment configuration
-- Render backend connection through `VITE_API_BASE_URL`
+- Render backend connection through `VITE_API_URL`
 - principal workflow
 - teacher workflow
 - class assignment model
@@ -121,7 +124,29 @@ Covered topics:
 
 - local backend API base URL
 - production Render backend API base URL
-- `VITE_API_BASE_URL` configuration
+- `VITE_API_URL` configuration
+
+### 5. Gantt Chart and Dated Development Timeline
+
+File:
+
+```text
+docs/gantt-chart.md
+```
+
+Status: Completed for panel presentation.
+
+Date notes:
+
+- July 13, 2026: Gantt chart and dated development timeline were added.
+
+Covered topics:
+
+- project timeline from June 2026 to July 2026
+- verified documentation dates
+- approximate project milestone dates
+- planning, frontend build, analytics/reporting, deployment, and documentation phases
+- panel-ready explanation of the development sequence
 
 ## Function Documentation Timeline
 
@@ -134,10 +159,12 @@ The following function dates are approximate project milestones unless marked as
 | June 2026, fourth week | Student Profile full skill mastery endpoint handoff | Documented in current web dashboard docs |
 | June 2026, fourth week | Selected assessment student score export endpoint handoff | Documented in current web dashboard docs |
 | July 9, 2026 | Initial frontend docs present in repository history | Repository-verified |
-| July 12, 2026 | Render backend URL and `VITE_API_BASE_URL` setup | Documented |
+| July 12, 2026 | Render backend URL and `VITE_API_URL` setup | Documented |
 | July 12, 2026 | Main web dashboard documentation refresh | Completed |
 | July 12, 2026 | Demo checklist refresh | Completed |
 | July 12, 2026 | Frontend documentation status file created | Completed |
+| July 13, 2026 | Teacher class assignment flow updated to use backend-returned grade-level sections | Completed |
+| July 13, 2026 | Gantt chart and dated development timeline added | Completed |
 
 ## Still Missing or Recommended Next
 

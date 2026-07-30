@@ -16,6 +16,7 @@ import TeacherSettingsPage from './pages/TeacherSettingsPage'
 
 const USER_STORAGE_KEY = 'assessment-user'
 const TOKEN_STORAGE_KEY = 'assessment-token'
+const TEACHER_WORKSPACE_CONTEXT_KEY = 'teacher-workspace-context'
 const DEFAULT_PUBLIC_PAGE = 'login'
 const DEFAULT_ROLE_PAGE = {
   principal: 'principal-dashboard',
@@ -75,6 +76,50 @@ function storeAuth(auth) {
 function clearAuth() {
   localStorage.removeItem(USER_STORAGE_KEY)
   localStorage.removeItem(TOKEN_STORAGE_KEY)
+  sessionStorage.removeItem(TEACHER_WORKSPACE_CONTEXT_KEY)
+}
+
+function readTeacherWorkspaceContext() {
+  const storedContext = sessionStorage.getItem(TEACHER_WORKSPACE_CONTEXT_KEY)
+
+  if (!storedContext) {
+    return {
+      classId: null,
+      assessmentId: null,
+      classTab: 'assessment',
+    }
+  }
+
+  try {
+    const parsedContext = JSON.parse(storedContext)
+
+    return {
+      classId: parsedContext.classId ?? null,
+      assessmentId: parsedContext.assessmentId ?? null,
+      classTab:
+        parsedContext.classTab === 'students' || parsedContext.classTab === 'analytics'
+          ? parsedContext.classTab
+          : 'assessment',
+    }
+  } catch {
+    sessionStorage.removeItem(TEACHER_WORKSPACE_CONTEXT_KEY)
+    return {
+      classId: null,
+      assessmentId: null,
+      classTab: 'assessment',
+    }
+  }
+}
+
+function storeTeacherWorkspaceContext(context) {
+  sessionStorage.setItem(
+    TEACHER_WORKSPACE_CONTEXT_KEY,
+    JSON.stringify({
+      classId: context.classId ?? null,
+      assessmentId: context.assessmentId ?? null,
+      classTab: context.classTab ?? 'assessment',
+    }),
+  )
 }
 
 function getHashPage() {
@@ -105,6 +150,7 @@ function renderProtectedPage(
   onNavigate,
   teacherActiveClassId,
   teacherActiveAssessmentId,
+  teacherActiveClassTab,
 ) {
   const sharedProps = { user: auth.user, role: auth.user.role, token: auth.token, onNavigate }
 
@@ -116,7 +162,13 @@ function renderProtectedPage(
     case 'teacher-approval':
       return <TeacherApprovalPage {...sharedProps} />
     case 'class-records':
-      return <ClassRecordsPage {...sharedProps} initialClassId={teacherActiveClassId} />
+      return (
+        <ClassRecordsPage
+          {...sharedProps}
+          initialClassId={teacherActiveClassId}
+          initialTeacherTab={teacherActiveClassTab}
+        />
+      )
     case 'teacher-class-assignment':
       return <TeacherClassAssignmentPage {...sharedProps} />
     case 'assessment-setup':
@@ -142,8 +194,15 @@ function renderProtectedPage(
 
 function App() {
   const [auth, setAuth] = useState(() => readStoredAuth())
-  const [teacherActiveClassId, setTeacherActiveClassId] = useState(null)
-  const [teacherActiveAssessmentId, setTeacherActiveAssessmentId] = useState(null)
+  const [teacherActiveClassId, setTeacherActiveClassId] = useState(
+    () => readTeacherWorkspaceContext().classId,
+  )
+  const [teacherActiveAssessmentId, setTeacherActiveAssessmentId] = useState(
+    () => readTeacherWorkspaceContext().assessmentId,
+  )
+  const [teacherActiveClassTab, setTeacherActiveClassTab] = useState(
+    () => readTeacherWorkspaceContext().classTab,
+  )
   const [currentPage, setCurrentPage] = useState(() =>
     normalizePage(readStoredAuth(), getHashPage()),
   )
@@ -185,12 +244,22 @@ function App() {
 
   const handleNavigate = (page, options = {}) => {
     if (auth?.user?.role === 'teacher') {
-      setTeacherActiveClassId(
-        page === 'assessment-setup' || page === 'class-records' ? options.classId ?? null : null,
-      )
-      setTeacherActiveAssessmentId(
-        page === 'assessment-setup' ? options.assessmentId ?? null : null,
-      )
+      const nextClassId =
+        page === 'assessment-setup' || page === 'class-records'
+          ? options.classId ?? teacherActiveClassId
+          : null
+      const nextAssessmentId = page === 'assessment-setup' ? options.assessmentId ?? null : null
+      const nextClassTab =
+        page === 'class-records' ? options.initialTab ?? teacherActiveClassTab : 'assessment'
+
+      setTeacherActiveClassId(nextClassId)
+      setTeacherActiveAssessmentId(nextAssessmentId)
+      setTeacherActiveClassTab(nextClassTab)
+      storeTeacherWorkspaceContext({
+        classId: nextClassId,
+        assessmentId: nextAssessmentId,
+        classTab: nextClassTab,
+      })
     }
 
     const nextPage = normalizePage(auth, page)
@@ -213,6 +282,7 @@ function App() {
     handleNavigate,
     teacherActiveClassId,
     teacherActiveAssessmentId,
+    teacherActiveClassTab,
   )
   const isTeacherWorkspaceLayout = auth.user.role === 'teacher'
 

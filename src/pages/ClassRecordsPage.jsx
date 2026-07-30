@@ -31,6 +31,7 @@ import {
   getSubjects,
   previewSf1,
 } from '../api/apiClient'
+import { HorizontalMasteryChart } from '../components/AnalyticsCharts'
 
 const initialAssignmentForm = {
   teacherId: '',
@@ -39,6 +40,8 @@ const initialAssignmentForm = {
   sectionId: '',
   academicYearId: '1',
 }
+
+const currentAcademicYearLabel = 'SY 2025-2026'
 
 const initialManualForm = {
   sectionId: '',
@@ -516,7 +519,13 @@ function studentBelongsToClass(student, assignment) {
   return gradeMatches && yearMatches
 }
 
-function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
+function ClassRecordsPage({
+  role,
+  user,
+  onNavigate,
+  initialClassId = null,
+  initialTeacherTab = 'assessment',
+}) {
   const teacherId = user?.id
   const [classAssignments, setClassAssignments] = useState([])
   const [students, setStudents] = useState([])
@@ -534,10 +543,14 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
   const [selectedFile, setSelectedFile] = useState(null)
   const [previewData, setPreviewData] = useState(null)
   const [confirmResult, setConfirmResult] = useState(null)
-  const [activeTeacherTab, setActiveTeacherTab] = useState('assessment')
+  const [activeTeacherTab, setActiveTeacherTab] = useState(
+    initialTeacherTab === 'students' || initialTeacherTab === 'analytics'
+      ? initialTeacherTab
+      : 'assessment',
+  )
   const [selectedAnalyticsTestId, setSelectedAnalyticsTestId] = useState('')
   const [selectedAnalyticsPartId, setSelectedAnalyticsPartId] = useState('')
-  const [selectedStudentClassFilter, setSelectedStudentClassFilter] = useState('all')
+  const [selectedStudentClassFilter, setSelectedStudentClassFilter] = useState('')
   const [studentNameSearch, setStudentNameSearch] = useState('')
   const [selectedStudentInfo, setSelectedStudentInfo] = useState(null)
   const [analyticsDetails, setAnalyticsDetails] = useState(null)
@@ -546,6 +559,7 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
   const [teacherInterventionRecommendations, setTeacherInterventionRecommendations] = useState([])
   const [studentSkillMasteryRows, setStudentSkillMasteryRows] = useState([])
   const [activePrincipalTool, setActivePrincipalTool] = useState(null)
+  const [isSf1ImportModalOpen, setIsSf1ImportModalOpen] = useState(false)
   const [studentsError, setStudentsError] = useState('')
   const [assessmentsError, setAssessmentsError] = useState('')
   const [studentsSuccess, setStudentsSuccess] = useState('')
@@ -742,8 +756,12 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
 
     return Array.from(optionMap.values())
   }, [classAssignments])
+  const selectedClassFilterKey = selectedClassAssignment
+    ? getClassSectionKey(selectedClassAssignment)
+    : (teacherClassOptions[0]?.key ?? '')
+  const effectiveStudentClassFilter = selectedStudentClassFilter || selectedClassFilterKey
   const selectedStudentClassAssignment =
-    teacherClassOptions.find((option) => option.key === selectedStudentClassFilter)?.assignment ??
+    teacherClassOptions.find((option) => option.key === effectiveStudentClassFilter)?.assignment ??
     null
   const teacherAssignedStudents = useMemo(() => {
     if (!classAssignments.length) {
@@ -755,14 +773,11 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
     )
   }, [classAssignments, students])
   const filteredTeacherStudents = useMemo(() => {
-    const classFilteredStudents =
-      selectedStudentClassFilter === 'all'
-        ? teacherAssignedStudents
-        : teacherAssignedStudents.filter(
-            (student) =>
-              selectedStudentClassAssignment &&
-              studentBelongsToClass(student, selectedStudentClassAssignment),
-          )
+    const classFilteredStudents = teacherAssignedStudents.filter(
+      (student) =>
+        selectedStudentClassAssignment &&
+        studentBelongsToClass(student, selectedStudentClassAssignment),
+    )
 
     const searchText = normalizeMatchText(studentNameSearch)
 
@@ -773,12 +788,7 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
     return classFilteredStudents.filter((student) =>
       normalizeMatchText(student.name).includes(searchText),
     )
-  }, [
-    selectedStudentClassAssignment,
-    selectedStudentClassFilter,
-    studentNameSearch,
-    teacherAssignedStudents,
-  ])
+  }, [selectedStudentClassAssignment, studentNameSearch, teacherAssignedStudents])
   const selectedClassGroupAssignments = useMemo(() => {
     if (!selectedClassAssignment) {
       return []
@@ -953,9 +963,7 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
     ? getClassDisplayLabel(selectedClassAssignment)
     : 'Select a class'
   const selectedStudentClassLabel =
-    selectedStudentClassFilter === 'all'
-      ? 'All Classes'
-      : getClassDisplayLabel(selectedStudentClassAssignment)
+    getClassDisplayLabel(selectedStudentClassAssignment)
   const teacherHeaderLabel =
     activeTeacherTab === 'students' ? selectedStudentClassLabel : selectedClassLabel
   const teacherHeaderStudentCount =
@@ -1489,7 +1497,26 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
     setConfirmMessage({ error: '', success: '' })
   }
 
-  const handlePreviewSubmit = async () => {
+  const handleOpenSf1Import = () => {
+    setActivePrincipalTool(null)
+    setSelectedFile(null)
+    setPreviewData(null)
+    setConfirmResult(null)
+    setPreviewMessage({ error: '', success: '' })
+    setConfirmMessage({ error: '', success: '' })
+    setIsSf1ImportModalOpen(true)
+  }
+
+  const handleCloseSf1Import = () => {
+    if (isPreviewLoading || isConfirmSubmitting) {
+      return
+    }
+
+    setIsSf1ImportModalOpen(false)
+  }
+
+  const handlePreviewSubmit = async (event) => {
+    event?.preventDefault()
     setPreviewMessage({ error: '', success: '' })
     setConfirmResult(null)
 
@@ -1516,6 +1543,11 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
 
   const handleConfirmSubmit = async (event) => {
     event.preventDefault()
+
+    if (isConfirmSubmitting || confirmResult) {
+      return
+    }
+
     setConfirmMessage({ error: '', success: '' })
 
     if (!selectedFile) {
@@ -1533,9 +1565,13 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
     try {
       const result = await confirmSf1(selectedFile)
       setConfirmResult(result)
-      setConfirmMessage({ error: '', success: 'SF1 import confirmed successfully.' })
-      setStudentsSuccess('Student records refreshed after SF1 confirm import.')
+      setConfirmMessage({ error: '', success: '' })
+      setStudentsSuccess('SF1 import completed successfully.')
+      setIsSf1ImportModalOpen(false)
+      setActivePrincipalTool(null)
       await loadStudents({ preserveMessage: true })
+      await loadSections()
+      await loadTeacherClasses()
     } catch (confirmError) {
       setConfirmMessage({
         error: confirmError.message || 'Unable to confirm SF1 import.',
@@ -1560,29 +1596,24 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
             Back to Home
           </button>
 
-          <div className="teacher-assessment-topline">
-            <button
-              type="button"
-              className={activeTeacherTab === 'assessment' ? 'is-active' : ''}
-              onClick={() => setActiveTeacherTab('assessment')}
-            >
-              Assessment
-            </button>
-            <button
-              type="button"
-              className={activeTeacherTab === 'analytics' ? 'is-active' : ''}
-              onClick={() => setActiveTeacherTab('analytics')}
-            >
-              Analytics
-            </button>
-            <button
-              type="button"
-              className={activeTeacherTab === 'students' ? 'is-active' : ''}
-              onClick={() => setActiveTeacherTab('students')}
-            >
-              Students
-            </button>
-          </div>
+          {activeTeacherTab !== 'students' ? (
+            <div className="teacher-assessment-topline">
+              <button
+                type="button"
+                className={activeTeacherTab === 'assessment' ? 'is-active' : ''}
+                onClick={() => setActiveTeacherTab('assessment')}
+              >
+                Assessment
+              </button>
+              <button
+                type="button"
+                className={activeTeacherTab === 'analytics' ? 'is-active' : ''}
+                onClick={() => setActiveTeacherTab('analytics')}
+              >
+                Analytics
+              </button>
+            </div>
+          ) : null}
 
           <div className="teacher-assessment-title-row">
             <div>
@@ -1802,23 +1833,7 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
                   </div>
 
                   {hasAnalyticsChartRows ? (
-                    <div className="teacher-lms-bar-list">
-                      {analyticsChartRows.slice(0, 3).map((item) => (
-                        <div className="teacher-lms-bar-row" key={item.id}>
-                          <div>
-                            <strong>{item.label}</strong>
-                            <span>{formatPercent(item.value)}</span>
-                          </div>
-                          <div className="teacher-lms-bar-track">
-                            <span
-                              style={{
-                                width: `${Math.max(4, Math.min(100, item.value))}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <HorizontalMasteryChart data={analyticsChartRows.slice(0, 5)} />
                   ) : (
                     <div className="teacher-empty-chart">
                       <p>No analytics data available yet for this selection.</p>
@@ -2046,10 +2061,9 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
                   <span>Class:</span>
                   <select
                     id="teacherStudentClassFilter"
-                    value={selectedStudentClassFilter}
+                    value={effectiveStudentClassFilter}
                     onChange={(event) => setSelectedStudentClassFilter(event.target.value)}
                   >
-                    <option value="all">All classes</option>
                     {teacherClassOptions.map((option) => (
                       <option key={option.key} value={option.key}>
                         {option.label}
@@ -2211,11 +2225,6 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
   return (
     <div className="principal-class-records-page">
       <section className="principal-class-header">
-        <p>
-          <span>Assessments</span>
-          <strong>/</strong>
-          <span>Teacher Class Assignment</span>
-        </p>
         <h2>Teacher Class Assignment</h2>
         <span>Manage and assign teachers to sections and subjects for the current academic year.</span>
       </section>
@@ -2230,9 +2239,9 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
             <button
               type="button"
               className={`principal-smart-import-card ${
-                activePrincipalTool === 'smart-import' ? 'is-active' : ''
+                isSf1ImportModalOpen ? 'is-active' : ''
               }`}
-              onClick={() => setActivePrincipalTool('smart-import')}
+              onClick={handleOpenSf1Import}
             >
               <span aria-hidden="true">
                 <FileText size={18} strokeWidth={2.3} />
@@ -2262,6 +2271,9 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
         ) : null}
         {assignmentMessage.success ? (
           <p className="form-message form-message-success">{assignmentMessage.success}</p>
+        ) : null}
+        {studentsSuccess ? (
+          <p className="form-message form-message-success">{studentsSuccess}</p>
         ) : null}
 
         <form className="principal-assignment-form" onSubmit={handleAssignmentSubmit}>
@@ -2330,7 +2342,7 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
               <option value="">
                 {assignmentForm.gradeLevelId
                   ? 'Select section'
-                  : 'Select grade level first'}
+                  : 'Select section'}
               </option>
               {assignmentForm.gradeLevelId && !assignmentSectionOptions.length ? (
                 <option value="" disabled>
@@ -2345,22 +2357,199 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
             </select>
           </label>
 
-          <label htmlFor="classAssignmentAcademicYearId">
-            <span>Academic Year ID</span>
-            <input
-              id="classAssignmentAcademicYearId"
-              name="academicYearId"
-              value={assignmentForm.academicYearId}
-              onChange={handleAssignmentFormChange}
-              placeholder="Input needed"
-            />
-          </label>
+          <div className="principal-assignment-readonly-field" aria-label="Academic Year">
+            <span>Academic Year</span>
+            <strong>{currentAcademicYearLabel}</strong>
+          </div>
 
           <button type="submit" className="primary-button" disabled={isAssignmentSubmitting}>
             {isAssignmentSubmitting ? 'Assigning...' : 'Assign Teacher'}
           </button>
         </form>
       </section>
+
+      {isSf1ImportModalOpen ? (
+        <div
+          className="sf1-import-modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              handleCloseSf1Import()
+            }
+          }}
+        >
+          <section
+            className={`sf1-import-modal ${previewData ? 'is-review' : ''}`}
+            role="dialog"
+            aria-modal="true"
+          >
+            <header className="sf1-import-modal-header">
+              <div>
+                <p className="content-card-tag">Smart Import (SF1)</p>
+                <h3>{previewData ? 'Review SF1 import' : 'Choose SF1 file'}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseSf1Import}
+                disabled={isPreviewLoading || isConfirmSubmitting}
+              >
+                Close
+              </button>
+            </header>
+
+            {!previewData ? (
+              <form className="sf1-import-modal-body" onSubmit={handlePreviewSubmit}>
+                <p className="supporting-text">
+                  Select the SF1 Excel file first. The preview and confirmation step will stay in
+                  this window.
+                </p>
+
+                {previewMessage.error ? (
+                  <p className="form-message form-message-error">{previewMessage.error}</p>
+                ) : null}
+
+                <label className="field-group" htmlFor="sf1File">
+                  <span>SF1 Excel File</span>
+                  <input
+                    id="sf1File"
+                    type="file"
+                    accept=".xls,.xlsx"
+                    onChange={handleFileChange}
+                  />
+                </label>
+
+                {selectedFile ? (
+                  <div className="sf1-selected-file">
+                    <span>Selected file</span>
+                    <strong>{selectedFile.name}</strong>
+                  </div>
+                ) : null}
+
+                <footer className="sf1-import-modal-footer">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={handleCloseSf1Import}
+                    disabled={isPreviewLoading}
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" className="primary-button" disabled={isPreviewLoading}>
+                    {isPreviewLoading ? 'Previewing...' : 'Save and Preview'}
+                  </button>
+                </footer>
+              </form>
+            ) : (
+              <div className="sf1-import-modal-body sf1-review-body">
+                <p className="supporting-text">
+                  Review the detected section, school year, and student rows before saving the
+                  import.
+                </p>
+
+                {previewMessage.success ? (
+                  <p className="form-message form-message-success">{previewMessage.success}</p>
+                ) : null}
+                {confirmMessage.error ? (
+                  <p className="form-message form-message-error">{confirmMessage.error}</p>
+                ) : null}
+                <div className="sf1-review-header">
+                  <div>
+                    <span>Selected File</span>
+                    <strong>{selectedFile?.name || 'No file selected'}</strong>
+                  </div>
+                  <button type="button" className="secondary-button" onClick={handleOpenSf1Import}>
+                    Choose Different File
+                  </button>
+                </div>
+
+                <div className="approval-table-wrap sf1-review-table-wrap">
+                  <table className="approval-table preview-table">
+                    <thead>
+                      <tr>
+                        <th>Row Number</th>
+                        <th>Student LRN</th>
+                        <th>First Name</th>
+                        <th>Last Name</th>
+                        <th>Gender</th>
+                        <th>Status</th>
+                        <th>Message</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {!previewRows.length ? (
+                        <tr>
+                          <td className="approval-empty" colSpan="7">
+                            No preview rows returned.
+                          </td>
+                        </tr>
+                      ) : (
+                        previewRows.map((row, index) => (
+                          <tr key={`${row.rowNumber}-${row.studentLrn}-${index}`}>
+                            <td>{row.rowNumber || '-'}</td>
+                            <td>{row.studentLrn || '-'}</td>
+                            <td>{row.firstName || '-'}</td>
+                            <td>{row.lastName || '-'}</td>
+                            <td>{row.gender || '-'}</td>
+                            <td>
+                              <span
+                                className={`status-pill status-${String(row.status).toLowerCase()}`}
+                              >
+                                {formatStatus(row.status)}
+                              </span>
+                            </td>
+                            <td>{row.message || '-'}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="sf1-review-summary-grid">
+                  <article className="mini-stat-card">
+                    <span>School Year</span>
+                    <strong>{previewData.detectedSchoolYear || 'Not detected'}</strong>
+                  </article>
+                  <article className="mini-stat-card">
+                    <span>Section</span>
+                    <strong>{previewData.detectedSectionName || 'Not detected'}</strong>
+                  </article>
+                  <article className="mini-stat-card">
+                    <span>Total</span>
+                    <strong>{previewData.totalRows}</strong>
+                  </article>
+                  <article className="mini-stat-card">
+                    <span>Valid</span>
+                    <strong>{previewData.validRows}</strong>
+                  </article>
+                  <article className="mini-stat-card">
+                    <span>Invalid</span>
+                    <strong>{previewData.invalidRows}</strong>
+                  </article>
+                </div>
+
+                <form className="sf1-confirm-actions" onSubmit={handleConfirmSubmit}>
+                  <div>
+                    <span>Ready to save</span>
+                    <strong>Confirm import after reviewing the preview rows.</strong>
+                  </div>
+                  <button
+                    type="submit"
+                    className="primary-button"
+                    disabled={isConfirmSubmitting || Boolean(confirmResult)}
+                  >
+                    {isConfirmSubmitting
+                      ? 'Confirming...'
+                      : confirmResult
+                        ? 'Import Completed'
+                        : 'Confirm Import'}
+                  </button>
+                </form>
+              </div>
+            )}
+          </section>
+        </div>
+      ) : null}
 
       <section className="principal-assignment-card">
         <div className="principal-assignment-table-header">
@@ -2422,9 +2611,6 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
         </div>
 
         {studentsError ? <p className="form-message form-message-error">{studentsError}</p> : null}
-        {studentsSuccess ? (
-          <p className="form-message form-message-success">{studentsSuccess}</p>
-        ) : null}
 
         <div className="approval-table-wrap">
           <table className="approval-table">
@@ -2687,191 +2873,7 @@ function ClassRecordsPage({ role, user, onNavigate, initialClassId = null }) {
           </form>
         </section>
 
-        <section
-          className={`content-card principal-tool-panel ${
-            activePrincipalTool === 'smart-import' ? 'is-active' : ''
-          }`}
-        >
-          <p className="content-card-tag">SF1 Smart Import Preview</p>
-          <h3>Upload and preview an SF1 file</h3>
-          <p className="supporting-text">
-            Preview the file first to inspect row validity before running the confirm import step.
-          </p>
-
-          {previewMessage.error ? (
-            <p className="form-message form-message-error">{previewMessage.error}</p>
-          ) : null}
-          {previewMessage.success ? (
-            <p className="form-message form-message-success">{previewMessage.success}</p>
-          ) : null}
-
-          <div className="file-upload-block">
-            <label className="field-group" htmlFor="sf1File">
-              <span>SF1 Excel File</span>
-              <input
-                id="sf1File"
-                type="file"
-                accept=".xls,.xlsx"
-                onChange={handleFileChange}
-              />
-            </label>
-
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={handlePreviewSubmit}
-              disabled={isPreviewLoading}
-            >
-              {isPreviewLoading ? 'Previewing...' : 'Preview'}
-            </button>
-          </div>
-
-          {previewData ? (
-            <>
-              <div className="mini-stat-grid">
-                <article className="mini-stat-card">
-                  <span>Detected School Year</span>
-                  <strong>{previewData.detectedSchoolYear || 'Not detected'}</strong>
-                </article>
-                <article className="mini-stat-card">
-                  <span>Detected Section</span>
-                  <strong>{previewData.detectedSectionName || 'Not detected'}</strong>
-                </article>
-              </div>
-
-              <div className="mini-stat-grid">
-                <article className="mini-stat-card">
-                  <span>Total Rows</span>
-                  <strong>{previewData.totalRows}</strong>
-                </article>
-                <article className="mini-stat-card">
-                  <span>Valid Rows</span>
-                  <strong>{previewData.validRows}</strong>
-                </article>
-                <article className="mini-stat-card">
-                  <span>Invalid Rows</span>
-                  <strong>{previewData.invalidRows}</strong>
-                </article>
-              </div>
-
-              <div className="approval-table-wrap">
-                <table className="approval-table preview-table">
-                  <thead>
-                    <tr>
-                      <th>Row Number</th>
-                      <th>Student LRN</th>
-                      <th>First Name</th>
-                      <th>Last Name</th>
-                      <th>Gender</th>
-                      <th>Status</th>
-                      <th>Message</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {!previewRows.length ? (
-                      <tr>
-                        <td className="approval-empty" colSpan="7">
-                          No preview rows returned.
-                        </td>
-                      </tr>
-                    ) : (
-                      previewRows.map((row, index) => (
-                        <tr key={`${row.rowNumber}-${row.studentLrn}-${index}`}>
-                          <td>{row.rowNumber || '-'}</td>
-                          <td>{row.studentLrn || '-'}</td>
-                          <td>{row.firstName || '-'}</td>
-                          <td>{row.lastName || '-'}</td>
-                          <td>{row.gender || '-'}</td>
-                          <td>
-                            <span
-                              className={`status-pill status-${String(row.status).toLowerCase()}`}
-                            >
-                              {formatStatus(row.status)}
-                            </span>
-                          </td>
-                          <td>{row.message || '-'}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          ) : null}
-        </section>
       </div>
-
-      <section
-        className={`content-card principal-tool-panel principal-confirm-panel ${
-          activePrincipalTool === 'smart-import' ? 'is-active' : ''
-        }`}
-      >
-        <p className="content-card-tag">SF1 Confirm Import</p>
-        <h3>Confirm import using the selected SF1 file</h3>
-        <p className="supporting-text">
-          Use the same file from the preview step. The detected section and school year from the
-          uploaded SF1 file will be used automatically during confirm import.
-        </p>
-
-        {confirmMessage.error ? (
-          <p className="form-message form-message-error">{confirmMessage.error}</p>
-        ) : null}
-        {confirmMessage.success ? (
-          <p className="form-message form-message-success">{confirmMessage.success}</p>
-        ) : null}
-
-        <form className="form-grid confirm-form-grid" onSubmit={handleConfirmSubmit}>
-          <div className="confirm-file-indicator">
-            <span>Selected File</span>
-            <strong>{selectedFile?.name || 'No file selected'}</strong>
-          </div>
-
-          <div className="confirm-file-indicator">
-            <span>Detected School Year</span>
-            <strong>{previewData?.detectedSchoolYear || 'Preview required'}</strong>
-          </div>
-
-          <div className="confirm-file-indicator">
-            <span>Detected Section</span>
-            <strong>{previewData?.detectedSectionName || 'Preview required'}</strong>
-          </div>
-
-          <div className="form-actions">
-            <button type="submit" className="primary-button" disabled={isConfirmSubmitting}>
-              {isConfirmSubmitting ? 'Confirming...' : 'Confirm Import'}
-            </button>
-          </div>
-        </form>
-
-        {confirmResult ? (
-          <div className="mini-stat-grid">
-            <article className="mini-stat-card">
-              <span>Detected School Year</span>
-              <strong>{confirmResult.detectedSchoolYear || 'Not detected'}</strong>
-            </article>
-            <article className="mini-stat-card">
-              <span>Detected Section</span>
-              <strong>{confirmResult.detectedSectionName || 'Not detected'}</strong>
-            </article>
-            <article className="mini-stat-card">
-              <span>Imported Students</span>
-              <strong>{confirmResult.importedStudents}</strong>
-            </article>
-            <article className="mini-stat-card">
-              <span>Updated Students</span>
-              <strong>{confirmResult.updatedStudents}</strong>
-            </article>
-            <article className="mini-stat-card">
-              <span>Enrolled Students</span>
-              <strong>{confirmResult.enrolledStudents}</strong>
-            </article>
-            <article className="mini-stat-card">
-              <span>Skipped Rows</span>
-              <strong>{confirmResult.skippedRows}</strong>
-            </article>
-          </div>
-        ) : null}
-      </section>
     </div>
   )
 }

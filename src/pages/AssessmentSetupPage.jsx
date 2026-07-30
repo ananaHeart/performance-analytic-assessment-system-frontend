@@ -42,10 +42,6 @@ const PART_TYPE_OPTIONS = [
 const ASSESSMENT_TYPE_OPTIONS = ['Quiz', 'Exam', 'Long Test']
 const MULTIPLE_CHOICE_OPTIONS = ['A', 'B', 'C', 'D']
 const TRUE_FALSE_OPTIONS = ['True', 'False']
-const MAPPING_MODE_OPTIONS = [
-  { value: 'RANGE', label: 'Auto Range Mapping' },
-  { value: 'CUSTOM', label: 'Custom Item Mapping' },
-]
 
 function getAutomaticAssessmentStatus(status) {
   const normalizedStatus = String(status ?? '').trim().toLowerCase()
@@ -67,18 +63,6 @@ function buildAnswerKey(entries) {
   return entries.map((entry) => entry.trim()).join(',')
 }
 
-function parseCustomItemNumbers(value) {
-  if (!String(value ?? '').trim()) {
-    return []
-  }
-
-  return String(value)
-    .split(',')
-    .map((entry) => entry.trim())
-    .filter(Boolean)
-    .map((entry) => Number(entry))
-}
-
 function formatItemList(items = []) {
   if (!items.length) {
     return 'none'
@@ -89,6 +73,17 @@ function formatItemList(items = []) {
   }
 
   return `${items.slice(0, 12).join(', ')} and ${items.length - 12} more`
+}
+
+function getRangeItemCount(mapping) {
+  const startItem = Number(mapping?.startItem)
+  const endItem = Number(mapping?.endItem)
+
+  if (!Number.isInteger(startItem) || !Number.isInteger(endItem) || endItem < startItem) {
+    return ''
+  }
+
+  return String(endItem - startItem + 1)
 }
 
 function findCompetencyById(competencies = [], competencyId) {
@@ -110,7 +105,7 @@ function getSkillMappingCoverage(partForm) {
   const totalItems = Number(partForm.numberOfItems)
   const hasValidTotal = Number.isInteger(totalItems) && totalItems > 0
   const selectedMappings = Array.isArray(partForm.branchMappings) ? partForm.branchMappings : []
-  const mode = partForm.mappingMode === 'CUSTOM' ? 'CUSTOM' : 'RANGE'
+  const mode = 'RANGE'
   const errors = []
   const mappedItems = new Set()
   const itemOwners = new Map()
@@ -119,73 +114,46 @@ function getSkillMappingCoverage(partForm) {
   selectedMappings.forEach((mapping) => {
     const competencyId = Number(mapping.competencyId)
     const competencyName = mapping.competencyName || 'Selected branch skill'
-    let itemNumbers
-    let startItem = null
-    let endItem = null
 
     if (!competencyId) {
       errors.push('Selected branch skill is missing a competency ID.')
       return
     }
 
-    if (mode === 'RANGE') {
-      const hasStart = String(mapping.startItem ?? '').trim()
-      const hasEnd = String(mapping.endItem ?? '').trim()
-      startItem = Number(mapping.startItem)
-      endItem = Number(mapping.endItem)
+    const hasStart = String(mapping.startItem ?? '').trim()
+    const hasEnd = String(mapping.endItem ?? '').trim()
+    const startItem = Number(mapping.startItem)
+    const endItem = Number(mapping.endItem)
 
-      if (!hasStart || !hasEnd) {
-        errors.push(`${competencyName}: enter both start and end item numbers.`)
-        return
-      }
-
-      if (!Number.isInteger(startItem) || !Number.isInteger(endItem)) {
-        errors.push(`${competencyName}: item range must use whole numbers.`)
-        return
-      }
-
-      if (startItem < 1 || (hasValidTotal && startItem > totalItems)) {
-        errors.push(`${competencyName}: start item must be within the number of items.`)
-        return
-      }
-
-      if (endItem < startItem) {
-        errors.push(`${competencyName}: end item must be greater than or equal to start item.`)
-        return
-      }
-
-      if (hasValidTotal && endItem > totalItems) {
-        errors.push(`${competencyName}: end item must not exceed ${totalItems}.`)
-        return
-      }
-
-      itemNumbers = Array.from({ length: endItem - startItem + 1 }, (_, index) => startItem + index)
-    } else {
-      itemNumbers = parseCustomItemNumbers(mapping.itemNumbers)
-
-      if (!itemNumbers.length) {
-        errors.push(`${competencyName}: enter at least one item number.`)
-        return
-      }
-
-      if (itemNumbers.some((itemNumber) => !Number.isInteger(itemNumber))) {
-        errors.push(`${competencyName}: custom item numbers must be whole numbers.`)
-        return
-      }
-
-      const uniqueItems = new Set(itemNumbers)
-      if (uniqueItems.size !== itemNumbers.length) {
-        errors.push(`${competencyName}: the same item number cannot repeat in one branch skill.`)
-        return
-      }
-
-      if (itemNumbers.some((itemNumber) => itemNumber < 1 || (hasValidTotal && itemNumber > totalItems))) {
-        errors.push(`${competencyName}: item numbers must be within the number of items.`)
-        return
-      }
-
-      itemNumbers = [...uniqueItems].sort((left, right) => left - right)
+    if (!hasStart || !hasEnd) {
+      errors.push(`${competencyName}: enter both start and end item numbers.`)
+      return
     }
+
+    if (!Number.isInteger(startItem) || !Number.isInteger(endItem)) {
+      errors.push(`${competencyName}: item range must use whole numbers.`)
+      return
+    }
+
+    if (startItem < 1 || (hasValidTotal && startItem > totalItems)) {
+      errors.push(`${competencyName}: start item must be within the number of items.`)
+      return
+    }
+
+    if (endItem < startItem) {
+      errors.push(`${competencyName}: end item must be greater than or equal to start item.`)
+      return
+    }
+
+    if (hasValidTotal && endItem > totalItems) {
+      errors.push(`${competencyName}: end item must not exceed ${totalItems}.`)
+      return
+    }
+
+    const itemNumbers = Array.from(
+      { length: endItem - startItem + 1 },
+      (_, index) => startItem + index,
+    )
 
     itemNumbers.forEach((itemNumber) => {
       if (itemOwners.has(itemNumber)) {
@@ -201,8 +169,8 @@ function getSkillMappingCoverage(partForm) {
       competencyName,
       mappingMode: mode,
       itemCount: itemNumbers.length,
-      startItem: mode === 'RANGE' ? startItem : null,
-      endItem: mode === 'RANGE' ? endItem : null,
+      startItem,
+      endItem,
       itemNumbers,
     })
   })
@@ -313,7 +281,7 @@ function buildDraftPartFromForm(partForm, competencies) {
     ...partForm,
     competencyId: Number(partForm.competencyId),
     competencyName: competency?.label ?? competency?.name ?? 'Selected parent competency',
-    mappingMode: partForm.mappingMode === 'CUSTOM' ? 'CUSTOM' : 'RANGE',
+    mappingMode: 'RANGE',
     branchMappings: mappingCoverage.mappings,
     mappedItemCount: mappingCoverage.mappedItemCount,
     numberOfItems: Number(partForm.numberOfItems),
@@ -335,11 +303,11 @@ function buildTestPartPayload(part) {
 function buildSkillMappingPayload(part) {
   return (part.branchMappings ?? []).map((mapping) => ({
     competencyId: Number(mapping.competencyId),
-    mappingMode: part.mappingMode === 'CUSTOM' ? 'CUSTOM' : 'RANGE',
+    mappingMode: 'RANGE',
     itemCount: Number(mapping.itemCount),
-    startItem: part.mappingMode === 'CUSTOM' ? null : Number(mapping.startItem),
-    endItem: part.mappingMode === 'CUSTOM' ? null : Number(mapping.endItem),
-    itemNumbers: part.mappingMode === 'CUSTOM' ? mapping.itemNumbers ?? [] : [],
+    startItem: Number(mapping.startItem),
+    endItem: Number(mapping.endItem),
+    itemNumbers: [],
   }))
 }
 
@@ -515,7 +483,6 @@ function buildBranchMappingsFromSavedMappings(mappings = []) {
     competencyName: mapping.competencyName ?? 'Saved branch skill',
     startItem: mapping.startItem ? String(mapping.startItem) : '',
     endItem: mapping.endItem ? String(mapping.endItem) : '',
-    itemNumbers: (mapping.itemNumbers ?? []).join(', '),
   }))
 }
 
@@ -817,20 +784,6 @@ function AssessmentSetupPage({ user, initialClassId, initialAssessmentId, onNavi
     }))
   }
 
-  const handleMappingModeChange = (event) => {
-    const { value } = event.target
-    setPartForm((currentForm) => ({
-      ...currentForm,
-      mappingMode: value,
-      branchMappings: (currentForm.branchMappings ?? []).map((mapping) => ({
-        ...mapping,
-        startItem: '',
-        endItem: '',
-        itemNumbers: '',
-      })),
-    }))
-  }
-
   const handleBranchSkillToggle = (branch, isChecked) => {
     setPartForm((currentForm) => {
       const currentMappings = currentForm.branchMappings ?? []
@@ -857,7 +810,6 @@ function AssessmentSetupPage({ user, initialClassId, initialAssessmentId, onNavi
             competencyName: branch.label ?? branch.name,
             startItem: '',
             endItem: '',
-            itemNumbers: '',
           },
         ],
       }
@@ -964,13 +916,12 @@ function AssessmentSetupPage({ user, initialClassId, initialAssessmentId, onNavi
       numberOfItems: partToEdit.numberOfItems ? String(partToEdit.numberOfItems) : '',
       pointsPerItem: partToEdit.pointsPerItem ? String(partToEdit.pointsPerItem) : '',
       answerKey: partToEdit.answerKey ?? '',
-      mappingMode: partToEdit.mappingMode ?? 'RANGE',
+      mappingMode: 'RANGE',
       branchMappings: (partToEdit.branchMappings ?? []).map((mapping) => ({
         competencyId: mapping.competencyId ? String(mapping.competencyId) : '',
         competencyName: mapping.competencyName ?? 'Selected branch skill',
         startItem: mapping.startItem ? String(mapping.startItem) : '',
         endItem: mapping.endItem ? String(mapping.endItem) : '',
-        itemNumbers: (mapping.itemNumbers ?? []).join(', '),
       })),
     })
     setSavedPartEditIndex(null)
@@ -993,7 +944,7 @@ function AssessmentSetupPage({ user, initialClassId, initialAssessmentId, onNavi
       numberOfItems: partToEdit.numberOfItems ? String(partToEdit.numberOfItems) : '',
       pointsPerItem: partToEdit.pointsPerItem ? String(partToEdit.pointsPerItem) : '',
       answerKey: partToEdit.answerKey ?? '',
-      mappingMode: partToEdit.skillMappings?.[0]?.mappingMode ?? 'RANGE',
+      mappingMode: 'RANGE',
       branchMappings: buildBranchMappingsFromSavedMappings(partToEdit.skillMappings ?? []),
     })
     setPartMessage({ error: '', success: 'Saved section loaded into the form for editing.' })
@@ -1469,22 +1420,10 @@ function AssessmentSetupPage({ user, initialClassId, initialAssessmentId, onNavi
                   </select>
                 </label>
 
-                <label className="field-group" htmlFor="mappingMode">
-                  <span>Mapping Mode</span>
-                  <select
-                    id="mappingMode"
-                    name="mappingMode"
-                    value={partForm.mappingMode}
-                    onChange={handleMappingModeChange}
-                    disabled={!isClassSelected || isPartFormLocked}
-                  >
-                    {MAPPING_MODE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <div className="field-group mapping-mode-note" aria-label="Mapping behavior">
+                  <span>Mapping Behavior</span>
+                  <strong>Range-based item mapping</strong>
+                </div>
               </div>
 
               <div className="branch-skill-list">
@@ -1519,7 +1458,7 @@ function AssessmentSetupPage({ user, initialClassId, initialAssessmentId, onNavi
                         <span>{branch.label}</span>
                       </label>
 
-                      {isChecked && partForm.mappingMode === 'RANGE' ? (
+                      {isChecked ? (
                         <div className="range-inputs">
                           <label>
                             <span>Start</span>
@@ -1547,21 +1486,15 @@ function AssessmentSetupPage({ user, initialClassId, initialAssessmentId, onNavi
                               disabled={isPartFormLocked}
                             />
                           </label>
+                          <label>
+                            <span>Item Count</span>
+                            <input
+                              value={getRangeItemCount(branchMapping)}
+                              readOnly
+                              aria-label={`${branch.label} item count`}
+                            />
+                          </label>
                         </div>
-                      ) : null}
-
-                      {isChecked && partForm.mappingMode === 'CUSTOM' ? (
-                        <label className="custom-item-input">
-                          <span>Item numbers</span>
-                          <input
-                            value={branchMapping?.itemNumbers ?? ''}
-                            onChange={(event) =>
-                              handleBranchMappingChange(branch.id, 'itemNumbers', event.target.value)
-                            }
-                            placeholder="Example: 1, 3, 5"
-                            disabled={isPartFormLocked}
-                          />
-                        </label>
                       ) : null}
                     </div>
                   )
@@ -1574,10 +1507,7 @@ function AssessmentSetupPage({ user, initialClassId, initialAssessmentId, onNavi
                   <div className="mapping-preview-list">
                     {mappingCoverage.mappings.map((mapping) => (
                       <span key={mapping.competencyId}>
-                        {mapping.competencyName}:{' '}
-                        {partForm.mappingMode === 'RANGE'
-                          ? `items ${mapping.startItem}-${mapping.endItem}`
-                          : `items ${formatItemList(mapping.itemNumbers)}`}
+                        {mapping.competencyName}: items {mapping.startItem}-{mapping.endItem}
                       </span>
                     ))}
                   </div>

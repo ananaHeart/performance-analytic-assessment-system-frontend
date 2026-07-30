@@ -232,7 +232,23 @@ function TeacherDashboard({ user, onNavigate }) {
       {pageError ? <p className="form-message form-message-error">{pageError}</p> : null}
 
       <section className="teacher-classes-section" aria-labelledby="teacherClassesHeading">
-        <h2 id="teacherClassesHeading">Classes</h2>
+        <div className="teacher-classes-heading-row">
+          <h2 id="teacherClassesHeading">Classes</h2>
+          {teacherClassGroups.length ? (
+            <button
+              type="button"
+              className="teacher-view-students-link"
+              onClick={() =>
+                onNavigate('class-records', {
+                  classId: teacherClassGroups[0].primaryAssignment.classId,
+                  initialTab: 'students',
+                })
+              }
+            >
+              View students
+            </button>
+          ) : null}
+        </div>
 
         <div className="teacher-classes-grid">
           {teacherClassGroups.map((group) => {

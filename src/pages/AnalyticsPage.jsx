@@ -12,6 +12,7 @@ import {
   getTeachers,
   getTrends,
 } from '../api/apiClient'
+import { VerticalMasteryChart } from '../components/AnalyticsCharts'
 
 const USER_STORAGE_KEY = 'assessment-user'
 
@@ -500,21 +501,18 @@ function AnalyticsPage({ user, role }) {
       {!Object.values(filters).some(Boolean) ? (
         <section className="principal-analytics-panel principal-grade-chart-panel">
           <h3>Percentage by grade level</h3>
-          <div className="principal-grade-chart">
-            {gradeBars.map((bar) => {
-              const percent = clampPercent(parseNumber(bar.value))
-              return (
-                <div className="principal-grade-bar" key={bar.id}>
-                  <strong>{percent === null ? 'No data' : `${Math.round(percent)}%`}</strong>
-                  <span style={{ height: `${percent ?? 4}%` }} />
-                  <small>{bar.label}</small>
-                </div>
-              )
-            })}
-            {!isAnalyticsLoading && !gradeBars.length ? (
-              <p className="principal-analytics-empty">No grade-level analytics found.</p>
-            ) : null}
-          </div>
+          {gradeBars.length ? (
+            <VerticalMasteryChart
+              data={gradeBars.map((bar) => ({
+                id: bar.id,
+                label: bar.label,
+                value: clampPercent(parseNumber(bar.value)),
+              }))}
+            />
+          ) : null}
+          {!isAnalyticsLoading && !gradeBars.length ? (
+            <p className="principal-analytics-empty">No grade-level analytics found.</p>
+          ) : null}
         </section>
       ) : (
         <>
@@ -580,18 +578,16 @@ function AnalyticsPage({ user, role }) {
             {selectedClassId && !trends.length && !isAnalyticsLoading ? (
               <p className="principal-analytics-empty">No trend records found.</p>
             ) : null}
-            <div className="principal-trend-chart">
-              {trends.map((trend) => {
-                const percent = clampPercent(parseNumber(trend.value)) ?? 0
-                return (
-                  <div className="principal-trend-bar" key={trend.id ?? trend.label}>
-                    <strong>{Math.round(percent)}%</strong>
-                    <span style={{ height: `${percent}%` }} />
-                    <small>{trend.label}</small>
-                  </div>
-                )
-              })}
-            </div>
+            {trends.length ? (
+              <VerticalMasteryChart
+                data={trends.map((trend) => ({
+                  id: trend.id ?? trend.label,
+                  label: trend.label,
+                  value: clampPercent(parseNumber(trend.value)),
+                }))}
+                height={220}
+              />
+            ) : null}
           </section>
         </>
       )}

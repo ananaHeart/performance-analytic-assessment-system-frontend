@@ -1,6 +1,9 @@
 # Web Dashboard Documentation
 
-Last reviewed: July 12, 2026
+Document created: July 9, 2026  
+Last reviewed: July 13, 2026  
+Last updated: July 13, 2026  
+Coverage period: June 2026 to July 2026
 
 ## 1. Overview
 
@@ -12,7 +15,7 @@ The dashboard is connected to the Spring Boot backend through REST API calls. Th
 https://performance-analytics-assessment-system.onrender.com
 ```
 
-The frontend does not hardcode the backend host. It uses the Vite environment variable `VITE_API_BASE_URL`.
+The frontend does not hardcode the backend host. It uses the Vite environment variable `VITE_API_URL`. The legacy `VITE_API_BASE_URL` variable is still supported as a fallback.
 
 ## 2. Technology Stack
 
@@ -35,19 +38,19 @@ src/api/apiClient.js
 It reads the backend base URL from:
 
 ```env
-VITE_API_BASE_URL
+VITE_API_URL
 ```
 
 Local development example:
 
 ```env
-VITE_API_BASE_URL=http://localhost:8080
+VITE_API_URL=http://localhost:8080
 ```
 
 Production example:
 
 ```env
-VITE_API_BASE_URL=https://performance-analytics-assessment-system.onrender.com
+VITE_API_URL=https://performance-analytics-assessment-system.onrender.com
 ```
 
 Supporting files:
@@ -66,10 +69,12 @@ The following dates are included to help explain when major frontend documentati
 - June 30, 2026: Backend/frontend handoff notes for teacher intervention, student skill mastery, and student score export were available for frontend wiring.
 - July 9, 2026: Initial frontend documentation files existed in the frontend repository commit history.
 - July 12, 2026: Web dashboard documentation was refreshed for panel presentation.
-- July 12, 2026: Render backend deployment configuration was documented using `VITE_API_BASE_URL`.
+- July 12, 2026: Render backend deployment configuration was documented using `VITE_API_URL`.
 - July 12, 2026: Student Profile Skill Mastery documentation was updated to use `GET /api/analytics/student-skill-mastery`.
 - July 12, 2026: Teacher Intervention documentation was updated to use `GET /api/analytics/teacher-interventions`.
 - July 12, 2026: Selected assessment student score export documentation was updated to use `GET /api/export/student-scores/{testId}`.
+- July 13, 2026: Teacher class assignment flow was documented as Teacher -> Subject -> Grade Level -> Section -> Assign, using only backend-returned available sections.
+- July 13, 2026: Gantt chart documentation was added in `docs/gantt-chart.md`.
 
 ## 5. User Roles
 
@@ -125,6 +130,26 @@ Within the dashboard, a class context should be understood as a combination of:
 - academic year
 
 Raw numeric IDs are internal implementation details. User-facing labels should use readable grade, section, subject, teacher, and academic year values.
+
+Current assignment dropdown order:
+
+1. Teacher
+2. Subject
+3. Grade Level
+4. Section
+5. Assign
+
+The section dropdown must depend on the selected grade level. The frontend calls the backend section endpoint with the selected grade level and displays only sections returned by the backend. If no available section exists for the selected grade level, the UI shows:
+
+```text
+No available sections for this grade level.
+```
+
+This supports the intended flow:
+
+```text
+Principal imports SF1 -> System creates available sections -> Principal assigns teachers only to available imported sections
+```
 
 ## 9. Student Records and SF1 Import
 
@@ -262,7 +287,7 @@ Render frontend settings:
 
 - Build command: `npm run build`
 - Publish directory: `dist`
-- Environment variable: `VITE_API_BASE_URL`
+- Environment variable: `VITE_API_URL`
 - Production value: `https://performance-analytics-assessment-system.onrender.com`
 
 The backend must allow the deployed frontend domain through CORS.
@@ -287,6 +312,8 @@ The following frontend features are currently documented as implemented:
 - student profile skill mastery
 - selected assessment student score export
 - production backend environment configuration
+- teacher class assignment flow using backend-returned grade-level sections
+- dated Gantt chart documentation
 
 ## 18. Known Remaining Documentation Gaps
 

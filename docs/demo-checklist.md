@@ -1,6 +1,9 @@
 # Performance Analytics Assessment System - Demo Checklist
 
-Last reviewed: July 12, 2026
+Document created: July 9, 2026  
+Last reviewed: July 13, 2026  
+Last updated: July 13, 2026  
+Coverage period: June 2026 to July 2026
 
 ## System Purpose
 
@@ -13,11 +16,12 @@ The mobile app is used by the teacher. Students do not answer through the mobile
 - July 9, 2026: Initial demo-related documentation existed in the frontend repository history.
 - July 12, 2026: Demo checklist was refreshed for panel presentation.
 - July 12, 2026: Demo flow was updated to include Student Profile Skill Mastery, Teacher Intervention, Render backend configuration, and selected assessment student score export.
+- July 13, 2026: Demo flow was updated to include grade-level dependent section assignment and Gantt chart documentation.
 
 ## Demo Prerequisites
 
 - Backend is running locally or deployed on Render.
-- Web dashboard has the correct `VITE_API_BASE_URL`.
+- Web dashboard has the correct `VITE_API_URL`.
 - Teacher account is approved by the principal.
 - Teacher has an assigned class, subject, section, grade level, and academic year.
 - Students are available through manual entry or SF1 import.
@@ -29,15 +33,21 @@ The mobile app is used by the teacher. Students do not answer through the mobile
 2. Open Teacher Approval.
 3. Approve a registered teacher account.
 4. Open Class Assignment.
-5. Assign teacher, grade level, section, subject, and academic year.
-6. Open Class Records / Student Records.
-7. Add students manually or use SF1 import preview and confirm.
+5. Select teacher.
+6. Select subject.
+7. Select grade level.
+8. Select one of the available backend-returned sections for that grade level.
+9. Assign the teacher to the class.
+10. If no sections exist for the selected grade level, confirm the UI shows `No available sections for this grade level.`
+11. Open Class Records / Student Records.
+12. Add students manually or use SF1 import preview and confirm.
 
 Expected result:
 
 - Teacher is active.
 - Class assignment exists.
 - Students are connected to the correct class context.
+- Teacher assignment uses imported available sections instead of hardcoded section values.
 
 ## B. Teacher Web Flow - Assessment Setup
 
