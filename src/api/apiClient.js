@@ -487,6 +487,38 @@ function normalizeInterventionRecord(item) {
   }
 }
 
+function normalizeTestPartResultRecord(item) {
+  const studentName =
+    item.studentName ??
+    item.name ??
+    [item.firstName, item.middleName, item.lastName].filter(Boolean).join(' ') ??
+    ''
+
+  return {
+    id: item.studentId ?? item.id ?? null,
+    studentName: studentName || 'Student',
+    studentLrn: item.studentLrn ?? item.lrn ?? item.LRN ?? '',
+    firstName: item.firstName ?? item.first_name ?? '',
+    middleName: item.middleName ?? item.middle_name ?? '',
+    lastName: item.lastName ?? item.last_name ?? '',
+    testId: item.testId ?? item.test_id ?? null,
+    testPartId: item.testPartId ?? item.test_part_id ?? item.partId ?? null,
+    score: item.partScore ?? item.part_score ?? item.totalScore ?? item.total_score ?? item.score ?? '',
+    maxScore:
+      item.maxScore ??
+      item.max_score ??
+      item.totalPoints ??
+      item.total_points ??
+      item.perfectScore ??
+      item.perfect_score ??
+      '',
+    percentage: item.percentage ?? item.masteryRate ?? item.rate ?? '',
+    performance: item.performance ?? item.status ?? item.masteryLevel ?? '',
+    checkedAt: item.checkedAt ?? item.checked_at ?? '',
+    syncedAt: item.syncedAt ?? item.synced_at ?? item.syncTimestamp ?? '',
+  }
+}
+
 function normalizeTeacherInterventionRecord(item) {
   const affectedStudents = extractCollection(item, [
     'affectedStudents',
@@ -575,7 +607,7 @@ function normalizeTrendRecord(item) {
 function normalizeSyncActivityRecord(item) {
   return {
     id: item.testId ?? item.id ?? null,
-    timestamp: item.timestamp ?? item.syncTimestamp ?? item.syncedAt ?? item.createdAt ?? item.date ?? '',
+    timestamp: item.syncTimestamp ?? item.timestamp ?? item.syncedAt ?? item.createdAt ?? item.date ?? '',
     activity: item.activity ?? item.action ?? item.testName ?? item.type ?? 'Sync Activity',
     details: item.details ?? item.message ?? item.syncStatus ?? item.status ?? '',
   }
@@ -925,6 +957,15 @@ export async function getIntervention(testId, competencyId, testPartId = '') {
   const payload = await request(`/api/analytics/intervention?${params.toString()}`)
   return extractCollection(payload, ['interventions', 'recommendations', 'data', 'records']).map(
     normalizeInterventionRecord,
+  )
+}
+
+export async function getTestPartResults(testId, testPartId) {
+  const payload = await request(
+    `/api/analytics/test-part-results?testId=${testId}&testPartId=${testPartId}`,
+  )
+  return extractCollection(payload, ['results', 'testPartResults', 'students', 'data', 'records']).map(
+    normalizeTestPartResultRecord,
   )
 }
 

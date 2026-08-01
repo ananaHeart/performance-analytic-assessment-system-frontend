@@ -61,9 +61,11 @@ function formatRecentSync(activity) {
   }
 
   return `${activity.activity || 'Sync'} - ${timestamp.toLocaleDateString('en-US', {
+    timeZone: 'Asia/Manila',
     month: 'short',
     day: 'numeric',
   })}, ${timestamp.toLocaleTimeString('en-US', {
+    timeZone: 'Asia/Manila',
     hour: 'numeric',
     minute: '2-digit',
   })}`

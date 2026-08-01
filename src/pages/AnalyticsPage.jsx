@@ -70,6 +70,7 @@ function formatDateTime(value) {
   }
 
   return parsedDate.toLocaleString('en-US', {
+    timeZone: 'Asia/Manila',
     month: 'short',
     day: 'numeric',
     hour: 'numeric',

@@ -16,12 +16,12 @@ import {
   downloadStudentScoresReport,
   getAssessmentDetails,
   getClassAssignments,
-  getIntervention,
   getLms,
   getPartSkillMappings,
   getStudentSkillMastery,
   getTeacherAssessments,
   getTeacherInterventions,
+  getTestPartResults,
   getTeachers,
   getGradeLevels,
   getSyncActivity,
@@ -277,6 +277,35 @@ function formatScore(value) {
   return String(Math.round(parsedValue))
 }
 
+function formatScoreWithMax(score, maxScore) {
+  const parsedScore = parseNumber(score)
+
+  if (parsedScore === null) {
+    return 'No data'
+  }
+
+  const formattedScore = formatScore(parsedScore)
+  const parsedMaxScore = parseNumber(maxScore)
+
+  if (parsedMaxScore === null) {
+    return formattedScore
+  }
+
+  return `${formattedScore} / ${formatScore(parsedMaxScore)}`
+}
+
+function formatStudentDisplayName(student) {
+  const firstName = String(student?.firstName ?? '').trim()
+  const middleName = String(student?.middleName ?? '').trim()
+  const lastName = String(student?.lastName ?? '').trim()
+
+  if (lastName && firstName) {
+    return `${lastName.toUpperCase()}, ${[firstName, middleName].filter(Boolean).join(' ').toUpperCase()}`
+  }
+
+  return String(student?.studentName ?? student?.name ?? 'Student').toUpperCase()
+}
+
 function getPerformanceLabel(percentage) {
   const parsedValue = parseNumber(percentage)
 
@@ -316,37 +345,42 @@ function getPartMaxScore(part) {
   return numberOfItems * pointsPerItem
 }
 
-function getStudentPartScore(student, part) {
-  const maxScore = getPartMaxScore(part)
-  const score = parseNumber(student?.score)
-  const correctItems = parseNumber(student?.correctItems)
-  const pointsPerItem = parseNumber(part?.pointsPerItem)
-  const percentage = parseNumber(student?.percentage)
+function getStudentScoreKey(student) {
+  return String(student?.id ?? student?.studentId ?? student?.studentLrn ?? student?.studentName ?? '')
+}
 
-  if (score !== null) {
-    if (
-      maxScore !== null &&
-      percentage !== null &&
-      score > maxScore &&
-      Math.round(score) === Math.round(percentage)
-    ) {
-      return (maxScore * percentage) / 100
+function mergeTestPartResults(partResultGroups = []) {
+  const studentMap = new Map()
+
+  partResultGroups.flat().forEach((student) => {
+    const key = getStudentScoreKey(student)
+
+    if (!key) {
+      return
     }
 
-    return score
-  }
+    const currentRecord =
+      studentMap.get(key) ?? {
+        ...student,
+        score: 0,
+        maxScore: 0,
+        percentage: '',
+      }
+    const nextScore = parseNumber(student.score) ?? 0
+    const nextMaxScore = parseNumber(student.maxScore) ?? 0
+    const totalScore = (parseNumber(currentRecord.score) ?? 0) + nextScore
+    const totalMaxScore = (parseNumber(currentRecord.maxScore) ?? 0) + nextMaxScore
 
-  if (correctItems !== null && pointsPerItem !== null) {
-    const computedScore = correctItems * pointsPerItem
+    studentMap.set(key, {
+      ...currentRecord,
+      ...student,
+      score: totalScore,
+      maxScore: totalMaxScore,
+      percentage: totalMaxScore > 0 ? (totalScore / totalMaxScore) * 100 : '',
+    })
+  })
 
-    return maxScore !== null ? Math.min(computedScore, maxScore) : computedScore
-  }
-
-  if (maxScore !== null && percentage !== null) {
-    return (maxScore * percentage) / 100
-  }
-
-  return null
+  return Array.from(studentMap.values())
 }
 
 function getPartBranchSkills(part) {
@@ -355,18 +389,6 @@ function getPartBranchSkills(part) {
 
 function getPrimaryPartSkill(part) {
   return getPartBranchSkills(part)[0] ?? null
-}
-
-function getPartSkillLabel(part) {
-  const branchSkills = getPartBranchSkills(part)
-    .map((mapping) => mapping.competencyName)
-    .filter(Boolean)
-
-  if (branchSkills.length) {
-    return branchSkills.join(', ')
-  }
-
-  return part?.competencyName || 'Competency'
 }
 
 function getUniqueTeacherInterventions(records = []) {
@@ -827,7 +849,19 @@ function ClassRecordsPage({
     selectedClassAssessments.find(
       (assessment) => String(assessment.id) === String(selectedAnalyticsTestId),
     ) ?? null
-  const analyticsParts = analyticsDetails?.parts ?? []
+  const analyticsParts = useMemo(() => analyticsDetails?.parts ?? [], [analyticsDetails?.parts])
+  const analyticsPartIds = useMemo(
+    () => analyticsParts.map((part) => String(part.id ?? '')).join('|'),
+    [analyticsParts],
+  )
+  const assessmentTotalItems = analyticsParts.reduce(
+    (total, part) => total + (parseNumber(part.numberOfItems) ?? 0),
+    0,
+  )
+  const assessmentMaxScore = analyticsParts.reduce(
+    (total, part) => total + (getPartMaxScore(part) ?? 0),
+    0,
+  )
   const selectedAnalyticsPart =
     analyticsParts.find((part) => String(part.id) === String(selectedAnalyticsPartId)) ??
     analyticsParts[0] ??
@@ -861,11 +895,12 @@ function ClassRecordsPage({
       analyticsStudents.map((student, index) => ({
         ...student,
         rowNumber: String(index + 1).padStart(2, '0'),
-        displayScore: getStudentPartScore(student, selectedAnalyticsPart),
+        displayName: formatStudentDisplayName(student),
+        displayScore: parseNumber(student.score),
         performance: getPerformanceLabel(student.percentage),
         performanceClass: getPerformanceClass(student.percentage),
       })),
-    [analyticsStudents, selectedAnalyticsPart],
+    [analyticsStudents],
   )
   const analyticsPercentages = analyticsStudentRows
     .map((student) => parseNumber(student.percentage))
@@ -875,7 +910,7 @@ function ClassRecordsPage({
       ? analyticsPercentages.reduce((total, value) => total + value, 0) / analyticsPercentages.length
       : null
   const rankedAnalyticsRows = [...analyticsStudentRows].sort(
-    (left, right) => (parseNumber(right.percentage) ?? -1) - (parseNumber(left.percentage) ?? -1),
+    (left, right) => (parseNumber(right.displayScore) ?? -1) - (parseNumber(left.displayScore) ?? -1),
   )
   const highestAnalyticsStudent = rankedAnalyticsRows[0] ?? null
   const lowestAnalyticsStudent = rankedAnalyticsRows[rankedAnalyticsRows.length - 1] ?? null
@@ -1076,6 +1111,8 @@ function ClassRecordsPage({
 
     setIsAnalyticsLoading(true)
     setAnalyticsMessage({ error: '', success: '' })
+    setAnalyticsDetails(null)
+    setAnalyticsStudents([])
 
     try {
       const [details, lmsRecords, teacherRecommendations] = await Promise.all([
@@ -1114,11 +1151,10 @@ function ClassRecordsPage({
     }
   }
 
-  const loadAnalyticsStudents = async (testId, part) => {
-    const branchSkill = getPrimaryPartSkill(part)
-    const competencyId = branchSkill?.competencyId ?? part?.competencyId
+  const loadAnalyticsStudents = async (testId, parts = []) => {
+    const partsWithIds = parts.filter((part) => part?.id)
 
-    if (!testId || !competencyId) {
+    if (!testId || !partsWithIds.length) {
       setAnalyticsStudents([])
       return
     }
@@ -1127,12 +1163,14 @@ function ClassRecordsPage({
     setAnalyticsMessage({ error: '', success: '' })
 
     try {
-      const studentRecords = await getIntervention(testId, competencyId, part.id)
-      setAnalyticsStudents(studentRecords)
+      const partResultGroups = await Promise.all(
+        partsWithIds.map((part) => getTestPartResults(testId, part.id)),
+      )
+      setAnalyticsStudents(mergeTestPartResults(partResultGroups))
     } catch (loadError) {
       setAnalyticsStudents([])
       setAnalyticsMessage({
-        error: loadError.message || 'Unable to load student LMS percentages for this part.',
+        error: loadError.message || 'Unable to load student scores for this assessment.',
         success: '',
       })
     } finally {
@@ -1256,14 +1294,13 @@ function ClassRecordsPage({
 
   useEffect(() => {
     if (role === 'teacher' && activeTeacherTab === 'analytics') {
-      loadAnalyticsStudents(selectedAnalyticsTestId, selectedAnalyticsPart)
+      loadAnalyticsStudents(selectedAnalyticsTestId, analyticsParts)
     }
   }, [
     role,
     activeTeacherTab,
     selectedAnalyticsTestId,
-    selectedAnalyticsPart?.id,
-    selectedAnalyticsSkillId,
+    analyticsPartIds,
   ])
 
   useEffect(() => {
@@ -1805,13 +1842,23 @@ function ClassRecordsPage({
                     </article>
                     <article>
                       <span>Highest Score</span>
-                      <strong>{formatPercent(highestAnalyticsStudent?.percentage)}</strong>
-                      <small>{highestAnalyticsStudent?.studentName || 'No data'}</small>
+                      <strong>
+                        {formatScoreWithMax(
+                          highestAnalyticsStudent?.displayScore,
+                          highestAnalyticsStudent?.maxScore,
+                        )}
+                      </strong>
+                      <small>{highestAnalyticsStudent?.displayName || 'No data'}</small>
                     </article>
                     <article>
                       <span>Lowest Score</span>
-                      <strong>{formatPercent(lowestAnalyticsStudent?.percentage)}</strong>
-                      <small>{lowestAnalyticsStudent?.studentName || 'No data'}</small>
+                      <strong>
+                        {formatScoreWithMax(
+                          lowestAnalyticsStudent?.displayScore,
+                          lowestAnalyticsStudent?.maxScore,
+                        )}
+                      </strong>
+                      <small>{lowestAnalyticsStudent?.displayName || 'No data'}</small>
                     </article>
                   </div>
                 </section>
@@ -1851,7 +1898,7 @@ function ClassRecordsPage({
                         <div className="teacher-section-title">
                           <ClipboardCheck size={18} strokeWidth={2.3} />
                           <div>
-                            <strong>Assessment Part Details</strong>
+                            <strong>Assessment Score Details</strong>
                             <span>
                               {selectedAnalyticsAssessment?.testName || 'Selected assessment'}
                             </span>
@@ -1862,35 +1909,12 @@ function ClassRecordsPage({
                           <div className="teacher-part-summary-card">
                             <article>
                               <span>Number of Items</span>
-                              <strong>{selectedAnalyticsPart?.numberOfItems ?? 0}</strong>
+                              <strong>{assessmentTotalItems}</strong>
                             </article>
                             <article>
-                              <span>Points per Item</span>
-                              <strong>{selectedAnalyticsPart?.pointsPerItem ?? 0}</strong>
+                              <span>Total Points</span>
+                              <strong>{formatScore(assessmentMaxScore)}</strong>
                             </article>
-                          </div>
-
-                          <div className="teacher-part-card-grid">
-                            {analyticsParts.map((part, index) => (
-                              <button
-                                type="button"
-                                key={part.id ?? index}
-                                className={
-                                  String(selectedAnalyticsPart?.id) === String(part.id)
-                                    ? 'is-active'
-                                    : ''
-                                }
-                                onClick={() => setSelectedAnalyticsPartId(String(part.id))}
-                              >
-                                <BookOpen size={22} strokeWidth={2.1} />
-                                <span>{part.partOrder || `Part ${index + 1}`}</span>
-                                <strong>{getPartSkillLabel(part)}</strong>
-                              </button>
-                            ))}
-
-                            {!analyticsParts.length && !isAnalyticsLoading ? (
-                              <p className="teacher-assessment-empty">No test parts found.</p>
-                            ) : null}
                           </div>
                         </div>
                       </section>
@@ -1900,7 +1924,7 @@ function ClassRecordsPage({
                           <Users size={18} strokeWidth={2.3} />
                           <div>
                             <strong>Student Results</strong>
-                            <span>Scores for the selected assessment part</span>
+                            <span>Whole test scores for the selected assessment</span>
                           </div>
                         </div>
 
@@ -1909,7 +1933,7 @@ function ClassRecordsPage({
                             <tr>
                               <th>Student Name</th>
                               <th>Score</th>
-                              <th>LMS Percentage</th>
+                              <th>Percentage</th>
                               <th>Performance</th>
                             </tr>
                           </thead>
@@ -1922,24 +1946,24 @@ function ClassRecordsPage({
 
                             {!isAnalyticsLoading && !analyticsStudentRows.length ? (
                               <tr>
-                                <td colSpan="4">No student LMS records found for this part.</td>
+                                <td colSpan="4">No student score records found for this assessment.</td>
                               </tr>
                             ) : null}
 
                             {!isAnalyticsLoading
                               ? analyticsStudentRows.map((student) => (
                                   <tr
-                                    key={student.id ?? `${student.studentName}-${student.rowNumber}`}
+                                    key={student.id ?? `${student.displayName}-${student.rowNumber}`}
                                   >
                                     <td>
                                       <div className="teacher-student-result-name">
                                         <span>
-                                          {getStudentInitials({ name: student.studentName })}
+                                          {getStudentInitials({ name: student.displayName })}
                                         </span>
-                                        <strong>{student.studentName || 'Student'}</strong>
+                                        <strong>{student.displayName || 'Student'}</strong>
                                       </div>
                                     </td>
-                                    <td>{formatScore(student.displayScore)}</td>
+                                    <td>{formatScoreWithMax(student.displayScore, student.maxScore)}</td>
                                     <td>{formatPercent(student.percentage)}</td>
                                     <td>
                                       <span
