@@ -1,0 +1,134 @@
+import {
+  ArrowRight,
+  BarChart3,
+  ClipboardCheck,
+  GraduationCap,
+  LogIn,
+  RefreshCw,
+  UserPlus,
+} from 'lucide-react'
+import landingHero from '../assets/landing-hero.png'
+
+const WORKFLOW_STEPS = [
+  {
+    title: 'Prepare assessments',
+    description: 'Build structured assessments for the classes and subjects you handle.',
+    icon: ClipboardCheck,
+    tone: 'green',
+  },
+  {
+    title: 'Review and synchronize',
+    description: 'Bring verified classroom results into one dependable school record.',
+    icon: RefreshCw,
+    tone: 'blue',
+  },
+  {
+    title: 'Act on evidence',
+    description: 'See mastery patterns and identify the teaching action needed next.',
+    icon: BarChart3,
+    tone: 'amber',
+  },
+]
+
+function LandingPage({ onNavigate }) {
+  return (
+    <main className="landing-page">
+      <header className="landing-header">
+        <button
+          type="button"
+          className="landing-brand"
+          onClick={() => onNavigate('home')}
+          aria-label="SMART Assessment System home"
+        >
+          <span className="landing-brand-mark" aria-hidden="true">
+            <GraduationCap size={22} strokeWidth={2.2} />
+          </span>
+          <span className="landing-brand-copy">
+            <strong>SMART</strong>
+            <span>Assessment System</span>
+          </span>
+        </button>
+
+        <nav className="landing-header-actions" aria-label="Account access">
+          <button type="button" className="landing-login-link" onClick={() => onNavigate('login')}>
+            Log in
+          </button>
+          <button
+            type="button"
+            className="landing-header-register"
+            onClick={() => onNavigate('register')}
+          >
+            Register now
+          </button>
+        </nav>
+      </header>
+
+      <section
+        className="landing-hero"
+        style={{ '--landing-hero-image': `url(${landingHero})` }}
+        aria-labelledby="landing-title"
+      >
+        <div className="landing-hero-overlay" aria-hidden="true" />
+        <div className="landing-hero-inner">
+          <div className="landing-hero-copy">
+            <p className="landing-eyebrow">Welcome to SMART</p>
+            <h1 id="landing-title">SMART Assessment System</h1>
+            <p className="landing-hero-lead">
+              Thank you for choosing a clearer way to turn classroom assessment results into
+              practical teaching decisions.
+            </p>
+
+            <div className="landing-hero-actions">
+              <button type="button" className="landing-primary-action" onClick={() => onNavigate('login')}>
+                <LogIn size={18} strokeWidth={2.2} aria-hidden="true" />
+                Log in
+                <ArrowRight size={17} strokeWidth={2.2} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="landing-secondary-action"
+                onClick={() => onNavigate('register')}
+              >
+                <UserPlus size={18} strokeWidth={2.2} aria-hidden="true" />
+                Register now
+              </button>
+            </div>
+
+            <p className="landing-access-note">For school principals and teachers.</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="landing-workflow" aria-labelledby="landing-workflow-title">
+        <div className="landing-section-inner">
+          <div className="landing-workflow-heading">
+            <p className="landing-section-label">One connected workflow</p>
+            <h2 id="landing-workflow-title">From checked papers to clear next steps.</h2>
+          </div>
+
+          <div className="landing-workflow-list">
+            {WORKFLOW_STEPS.map(({ title, description, icon: Icon, tone }, index) => (
+              <article className="landing-workflow-item" key={title}>
+                <span className={`landing-workflow-icon is-${tone}`} aria-hidden="true">
+                  <Icon size={21} strokeWidth={2.1} />
+                </span>
+                <div>
+                  <span className="landing-workflow-number">0{index + 1}</span>
+                  <h3>{title}</h3>
+                  <p>{description}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <footer className="landing-footer">
+        <span>© 2026 SMART Assessment System</span>
+        <span>Built for evidence-informed teaching.</span>
+      </footer>
+    </main>
+  )
+}
+
+export default LandingPage

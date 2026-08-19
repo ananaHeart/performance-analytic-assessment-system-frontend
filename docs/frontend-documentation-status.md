@@ -2,8 +2,8 @@
 
 Document created: July 12, 2026  
 Last reviewed: July 13, 2026  
-Last updated: July 13, 2026  
-Coverage period: June 2026 to July 2026
+Last updated: August 1, 2026  
+Coverage period: June 2026 to August 2026
 
 ## Date Basis
 
@@ -165,6 +165,13 @@ The following function dates are approximate project milestones unless marked as
 | July 12, 2026 | Frontend documentation status file created | Completed |
 | July 13, 2026 | Teacher class assignment flow updated to use backend-returned grade-level sections | Completed |
 | July 13, 2026 | Gantt chart and dated development timeline added | Completed |
+| August 1, 2026 | Frontend design-system cleanup using shared CSS tokens, white-first layout, and green action/highlight rules | Completed |
+| August 1, 2026 | Teacher-side UI cleanup for dashboard, class view, assessment list, student results, student profile, analytics, and intervention panel | Completed |
+| August 1, 2026 | Principal-side UI cleanup for dashboard, teacher class assignment, SF1 import modal, analytics, teachers, and settings | Completed |
+| August 1, 2026 | Recharts-based analytics chart styling | Completed |
+| August 1, 2026 | Sync activity display aligned with backend timestamp data and Philippine/local time formatting | Completed |
+| August 1, 2026 | Teacher analytics student result table updated to show whole-assessment scores | Completed |
+| August 1, 2026 | Performance Summary highest and lowest student cards updated to show score values instead of percentage-only values | Completed |
 
 ## Still Missing or Recommended Next
 
@@ -197,6 +204,9 @@ Recommended screenshots:
 - analytics page
 - student profile skill mastery
 - export report result
+- SF1 import modal
+- whole-assessment student result table
+- Recharts least mastered skills chart
 
 ### 4. Full User Manual
 

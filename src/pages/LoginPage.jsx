@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { ArrowRight, Eye, EyeOff, GraduationCap, LockKeyhole, Mail } from 'lucide-react'
-import { login } from '../api/apiClient'
+import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail } from 'lucide-react'
+import { getCurrentUserV2, loginV2 } from '../api/apiV2Client'
+import PublicAuthShell from '../components/PublicAuthShell'
+import { getV2DeviceIdentifier } from '../v2/v2Session'
 
 function LoginPage({ onLoginSuccess, onNavigate }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [rememberMe, setRememberMe] = useState(false)
   const [isPasswordVisible, setIsPasswordVisible] = useState(false)
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -14,105 +15,114 @@ function LoginPage({ onLoginSuccess, onNavigate }) {
     event.preventDefault()
     setError('')
 
-    if (!email.trim() || !password.trim()) {
-      setError('Email and password are required.')
+    if (!email.trim() || !password) {
+      setError('Enter your email address and password.')
       return
     }
 
     setIsSubmitting(true)
 
     try {
-      const auth = await login(email.trim(), password)
-      onLoginSuccess(auth)
+      const auth = await loginV2(email.trim(), password, getV2DeviceIdentifier())
+
+      if (!auth.token || !auth.user?.role) {
+        throw new Error('The login response is incomplete. Please contact the administrator.')
+      }
+
+      const currentUser = await getCurrentUserV2(auth.token)
+
+      if (!currentUser?.role) {
+        throw new Error('The account session could not be verified. Please sign in again.')
+      }
+
+      onLoginSuccess({ ...auth, user: currentUser })
     } catch (submitError) {
-      setError(submitError.message || 'Login failed.')
+      setError(submitError.message || 'Unable to sign in. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
   }
 
   return (
-    <section className="public-page login-page">
-      <form className="login-card" onSubmit={handleSubmit}>
-        <div className="login-card-header">
-          <span className="login-brand-icon" aria-hidden="true">
-            <GraduationCap size={24} strokeWidth={2.2} />
-          </span>
-          <h1>SMART Assessment System</h1>
+    <PublicAuthShell
+      variant="login"
+      eyebrow="Welcome back"
+      title="Continue your assessment work."
+      description="Access the school records, assessment tools, and teaching insights assigned to your account."
+      trustMessage="Secure access for active school principals and teachers."
+      onNavigate={onNavigate}
+    >
+      <div className="public-auth-form-content">
+        <div className="public-auth-form-heading">
+          <p>Account access</p>
+          <h1>Log in to SMART</h1>
+          <span>Use your active school account to continue.</span>
         </div>
 
-        <label className="login-field" htmlFor="email">
-          <span>Email:</span>
-          <div className="login-input-wrap">
-            <Mail size={17} strokeWidth={2.1} aria-hidden="true" />
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="Enter email"
-              autoComplete="email"
-            />
-          </div>
-        </label>
+        <form className="public-auth-form" onSubmit={handleSubmit}>
+          <label className="public-auth-field" htmlFor="email">
+            <span>Email address</span>
+            <div className="public-auth-input-wrap">
+              <Mail size={18} strokeWidth={2} aria-hidden="true" />
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="name@school.edu"
+                autoComplete="email"
+                disabled={isSubmitting}
+              />
+            </div>
+          </label>
 
-        <label className="login-field" htmlFor="password">
-          <span>Password:</span>
-          <div className="login-input-wrap">
-            <LockKeyhole size={17} strokeWidth={2.1} aria-hidden="true" />
-            <input
-              id="password"
-              type={isPasswordVisible ? 'text' : 'password'}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Enter password"
-              autoComplete="current-password"
-            />
-            <button
-              type="button"
-              className="password-toggle-button"
-              onClick={() => setIsPasswordVisible((currentValue) => !currentValue)}
-              aria-label={isPasswordVisible ? 'Hide password' : 'Show password'}
-            >
-              {isPasswordVisible ? (
-                <EyeOff size={16} strokeWidth={2.1} />
-              ) : (
-                <Eye size={16} strokeWidth={2.1} />
-              )}
-            </button>
-          </div>
-        </label>
+          <label className="public-auth-field" htmlFor="password">
+            <span>Password</span>
+            <div className="public-auth-input-wrap">
+              <LockKeyhole size={18} strokeWidth={2} aria-hidden="true" />
+              <input
+                id="password"
+                type={isPasswordVisible ? 'text' : 'password'}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Enter your password"
+                autoComplete="current-password"
+                disabled={isSubmitting}
+              />
+              <button
+                type="button"
+                className="public-auth-password-toggle"
+                onClick={() => setIsPasswordVisible((currentValue) => !currentValue)}
+                aria-label={isPasswordVisible ? 'Hide password' : 'Show password'}
+                disabled={isSubmitting}
+              >
+                {isPasswordVisible ? (
+                  <EyeOff size={17} strokeWidth={2} />
+                ) : (
+                  <Eye size={17} strokeWidth={2} />
+                )}
+              </button>
+            </div>
+          </label>
 
-        <label className="remember-login-option">
-          <input
-            type="checkbox"
-            checked={rememberMe}
-            onChange={(event) => setRememberMe(event.target.checked)}
-          />
-          <span>Remember me</span>
-        </label>
+          {error ? (
+            <p className="public-auth-message is-error" role="alert" aria-live="polite">
+              {error}
+            </p>
+          ) : null}
 
-        {error ? <p className="form-message form-message-error">{error}</p> : null}
+          <button type="submit" className="public-auth-submit" disabled={isSubmitting}>
+            <span>{isSubmitting ? 'Signing in...' : 'Log in'}</span>
+            {!isSubmitting ? <ArrowRight size={18} strokeWidth={2.3} aria-hidden="true" /> : null}
+          </button>
+        </form>
 
-        <button type="submit" className="login-submit-button" disabled={isSubmitting}>
-          <span>{isSubmitting ? 'Signing in...' : 'Login'}</span>
-          {!isSubmitting ? <ArrowRight size={17} strokeWidth={2.3} aria-hidden="true" /> : null}
-        </button>
-
-        <button
-          type="button"
-          className="login-register-link"
-          onClick={() => onNavigate('teacher-sign-up')}
-        >
-          Create teacher account
-        </button>
-
-        <div className="login-card-footer">
-          <p>© 2026 SMART Assessment System.</p>
-          <p>All Rights Reserved.</p>
-        </div>
-      </form>
-    </section>
+        <p className="public-auth-account-note">
+          Access is limited to active principal and teacher accounts.
+        </p>
+        <p className="public-auth-footer">© 2026 SMART Assessment System</p>
+      </div>
+    </PublicAuthShell>
   )
 }
 

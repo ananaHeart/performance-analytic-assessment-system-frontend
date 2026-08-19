@@ -2,8 +2,8 @@
 
 Document created: July 9, 2026  
 Last reviewed: July 13, 2026  
-Last updated: July 13, 2026  
-Coverage period: June 2026 to July 2026
+Last updated: August 1, 2026  
+Coverage period: June 2026 to August 2026
 
 ## 1. Overview
 
@@ -23,7 +23,9 @@ The frontend does not hardcode the backend host. It uses the Vite environment va
 - Vite
 - JavaScript / JSX
 - CSS
+- CSS design tokens
 - Lucide React icons
+- Recharts
 - Spring Boot REST API backend
 - Render deployment target
 
@@ -75,6 +77,12 @@ The following dates are included to help explain when major frontend documentati
 - July 12, 2026: Selected assessment student score export documentation was updated to use `GET /api/export/student-scores/{testId}`.
 - July 13, 2026: Teacher class assignment flow was documented as Teacher -> Subject -> Grade Level -> Section -> Assign, using only backend-returned available sections.
 - July 13, 2026: Gantt chart documentation was added in `docs/gantt-chart.md`.
+- August 1, 2026: A frontend design-system cleanup was documented, using shared CSS design tokens, a white-first interface, and green only for actions, highlights, hover states, and active states.
+- August 1, 2026: Teacher dashboard, class view, assessment list, student results, student profile, teacher analytics, intervention panel, principal dashboard, class assignment, SF1 modal, principal analytics, teachers, and settings screens were reviewed for consistent spacing, card layout, typography, and button styling.
+- August 1, 2026: Analytics chart styling was standardized using Recharts for cleaner mastery and assessment visualizations.
+- August 1, 2026: Sync activity display was aligned with backend `syncTimestamp` data and formatted as Philippine/local time.
+- August 1, 2026: Teacher analytics student results were updated to show whole-assessment scores instead of separate Part 1 and Part 2 score tables.
+- August 1, 2026: Performance Summary highest and lowest student cards were updated to show actual score values instead of percentage-only values.
 
 ## 5. User Roles
 
@@ -187,12 +195,20 @@ Current analytics views include:
 
 - performance summary for the selected assessment
 - least mastered skills
-- assessment part details
-- student score table for the selected assessment part
-- LMS percentage / performance label
+- assessment score details
+- student score table for the selected whole assessment
+- score percentage / performance label
 - teacher-facing intervention recommendation
 
-The analytics view is assessment-driven. The selected assessment controls which details, scores, LMS data, and interventions are displayed.
+The analytics view is assessment-driven. The selected assessment controls which details, scores, LMS data, and interventions are displayed. The student result table is whole-assessment based, so teachers can immediately see each learner's total score for the selected quiz/test.
+
+Part-level backend results are still used when needed to compute or verify scores:
+
+```text
+GET /api/analytics/test-part-results?testId={testId}&testPartId={testPartId}
+```
+
+The frontend combines the selected assessment's part results into whole-test totals for the teacher-facing student result table.
 
 ## 12. Student Profile Skill Mastery
 
@@ -275,6 +291,7 @@ The frontend API client groups backend usage into these areas:
 - LMS and intervention analytics
 - student skill mastery
 - sync activity
+- test part results
 - export downloads
 
 The dashboard preserves request payloads and endpoint paths expected by the backend.
@@ -308,12 +325,15 @@ The following frontend features are currently documented as implemented:
 - competency and branch skill mapping
 - teacher analytics
 - student result table
+- whole-assessment score display in analytics
 - teacher-facing intervention recommendation
 - student profile skill mastery
 - selected assessment student score export
 - production backend environment configuration
 - teacher class assignment flow using backend-returned grade-level sections
 - dated Gantt chart documentation
+- shared frontend design tokens and Recharts-based chart styling
+- sync activity display using backend timestamp data and Philippine/local time formatting
 
 ## 18. Known Remaining Documentation Gaps
 
@@ -340,3 +360,23 @@ Future UI cleanup should preserve:
 - assessment and analytics data integrity
 
 The visual direction should remain a clean education dashboard using the `#3ACF49` primary accent.
+
+## 20. August 1, 2026 Frontend Update Summary
+
+The August 1 update focused on UI consistency and analytics data clarity.
+
+Implemented and documented:
+
+- shared frontend visual direction using design tokens
+- cleaner white-first page background
+- green used only for meaningful actions, active states, highlights, and positive status
+- more consistent cards, tables, buttons, spacing, and typography
+- Recharts-based analytics chart styling
+- compact teacher and principal dashboard layout
+- compact class assignment and SF1 import modal layout
+- student profile Skill Mastery display using the backend student-centered mastery endpoint
+- teacher analytics using backend sync activity and test part result data
+- whole-assessment student score table for the selected test
+- Performance Summary highest and lowest student cards showing actual score values instead of percentage-only values
+
+This update does not change backend endpoint structure or assessment business logic.

@@ -2,8 +2,8 @@
 
 Document created: July 9, 2026  
 Last reviewed: July 13, 2026  
-Last updated: July 13, 2026  
-Coverage period: June 2026 to July 2026
+Last updated: August 1, 2026  
+Coverage period: June 2026 to August 2026
 
 This repository contains the React + Vite web dashboard for the Performance Analytics Assessment System. It is the browser-based frontend used by principals and teachers to manage teacher approval, class assignments, student records, assessment setup, analytics, intervention recommendations, and report exports.
 
@@ -79,6 +79,9 @@ The documentation files for panel review are in the `docs` folder:
 - July 12, 2026: Current web dashboard features, demo flow, and documentation status were refreshed for panel presentation.
 - July 13, 2026: Teacher class assignment flow was updated to use Teacher -> Subject -> Grade Level -> Section -> Assign with backend-returned sections.
 - July 13, 2026: Gantt chart and dated development timeline were added for panel presentation.
+- August 1, 2026: Frontend UI was cleaned up using shared design tokens, a white-first layout, and green only for appropriate actions, highlights, hover states, and active states.
+- August 1, 2026: Analytics charts were standardized using Recharts, and teacher analytics was updated to show whole-assessment student scores instead of separated Part 1 / Part 2 result tables.
+- August 1, 2026: Recent sync activity and student score displays were aligned with backend/mobile sync data, including Philippine/local time formatting and whole-number score summaries.
 
 ## Main Frontend Capabilities
 
@@ -88,6 +91,7 @@ The documentation files for panel review are in the `docs` folder:
 - Student records through manual input and SF1 import
 - Teacher assessment setup with test parts and competency mappings
 - Teacher analytics based on synced mobile checking results
+- Whole-assessment student score table for selected assessments
 - Student score export for selected assessments
 - Student profile skill mastery display
 - Teacher-facing intervention recommendation panel

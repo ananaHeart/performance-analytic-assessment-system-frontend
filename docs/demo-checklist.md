@@ -2,8 +2,8 @@
 
 Document created: July 9, 2026  
 Last reviewed: July 13, 2026  
-Last updated: July 13, 2026  
-Coverage period: June 2026 to July 2026
+Last updated: August 1, 2026  
+Coverage period: June 2026 to August 2026
 
 ## System Purpose
 
@@ -17,6 +17,7 @@ The mobile app is used by the teacher. Students do not answer through the mobile
 - July 12, 2026: Demo checklist was refreshed for panel presentation.
 - July 12, 2026: Demo flow was updated to include Student Profile Skill Mastery, Teacher Intervention, Render backend configuration, and selected assessment student score export.
 - July 13, 2026: Demo flow was updated to include grade-level dependent section assignment and Gantt chart documentation.
+- August 1, 2026: Demo flow was updated to include the cleaned frontend UI, compact SF1 modal, Recharts analytics charts, sync-time display alignment, and whole-assessment student score table.
 
 ## Demo Prerequisites
 
@@ -118,16 +119,17 @@ Expected result:
 5. Review:
    - Performance Summary
    - Least Mastered Skills
-   - Assessment Part Details
+   - Assessment Score Details
    - Student Results
    - Recommended Intervention
 
 Expected result:
 
 - Analytics reflects uploaded mobile checking results.
-- Part details reflect the selected assessment part.
-- Student scores reflect backend checked results.
+- Score details reflect the selected assessment.
+- Student scores show whole-assessment totals for the selected quiz/test.
 - Teacher intervention is shown as a teacher-facing recommendation, not a student message.
+- Highest and lowest student cards show actual score values instead of percentage-only values.
 
 ## G. Teacher Web Flow - Student Profile
 

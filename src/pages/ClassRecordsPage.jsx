@@ -11,37 +11,35 @@ import {
   Users,
 } from 'lucide-react'
 import {
-  confirmSf1,
-  createClassAssignment,
   downloadStudentScoresReport,
   getAssessmentDetails,
-  getClassAssignments,
   getLms,
   getPartSkillMappings,
   getStudentSkillMastery,
   getTeacherAssessments,
   getTeacherInterventions,
   getTestPartResults,
-  getTeachers,
-  getGradeLevels,
   getSyncActivity,
   createManualStudent,
   getManualStudents,
-  getSections,
-  getSubjects,
-  previewSf1,
 } from '../api/apiClient'
+import {
+  createClassAssignmentV2,
+  getAvailableClassesV2,
+  getClassAssignmentsV2,
+  getSchoolSetupReferenceDataV2,
+  getTeacherAccountsV2,
+} from '../api/apiV2Client'
 import { HorizontalMasteryChart } from '../components/AnalyticsCharts'
 
 const initialAssignmentForm = {
   teacherId: '',
   subjectId: '',
   gradeLevelId: '',
-  sectionId: '',
-  academicYearId: '1',
+  classId: '',
 }
 
-const currentAcademicYearLabel = 'SY 2025-2026'
+const SF1_PENDING_MESSAGE = 'Smart Import (SF1): Pending V2 SF1 endpoint'
 
 const initialManualForm = {
   sectionId: '',
@@ -89,6 +87,178 @@ function valuesMatch(leftValue, rightValue) {
   const right = normalizeMatchText(rightValue)
 
   return Boolean(left && right && left === right)
+}
+
+function isAcademicYearPlaceholder(value) {
+  return String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    === 'academic year'
+}
+
+function formatAcademicYearLabel(value, fallback = 'Academic Year', academicYearRecords = []) {
+  const record = value && typeof value === 'object' ? value : null
+  const academicYearId = pickValue(record, [
+    'academicYearId',
+    'id',
+    'value',
+    'yearId',
+    'year_id',
+    'academic_year_id',
+  ]) ?? value
+  const rawLabel = record
+    ? record.academicYearName ??
+      record.year_name ??
+      record.yearName ??
+      record.academicYear ??
+      record.schoolYear ??
+      record.schoolYearName ??
+      record.academicYearLabel ??
+      record.label ??
+      record.displayName ??
+      record.name ??
+      ''
+    : value
+  const raw = String(rawLabel ?? '').trim()
+  const referenceYear = academicYearRecords.find(
+    (academicYear) =>
+      academicYear.id !== null &&
+      academicYear.id !== undefined &&
+      String(academicYear.id) === String(academicYearId),
+  )
+  const referenceLabel = referenceYear?.name ? formatAcademicYearLabel(referenceYear.name, '', []) : ''
+
+  const candidate = raw || referenceLabel
+
+  if (!raw) {
+    return candidate && !isAcademicYearPlaceholder(candidate) ? candidate : fallback
+  }
+
+  if (/^\d+$/.test(raw)) {
+    if (raw.length <= 4) {
+      return raw
+    }
+
+    return candidate && !isAcademicYearPlaceholder(candidate) ? candidate : fallback
+  }
+
+  if (isAcademicYearPlaceholder(raw)) {
+    return candidate && !isAcademicYearPlaceholder(candidate) ? candidate : fallback
+  }
+
+  return raw
+}
+
+function pickValue(record, keys) {
+  for (const key of keys) {
+    const value = record?.[key]
+
+    if (value !== undefined && value !== null && value !== '') {
+      return value
+    }
+  }
+
+  return null
+}
+
+function normalizeAcademicYearRecord(academicYear = {}) {
+  const id = pickValue(academicYear, [
+    'academicYearId',
+    'id',
+    'value',
+    'yearId',
+    'year_id',
+    'academic_year_id',
+  ])
+  const rawName =
+    pickValue(academicYear, [
+      'schoolYear',
+      'schoolYearName',
+      'year_name',
+      'yearName',
+      'academicYearLabel',
+      'label',
+      'displayName',
+      'academicYearName',
+      'name',
+    ]) ?? ''
+  const name = String(rawName)
+    .replace(new RegExp(`\\b${String(id)}\\b`, 'g'), '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const status = String(academicYear.status ?? '').trim().toLowerCase()
+
+  return {
+    ...academicYear,
+    id,
+    name,
+    isActive: Boolean(academicYear.isActive ?? academicYear.active ?? academicYear.is_active ?? status === 'active'),
+  }
+}
+
+function normalizeGradeLevelOption(gradeLevel = {}) {
+  const id = pickValue(gradeLevel, ['gradeLevelId', 'id', 'value'])
+
+  return {
+    ...gradeLevel,
+    id,
+    name:
+      pickValue(gradeLevel, ['gradeLevelName', 'name', 'grade', 'label', 'displayName']) ??
+      (id ? `Grade Level ${id}` : 'Grade Level'),
+  }
+}
+
+function normalizeSubjectOption(subject = {}) {
+  const id = pickValue(subject, ['subjectId', 'id', 'value'])
+
+  return {
+    ...subject,
+    id,
+    name:
+      pickValue(subject, ['subjectName', 'name', 'subject', 'label', 'displayName']) ??
+      (id ? `Subject ${id}` : 'Subject'),
+  }
+}
+
+function normalizeAvailableClassOption(classRecord = {}) {
+  const classId = pickValue(classRecord, ['classId', 'id', 'value'])
+  const sectionId =
+    classRecord.sectionId ??
+    classRecord.section?.sectionId ??
+    classRecord.section?.id ??
+    null
+  const sectionName =
+    classRecord.sectionName ??
+    classRecord.section?.sectionName ??
+    classRecord.section?.name ??
+    classRecord.name ??
+    classRecord.label ??
+    'Section'
+
+  return {
+    ...classRecord,
+    id: classId,
+    classId,
+    sectionId,
+    name: sectionName,
+    sectionName,
+    gradeLevelId:
+      classRecord.gradeLevelId ??
+      classRecord.gradeLevel?.gradeLevelId ??
+      classRecord.gradeLevel?.id ??
+      null,
+    gradeLevelName:
+      classRecord.gradeLevelName ??
+      classRecord.gradeLevel?.gradeLevelName ??
+      classRecord.gradeLevel?.name ??
+      '',
+    subjectId:
+      classRecord.subjectId ??
+      classRecord.subject?.subjectId ??
+      classRecord.subject?.id ??
+      null,
+  }
 }
 
 function sectionMatchesGrade(section, gradeLevel) {
@@ -544,6 +714,7 @@ function studentBelongsToClass(student, assignment) {
 function ClassRecordsPage({
   role,
   user,
+  token,
   onNavigate,
   initialClassId = null,
   initialTeacherTab = 'assessment',
@@ -554,6 +725,8 @@ function ClassRecordsPage({
   const [schoolTeachers, setSchoolTeachers] = useState([])
   const [subjects, setSubjects] = useState([])
   const [schoolGradeLevels, setSchoolGradeLevels] = useState([])
+  const [academicYears, setAcademicYears] = useState([])
+  const [selectedAcademicYearId, setSelectedAcademicYearId] = useState('')
   const [sections, setSections] = useState([])
   const [assignmentSections, setAssignmentSections] = useState([])
   const [assessments, setAssessments] = useState([])
@@ -562,9 +735,6 @@ function ClassRecordsPage({
   const [manualForm, setManualForm] = useState(initialManualForm)
   const [manualClassFilters, setManualClassFilters] = useState(initialManualClassFilters)
   const [manualRows, setManualRows] = useState(() => createManualStudentRows())
-  const [selectedFile, setSelectedFile] = useState(null)
-  const [previewData, setPreviewData] = useState(null)
-  const [confirmResult, setConfirmResult] = useState(null)
   const [activeTeacherTab, setActiveTeacherTab] = useState(
     initialTeacherTab === 'students' || initialTeacherTab === 'analytics'
       ? initialTeacherTab
@@ -581,28 +751,22 @@ function ClassRecordsPage({
   const [teacherInterventionRecommendations, setTeacherInterventionRecommendations] = useState([])
   const [studentSkillMasteryRows, setStudentSkillMasteryRows] = useState([])
   const [activePrincipalTool, setActivePrincipalTool] = useState(null)
-  const [isSf1ImportModalOpen, setIsSf1ImportModalOpen] = useState(false)
   const [studentsError, setStudentsError] = useState('')
   const [assessmentsError, setAssessmentsError] = useState('')
   const [studentsSuccess, setStudentsSuccess] = useState('')
   const [assignmentMessage, setAssignmentMessage] = useState({ error: '', success: '' })
   const [manualMessage, setManualMessage] = useState({ error: '', success: '' })
-  const [previewMessage, setPreviewMessage] = useState({ error: '', success: '' })
-  const [confirmMessage, setConfirmMessage] = useState({ error: '', success: '' })
   const [isStudentsLoading, setIsStudentsLoading] = useState(true)
   const [isAssessmentsLoading, setIsAssessmentsLoading] = useState(true)
   const [, setIsSectionsLoading] = useState(true)
   const [isAssignmentSubmitting, setIsAssignmentSubmitting] = useState(false)
   const [isManualSubmitting, setIsManualSubmitting] = useState(false)
-  const [isPreviewLoading, setIsPreviewLoading] = useState(false)
-  const [isConfirmSubmitting, setIsConfirmSubmitting] = useState(false)
   const [isAnalyticsLoading, setIsAnalyticsLoading] = useState(false)
   const [isAnalyticsExportLoading, setIsAnalyticsExportLoading] = useState(false)
   const [isStudentSkillMasteryLoading, setIsStudentSkillMasteryLoading] = useState(false)
   const [analyticsMessage, setAnalyticsMessage] = useState({ error: '', success: '' })
   const [studentSkillMasteryMessage, setStudentSkillMasteryMessage] = useState('')
 
-  const previewRows = previewData?.rows ?? []
   const sectionOptions = useMemo(
     () => sections.filter((section) => section.id !== null && section.id !== undefined),
     [sections],
@@ -640,6 +804,20 @@ function ClassRecordsPage({
       ) ?? null,
     [assignmentForm.gradeLevelId, assignmentGradeOptions],
   )
+  const selectedAcademicYear = useMemo(
+    () =>
+      academicYears.find(
+        (academicYear) => String(academicYear.id) === String(selectedAcademicYearId),
+      ) ?? null,
+    [academicYears, selectedAcademicYearId],
+  )
+  const formatAcademicYear = (value, fallback = 'Academic Year') =>
+    formatAcademicYearLabel(value, fallback, academicYears)
+  const selectedAcademicYearLabel =
+    formatAcademicYear(
+      selectedAcademicYear,
+      'No academic year selected',
+    )
   const assignmentSectionOptions = useMemo(() => {
     const sourceSections = assignmentForm.gradeLevelId ? assignmentSections : []
 
@@ -1026,34 +1204,78 @@ function ClassRecordsPage({
     setIsSectionsLoading(true)
 
     try {
-      const [sectionRecords, teacherRecords, subjectRecords, gradeLevelRecords] = await Promise.all([
-        getSections(),
-        getTeachers().catch(() => []),
-        getSubjects().catch(() => []),
-        getGradeLevels().catch(() => []),
+      const [teacherRecords, referenceData] = await Promise.all([
+        getTeacherAccountsV2(token, 'active'),
+        getSchoolSetupReferenceDataV2(token),
       ])
-      setSections(sectionRecords)
+
+      const academicYearRecords = (referenceData.academicYears ?? referenceData.years ?? [])
+        .map(normalizeAcademicYearRecord)
+        .filter((academicYear) => academicYear.id !== null && academicYear.id !== undefined)
+      const gradeLevelRecords = (referenceData.gradeLevels ?? [])
+        .map(normalizeGradeLevelOption)
+        .filter((gradeLevel) => gradeLevel.id !== null && gradeLevel.id !== undefined)
+      const subjectRecords = (referenceData.subjects ?? [])
+        .map(normalizeSubjectOption)
+        .filter((subject) => subject.id !== null && subject.id !== undefined)
+      const defaultAcademicYear =
+        academicYearRecords.find((academicYear) => academicYear.isActive) ??
+        academicYearRecords[0] ??
+        null
+
       setSchoolTeachers(teacherRecords)
       setSubjects(subjectRecords)
       setSchoolGradeLevels(gradeLevelRecords)
-    } catch {
+      setAcademicYears(academicYearRecords)
+      setSelectedAcademicYearId((currentAcademicYearId) =>
+        academicYearRecords.some(
+          (academicYear) => String(academicYear.id) === String(currentAcademicYearId),
+        )
+          ? currentAcademicYearId
+          : defaultAcademicYear?.id
+            ? String(defaultAcademicYear.id)
+            : '',
+      )
+    } catch (loadError) {
       setSections([])
       setSchoolTeachers([])
       setSubjects([])
       setSchoolGradeLevels([])
+      setAcademicYears([])
+      setSelectedAcademicYearId('')
+      setAssignmentMessage({
+        error: loadError.message || 'Unable to load V2 school setup reference data.',
+        success: '',
+      })
     } finally {
       setIsSectionsLoading(false)
     }
   }
 
   const loadTeacherClasses = async () => {
+    if (!selectedAcademicYearId) {
+      setClassAssignments([])
+      setSelectedClassAssignment(null)
+      return
+    }
+
     try {
-      const assignments = await getClassAssignments()
+      const assignments = await getClassAssignmentsV2(token, selectedAcademicYearId)
       const nextTeacherAssignments =
         role === 'teacher'
           ? assignments.filter((assignment) => Number(assignment.teacherId) === Number(teacherId))
           : assignments
       setClassAssignments(nextTeacherAssignments)
+      setSections(
+        nextTeacherAssignments
+          .filter((assignment) => assignment.sectionId)
+          .map((assignment) => ({
+            id: assignment.sectionId,
+            name: assignment.sectionName,
+            gradeLevelId: assignment.gradeLevelId,
+            gradeLevelName: assignment.gradeLevelName,
+          })),
+      )
       setSelectedClassAssignment((currentAssignment) =>
         nextTeacherAssignments.find(
           (assignment) =>
@@ -1065,8 +1287,13 @@ function ClassRecordsPage({
         nextTeacherAssignments[0] ??
         null,
       )
-    } catch {
+    } catch (loadError) {
+      setClassAssignments([])
       setSelectedClassAssignment(null)
+      setAssignmentMessage({
+        error: loadError.message || 'Unable to load V2 class assignments.',
+        success: '',
+      })
     }
   }
 
@@ -1237,25 +1464,41 @@ function ClassRecordsPage({
   useEffect(() => {
     loadStudents()
     loadSections()
-    loadTeacherClasses()
     loadTeacherAssessments()
   }, [])
 
   useEffect(() => {
-    const gradeLevelId = assignmentForm.gradeLevelId
+    if (selectedAcademicYearId) {
+      loadTeacherClasses()
+    }
+  }, [selectedAcademicYearId])
+
+  useEffect(() => {
+    const { gradeLevelId, subjectId } = assignmentForm
 
     setAssignmentSections([])
 
-    if (!gradeLevelId) {
+    if (!selectedAcademicYearId || !gradeLevelId || !subjectId) {
       return
     }
 
     let shouldApplyResults = true
 
-    getSections({ gradeLevelId })
-      .then((sectionRecords) => {
+    getAvailableClassesV2(
+      {
+        academicYearId: selectedAcademicYearId,
+        gradeLevelId,
+        subjectId,
+      },
+      token,
+    )
+      .then((classRecords) => {
         if (shouldApplyResults) {
-          setAssignmentSections(sectionRecords)
+          setAssignmentSections(
+            classRecords
+              .map(normalizeAvailableClassOption)
+              .filter((classRecord) => classRecord.classId !== null && classRecord.classId !== undefined),
+          )
         }
       })
       .catch(() => {
@@ -1267,7 +1510,7 @@ function ClassRecordsPage({
     return () => {
       shouldApplyResults = false
     }
-  }, [assignmentForm.gradeLevelId])
+  }, [assignmentForm.gradeLevelId, assignmentForm.subjectId, selectedAcademicYearId, token])
 
   useEffect(() => {
     if (role !== 'teacher') {
@@ -1329,9 +1572,9 @@ function ClassRecordsPage({
     setAssignmentForm((currentForm) => ({
       ...currentForm,
       [name]: value,
-      ...(name === 'teacherId' ? { subjectId: '', gradeLevelId: '', sectionId: '' } : {}),
-      ...(name === 'subjectId' ? { gradeLevelId: '', sectionId: '' } : {}),
-      ...(name === 'gradeLevelId' ? { sectionId: '' } : {}),
+      ...(name === 'teacherId' ? { subjectId: '', gradeLevelId: '', classId: '' } : {}),
+      ...(name === 'subjectId' ? { gradeLevelId: '', classId: '' } : {}),
+      ...(name === 'gradeLevelId' ? { classId: '' } : {}),
     }))
   }
 
@@ -1343,8 +1586,8 @@ function ClassRecordsPage({
       !assignmentForm.teacherId ||
       !assignmentForm.subjectId ||
       !assignmentForm.gradeLevelId ||
-      !assignmentForm.sectionId ||
-      !assignmentForm.academicYearId.trim()
+      !assignmentForm.classId ||
+      !selectedAcademicYearId
     ) {
       setAssignmentMessage({
         error: 'Select teacher, subject, grade level, section, and academic year before assigning.',
@@ -1356,12 +1599,12 @@ function ClassRecordsPage({
     setIsAssignmentSubmitting(true)
 
     try {
-      await createClassAssignment({
-        teacherId: Number(assignmentForm.teacherId),
+      await createClassAssignmentV2({
+        classId: Number(assignmentForm.classId),
+        teacherUserId: Number(assignmentForm.teacherId),
         subjectId: Number(assignmentForm.subjectId),
-        sectionId: Number(assignmentForm.sectionId),
-        academicYearId: Number(assignmentForm.academicYearId.trim()),
-      })
+        assignmentRole: 'primary',
+      }, token)
       setAssignmentForm(initialAssignmentForm)
       setAssignmentMessage({ error: '', success: 'Teacher assigned to class successfully.' })
       await loadTeacherClasses()
@@ -1446,6 +1689,15 @@ function ClassRecordsPage({
     )
   }
 
+  const handleSmartImportPendingClick = (event) => {
+    event.preventDefault()
+
+    setAssignmentMessage({
+      error: 'Smart Import (SF1) is temporarily disabled in V2. Use Manual Input for now.',
+      success: '',
+    })
+  }
+
   const handleManualSubmit = async (event) => {
     event.preventDefault()
     setManualMessage({ error: '', success: '' })
@@ -1522,100 +1774,6 @@ function ClassRecordsPage({
       })
     } finally {
       setIsManualSubmitting(false)
-    }
-  }
-
-  const handleFileChange = (event) => {
-    const nextFile = event.target.files?.[0] ?? null
-    setSelectedFile(nextFile)
-    setPreviewData(null)
-    setConfirmResult(null)
-    setPreviewMessage({ error: '', success: '' })
-    setConfirmMessage({ error: '', success: '' })
-  }
-
-  const handleOpenSf1Import = () => {
-    setActivePrincipalTool(null)
-    setSelectedFile(null)
-    setPreviewData(null)
-    setConfirmResult(null)
-    setPreviewMessage({ error: '', success: '' })
-    setConfirmMessage({ error: '', success: '' })
-    setIsSf1ImportModalOpen(true)
-  }
-
-  const handleCloseSf1Import = () => {
-    if (isPreviewLoading || isConfirmSubmitting) {
-      return
-    }
-
-    setIsSf1ImportModalOpen(false)
-  }
-
-  const handlePreviewSubmit = async (event) => {
-    event?.preventDefault()
-    setPreviewMessage({ error: '', success: '' })
-    setConfirmResult(null)
-
-    if (!selectedFile) {
-      setPreviewMessage({ error: 'Select an SF1 file before previewing.', success: '' })
-      return
-    }
-
-    setIsPreviewLoading(true)
-
-    try {
-      const previewResult = await previewSf1(selectedFile)
-      setPreviewData(previewResult)
-      setPreviewMessage({ error: '', success: 'SF1 preview generated successfully.' })
-    } catch (previewError) {
-      setPreviewMessage({
-        error: previewError.message || 'Unable to preview the SF1 file.',
-        success: '',
-      })
-    } finally {
-      setIsPreviewLoading(false)
-    }
-  }
-
-  const handleConfirmSubmit = async (event) => {
-    event.preventDefault()
-
-    if (isConfirmSubmitting || confirmResult) {
-      return
-    }
-
-    setConfirmMessage({ error: '', success: '' })
-
-    if (!selectedFile) {
-      setConfirmMessage({ error: 'Select an SF1 file before confirming import.', success: '' })
-      return
-    }
-
-    if (!previewData) {
-      setConfirmMessage({ error: 'Run SF1 preview before confirming import.', success: '' })
-      return
-    }
-
-    setIsConfirmSubmitting(true)
-
-    try {
-      const result = await confirmSf1(selectedFile)
-      setConfirmResult(result)
-      setConfirmMessage({ error: '', success: '' })
-      setStudentsSuccess('SF1 import completed successfully.')
-      setIsSf1ImportModalOpen(false)
-      setActivePrincipalTool(null)
-      await loadStudents({ preserveMessage: true })
-      await loadSections()
-      await loadTeacherClasses()
-    } catch (confirmError) {
-      setConfirmMessage({
-        error: confirmError.message || 'Unable to confirm SF1 import.',
-        success: '',
-      })
-    } finally {
-      setIsConfirmSubmitting(false)
     }
   }
 
@@ -2262,16 +2420,15 @@ function ClassRecordsPage({
           <div className="principal-assignment-toolbar-actions">
             <button
               type="button"
-              className={`principal-smart-import-card ${
-                isSf1ImportModalOpen ? 'is-active' : ''
-              }`}
-              onClick={handleOpenSf1Import}
+              className="principal-smart-import-card"
+              onClick={handleSmartImportPendingClick}
+              title={SF1_PENDING_MESSAGE}
+              aria-label={SF1_PENDING_MESSAGE}
             >
               <span aria-hidden="true">
                 <FileText size={18} strokeWidth={2.3} />
               </span>
               <strong>Smart Import (SF1)</strong>
-              <small>Import School Form Here.</small>
             </button>
 
             <button
@@ -2311,7 +2468,7 @@ function ClassRecordsPage({
             >
               <option value="">Select teacher</option>
               {schoolTeachers.map((teacher) => (
-                <option key={teacher.id} value={teacher.id}>
+                <option key={teacher.userId ?? teacher.id} value={teacher.userId ?? teacher.id}>
                   {teacher.name}
                 </option>
               ))}
@@ -2358,8 +2515,8 @@ function ClassRecordsPage({
             <span>Section</span>
             <select
               id="classAssignmentSectionId"
-              name="sectionId"
-              value={assignmentForm.sectionId}
+              name="classId"
+              value={assignmentForm.classId}
               onChange={handleAssignmentFormChange}
               disabled={!assignmentForm.gradeLevelId || !assignmentSectionOptions.length}
             >
@@ -2374,8 +2531,8 @@ function ClassRecordsPage({
                 </option>
               ) : null}
               {assignmentSectionOptions.map((section) => (
-                <option key={section.id} value={section.id}>
-                  {section.name}
+                <option key={section.classId ?? section.id} value={section.classId}>
+                  {section.sectionName || section.name}
                 </option>
               ))}
             </select>
@@ -2383,7 +2540,7 @@ function ClassRecordsPage({
 
           <div className="principal-assignment-readonly-field" aria-label="Academic Year">
             <span>Academic Year</span>
-            <strong>{currentAcademicYearLabel}</strong>
+            <strong>{selectedAcademicYearLabel}</strong>
           </div>
 
           <button type="submit" className="primary-button" disabled={isAssignmentSubmitting}>
@@ -2391,189 +2548,6 @@ function ClassRecordsPage({
           </button>
         </form>
       </section>
-
-      {isSf1ImportModalOpen ? (
-        <div
-          className="sf1-import-modal-backdrop"
-          role="presentation"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              handleCloseSf1Import()
-            }
-          }}
-        >
-          <section
-            className={`sf1-import-modal ${previewData ? 'is-review' : ''}`}
-            role="dialog"
-            aria-modal="true"
-          >
-            <header className="sf1-import-modal-header">
-              <div>
-                <p className="content-card-tag">Smart Import (SF1)</p>
-                <h3>{previewData ? 'Review SF1 import' : 'Choose SF1 file'}</h3>
-              </div>
-              <button
-                type="button"
-                onClick={handleCloseSf1Import}
-                disabled={isPreviewLoading || isConfirmSubmitting}
-              >
-                Close
-              </button>
-            </header>
-
-            {!previewData ? (
-              <form className="sf1-import-modal-body" onSubmit={handlePreviewSubmit}>
-                <p className="supporting-text">
-                  Select the SF1 Excel file first. The preview and confirmation step will stay in
-                  this window.
-                </p>
-
-                {previewMessage.error ? (
-                  <p className="form-message form-message-error">{previewMessage.error}</p>
-                ) : null}
-
-                <label className="field-group" htmlFor="sf1File">
-                  <span>SF1 Excel File</span>
-                  <input
-                    id="sf1File"
-                    type="file"
-                    accept=".xls,.xlsx"
-                    onChange={handleFileChange}
-                  />
-                </label>
-
-                {selectedFile ? (
-                  <div className="sf1-selected-file">
-                    <span>Selected file</span>
-                    <strong>{selectedFile.name}</strong>
-                  </div>
-                ) : null}
-
-                <footer className="sf1-import-modal-footer">
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={handleCloseSf1Import}
-                    disabled={isPreviewLoading}
-                  >
-                    Cancel
-                  </button>
-                  <button type="submit" className="primary-button" disabled={isPreviewLoading}>
-                    {isPreviewLoading ? 'Previewing...' : 'Save and Preview'}
-                  </button>
-                </footer>
-              </form>
-            ) : (
-              <div className="sf1-import-modal-body sf1-review-body">
-                <p className="supporting-text">
-                  Review the detected section, school year, and student rows before saving the
-                  import.
-                </p>
-
-                {previewMessage.success ? (
-                  <p className="form-message form-message-success">{previewMessage.success}</p>
-                ) : null}
-                {confirmMessage.error ? (
-                  <p className="form-message form-message-error">{confirmMessage.error}</p>
-                ) : null}
-                <div className="sf1-review-header">
-                  <div>
-                    <span>Selected File</span>
-                    <strong>{selectedFile?.name || 'No file selected'}</strong>
-                  </div>
-                  <button type="button" className="secondary-button" onClick={handleOpenSf1Import}>
-                    Choose Different File
-                  </button>
-                </div>
-
-                <div className="approval-table-wrap sf1-review-table-wrap">
-                  <table className="approval-table preview-table">
-                    <thead>
-                      <tr>
-                        <th>Row Number</th>
-                        <th>Student LRN</th>
-                        <th>First Name</th>
-                        <th>Last Name</th>
-                        <th>Gender</th>
-                        <th>Status</th>
-                        <th>Message</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {!previewRows.length ? (
-                        <tr>
-                          <td className="approval-empty" colSpan="7">
-                            No preview rows returned.
-                          </td>
-                        </tr>
-                      ) : (
-                        previewRows.map((row, index) => (
-                          <tr key={`${row.rowNumber}-${row.studentLrn}-${index}`}>
-                            <td>{row.rowNumber || '-'}</td>
-                            <td>{row.studentLrn || '-'}</td>
-                            <td>{row.firstName || '-'}</td>
-                            <td>{row.lastName || '-'}</td>
-                            <td>{row.gender || '-'}</td>
-                            <td>
-                              <span
-                                className={`status-pill status-${String(row.status).toLowerCase()}`}
-                              >
-                                {formatStatus(row.status)}
-                              </span>
-                            </td>
-                            <td>{row.message || '-'}</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="sf1-review-summary-grid">
-                  <article className="mini-stat-card">
-                    <span>School Year</span>
-                    <strong>{previewData.detectedSchoolYear || 'Not detected'}</strong>
-                  </article>
-                  <article className="mini-stat-card">
-                    <span>Section</span>
-                    <strong>{previewData.detectedSectionName || 'Not detected'}</strong>
-                  </article>
-                  <article className="mini-stat-card">
-                    <span>Total</span>
-                    <strong>{previewData.totalRows}</strong>
-                  </article>
-                  <article className="mini-stat-card">
-                    <span>Valid</span>
-                    <strong>{previewData.validRows}</strong>
-                  </article>
-                  <article className="mini-stat-card">
-                    <span>Invalid</span>
-                    <strong>{previewData.invalidRows}</strong>
-                  </article>
-                </div>
-
-                <form className="sf1-confirm-actions" onSubmit={handleConfirmSubmit}>
-                  <div>
-                    <span>Ready to save</span>
-                    <strong>Confirm import after reviewing the preview rows.</strong>
-                  </div>
-                  <button
-                    type="submit"
-                    className="primary-button"
-                    disabled={isConfirmSubmitting || Boolean(confirmResult)}
-                  >
-                    {isConfirmSubmitting
-                      ? 'Confirming...'
-                      : confirmResult
-                        ? 'Import Completed'
-                        : 'Confirm Import'}
-                  </button>
-                </form>
-              </div>
-            )}
-          </section>
-        </div>
-      ) : null}
 
       <section className="principal-assignment-card">
         <div className="principal-assignment-table-header">
@@ -2611,7 +2585,7 @@ function ClassRecordsPage({
                       {assignment.gradeLevelName || 'Grade level'} -{' '}
                       {assignment.sectionName || 'Section'}
                     </td>
-                    <td>{assignment.academicYear || 'Not assigned'}</td>
+                    <td>{formatAcademicYear(assignment, 'Not assigned')}</td>
                     <td>
                       <span className="status-pill status-active">Active</span>
                     </td>
@@ -2673,7 +2647,7 @@ function ClassRecordsPage({
                       <td>{student.gender}</td>
                       <td>{student.section || 'Not assigned'}</td>
                       <td>{student.gradeLevel || 'Not assigned'}</td>
-                      <td>{student.academicYear || 'Not assigned'}</td>
+                    <td>{formatAcademicYear(student, 'Not assigned')}</td>
                     </tr>
                   ))
                 : null}
@@ -2798,7 +2772,10 @@ function ClassRecordsPage({
                 <small>
                   {selectedManualClassOption.assignment.teacherName || 'Teacher'} /{' '}
                   {selectedManualClassOption.assignment.subjectName || 'Subject'} /{' '}
-                  {selectedManualClassOption.assignment.academicYear || 'Academic year'}
+                  {formatAcademicYear(
+                    selectedManualClassOption.assignment,
+                    'Academic year',
+                  )}
                 </small>
               </div>
             ) : null}

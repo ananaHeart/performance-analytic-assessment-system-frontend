@@ -98,6 +98,8 @@ function normalizeStudentRecord(student) {
 
   return {
     id: student.id ?? student.studentId ?? student.manualStudentId ?? null,
+    studentId: student.studentId ?? student.student_id ?? student.id ?? null,
+    classListId: student.classListId ?? student.class_list_id ?? null,
     studentLrn: student.studentLrn ?? student.lrn ?? student.LRN ?? '',
     firstName,
     middleName,
@@ -203,15 +205,31 @@ function normalizeSubjectRecord(subject) {
 }
 
 function normalizeClassAssignmentRecord(assignment) {
+  const classAssignmentId =
+    assignment.classAssignmentId ?? assignment.class_assignment_id ?? null
+  const explicitClassId =
+    assignment.classId ??
+    assignment.class_id ??
+    assignment.class?.classId ??
+    assignment.class?.class_id ??
+    assignment.class?.id ??
+    null
+  const legacyRecordId = assignment.id ?? null
+
   return {
-    id: assignment.id ?? assignment.classAssignmentId ?? null,
-    classId:
-      assignment.classId ??
-      assignment.id ??
-      assignment.classAssignmentId ??
-      assignment.sectionId ??
+    id: classAssignmentId ?? legacyRecordId ?? explicitClassId,
+    classAssignmentId,
+    // V1 assignment rows used `id` as the class identity. Never apply that
+    // fallback when the backend supplied a real V2 class-assignment identity.
+    classId: explicitClassId ?? (classAssignmentId === null ? legacyRecordId : null),
+    teacherId:
+      assignment.teacherId ??
+      assignment.teacherUserId ??
+      assignment.teacher_id ??
+      assignment.teacher_user_id ??
+      assignment.teacher?.id ??
+      assignment.teacher?.teacherId ??
       null,
-    teacherId: assignment.teacherId ?? assignment.teacher?.id ?? assignment.teacher?.teacherId ?? null,
     subjectId: assignment.subjectId ?? assignment.subject?.id ?? assignment.subject?.subjectId ?? null,
     sectionId: assignment.sectionId ?? assignment.section?.id ?? assignment.section?.sectionId ?? null,
     gradeLevelId:
@@ -252,6 +270,11 @@ function normalizeClassAssignmentRecord(assignment) {
       assignment.schoolYear ??
       assignment.academicYearLabel ??
       '',
+    academicYearId:
+      assignment.academicYearId ?? assignment.academic_year_id ?? assignment.academicYear?.id ?? null,
+    assignmentRole: assignment.assignmentRole ?? assignment.assignment_role ?? '',
+    status: assignment.status ?? '',
+    assignedAt: assignment.assignedAt ?? assignment.assigned_at ?? '',
   }
 }
 
@@ -290,11 +313,16 @@ function normalizeCompetencyTreeRecord(competency) {
 function normalizeAssessmentRecord(assessment) {
   return {
     id: assessment.testId ?? assessment.id ?? assessment.assessmentId ?? null,
-    classId: assessment.classId ?? assessment.classAssignmentId ?? assessment.sectionId ?? null,
+    classAssignmentId:
+      assessment.classAssignmentId ?? assessment.class_assignment_id ?? null,
+    classId: assessment.classId ?? assessment.class_id ?? assessment.class?.id ?? null,
+    termPeriodId: assessment.termPeriodId ?? assessment.term_period_id ?? null,
     testName: assessment.testName ?? assessment.name ?? 'Untitled Test',
     testType: assessment.testType ?? assessment.type ?? '',
     testDate: assessment.testDate ?? assessment.date ?? '',
     testStatus: assessment.testStatus ?? assessment.status ?? '',
+    instructions: assessment.instructions ?? '',
+    totalItems: assessment.totalItems ?? assessment.total_items ?? '',
     subjectName:
       assessment.subjectName ??
       assessment.subject?.name ??
@@ -724,69 +752,21 @@ export async function updateManualStudent(studentId, studentPayload) {
   })
 }
 
-export async function previewSf1(file) {
-  const formData = new FormData()
-  formData.append('file', file)
-
-  const payload = await request('/api/import/sf1/preview', {
-    method: 'POST',
-    body: formData,
-  })
-
-  const source = extractObject(payload)
-  const previewRows = extractCollection(source, ['previewRows', 'rows', 'records', 'students']).map(
-    normalizePreviewRow,
+function sf1UnavailableError() {
+  const error = new Error(
+    'Smart Import (SF1) is temporarily unavailable. V2 SF1 endpoint is pending integration.',
   )
-
-  return {
-    detectedSchoolYear:
-      source.detectedSchoolYear ??
-      source.schoolYear ??
-      source.academicYear ??
-      source.detectedAcademicYear ??
-      '',
-    detectedSectionName:
-      source.detectedSectionName ??
-      source.sectionName ??
-      source.section ??
-      source.detectedSection ??
-      '',
-    totalRows: source.totalRows ?? source.total ?? previewRows.length ?? 0,
-    validRows: source.validRows ?? source.valid ?? 0,
-    invalidRows: source.invalidRows ?? source.invalid ?? 0,
-    rows: previewRows,
-  }
+  error.code = 'SF1_PENDING'
+  error.status = 503
+  throw error
 }
 
-export async function confirmSf1(file) {
-  const formData = new FormData()
-  formData.append('file', file)
+export async function previewSf1() {
+  sf1UnavailableError()
+}
 
-  const payload = await request('/api/import/sf1/confirm', {
-    method: 'POST',
-    body: formData,
-  })
-
-  const source = extractObject(payload)
-
-  return {
-    detectedSchoolYear:
-      source.detectedSchoolYear ??
-      source.schoolYear ??
-      source.academicYear ??
-      source.detectedAcademicYear ??
-      '',
-    detectedSectionName:
-      source.detectedSectionName ??
-      source.sectionName ??
-      source.section ??
-      source.detectedSection ??
-      '',
-    importedStudents: source.importedStudents ?? source.imported ?? 0,
-    updatedStudents: source.updatedStudents ?? source.updated ?? 0,
-    enrolledStudents: source.enrolledStudents ?? source.enrolled ?? 0,
-    skippedRows: source.skippedRows ?? source.skipped ?? 0,
-  }
+export async function confirmSf1() {
+  sf1UnavailableError()
 }
 
 export async function getSections(filters = {}) {

@@ -544,7 +544,7 @@ function AssessmentSetupPage({ user, initialClassId, initialAssessmentId, onNavi
   const isSavedSetupLocked =
     isAssessmentSelected && Boolean(savedParts.length || savedSetupSnapshot?.parts?.length)
   const isSavedPartEditing = savedPartEditIndex !== null
-  const isPartFormLocked = isSavedSetupLocked && !isSavedPartEditing
+  const isPartFormLocked = isSetupSaving
   const answerKeyEntries = parseAnswerKeyEntries(partForm.answerKey)
   const answerKeyItemCount = Number(partForm.numberOfItems)
   const answerKeySlotCount =
@@ -838,17 +838,9 @@ function AssessmentSetupPage({ user, initialClassId, initialAssessmentId, onNavi
     }))
   }
 
-  const handleAddDraftPart = (event) => {
+  const handleAddDraftPart = async (event) => {
     event.preventDefault()
     setPartMessage({ error: '', success: '' })
-
-    if (isSavedSetupLocked && !isSavedPartEditing) {
-      setPartMessage({
-        error: 'This assessment setup is already saved. Use Review Setup to finish.',
-        success: '',
-      })
-      return
-    }
 
     const validationError = validatePartForm(partForm)
 
@@ -888,12 +880,56 @@ function AssessmentSetupPage({ user, initialClassId, initialAssessmentId, onNavi
       return
     }
 
+    if (isAssessmentSelected) {
+      setIsSetupSaving(true)
+
+      try {
+        const testPartResponse = await createTestPart(
+          selectedAssessmentId,
+          buildTestPartPayload(nextPart),
+        )
+        const createdTestPartId = extractCreatedTestPartId(testPartResponse)
+
+        if (!createdTestPartId) {
+          throw new Error(
+            'A test part was created, but the system could not continue to its branch skill mapping. Please refresh and review the saved assessment.',
+          )
+        }
+
+        await savePartSkillMappings({
+          testPartId: Number(createdTestPartId),
+          mappings: buildSkillMappingPayload(nextPart),
+        })
+
+        setSavedPartEditIndex(null)
+        setPartForm(initialPartForm)
+        await loadAssessmentDetails(selectedAssessmentId)
+        setPartMessage({ error: '', success: 'New section added to the saved assessment.' })
+        setPageSuccess('Assessment section added and ready for mobile sync.')
+      } catch (addPartError) {
+        setPartMessage({
+          error: addPartError.message || 'Unable to add another section to this assessment.',
+          success: '',
+        })
+      } finally {
+        setIsSetupSaving(false)
+      }
+
+      return
+    }
+
     setDraftParts((currentParts) => [
       ...currentParts,
       nextPart,
     ])
     setPartForm(initialPartForm)
     setPartMessage({ error: '', success: 'Test part added to this assessment setup.' })
+  }
+
+  const handleStartNewPart = () => {
+    setSavedPartEditIndex(null)
+    setPartForm(initialPartForm)
+    setPartMessage({ error: '', success: 'Ready to add another section.' })
   }
 
   const handleRemoveDraftPart = (indexToRemove) => {
@@ -1307,12 +1343,24 @@ function AssessmentSetupPage({ user, initialClassId, initialAssessmentId, onNavi
             <PlusCircle size={18} strokeWidth={2.2} />
           </span>
           <div>
-            <h3>Assessment Sections / Test Parts</h3>
+            <h3>{isSavedPartEditing ? 'Edit Assessment Section' : 'Add New Assessment Section'}</h3>
             <p className="supporting-text">
-              Add the sections of this assessment, such as Multiple Choice, Identification, or
-              Enumeration.
+              {isSavedPartEditing
+                ? 'Update the selected saved section, then return to add-new-section mode.'
+                : 'Add another section of this assessment, such as Multiple Choice, Identification, or Enumeration.'}
             </p>
           </div>
+          {isAssessmentSelected ? (
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={handleStartNewPart}
+              disabled={isSetupSaving}
+            >
+              <PlusCircle size={16} strokeWidth={2.2} />
+              New Section
+            </button>
+          ) : null}
         </div>
 
         {partMessage.error ? <p className="form-message form-message-error">{partMessage.error}</p> : null}
@@ -1566,7 +1614,13 @@ function AssessmentSetupPage({ user, initialClassId, initialAssessmentId, onNavi
               disabled={!isClassSelected || isPartFormLocked}
               >
                 <PlusCircle size={18} strokeWidth={2.3} />
-                {isSavedPartEditing ? 'Apply Section Change' : 'Add Section'}
+                {isSetupSaving
+                  ? 'Saving...'
+                  : isSavedPartEditing
+                    ? 'Apply Section Change'
+                    : isAssessmentSelected
+                      ? 'Add Another Section'
+                      : 'Add Section'}
               </button>
             </div>
           </form>
