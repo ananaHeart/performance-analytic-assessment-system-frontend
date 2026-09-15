@@ -752,23 +752,6 @@ export async function updateManualStudent(studentId, studentPayload) {
   })
 }
 
-function sf1UnavailableError() {
-  const error = new Error(
-    'Smart Import (SF1) is temporarily unavailable. V2 SF1 endpoint is pending integration.',
-  )
-  error.code = 'SF1_PENDING'
-  error.status = 503
-  throw error
-}
-
-export async function previewSf1() {
-  sf1UnavailableError()
-}
-
-export async function confirmSf1() {
-  sf1UnavailableError()
-}
-
 export async function getSections(filters = {}) {
   const params = new URLSearchParams()
 

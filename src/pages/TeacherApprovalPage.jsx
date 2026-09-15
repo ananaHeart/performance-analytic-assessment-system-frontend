@@ -1,31 +1,28 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
+  GraduationCap,
   Check,
   Eye,
   Mail,
+  MapPin,
   Phone,
   RefreshCw,
   Search,
+  UserRound,
   X,
 } from 'lucide-react'
 import {
-  approveTeacherV2,
-  getTeacherAccountsV2,
-  getTeacherReferenceDataV2,
-  rejectTeacherV2,
-} from '../api/apiV2Client'
+  approveTeacherV3,
+  getTeacherAccountV3,
+  getTeacherAccountsV3,
+  rejectTeacherV3,
+} from '../api/apiV3Client'
 
 const teacherTabs = [
   { key: 'pending', label: 'Pending' },
   { key: 'active', label: 'Active' },
   { key: 'rejected', label: 'Rejected' },
 ]
-
-const emptyReferenceData = {
-  genders: [],
-  majors: [],
-  educationalAttainments: [],
-}
 
 function formatDate(dateValue, fallback = 'Not provided') {
   if (!dateValue) {
@@ -43,6 +40,56 @@ function formatDate(dateValue, fallback = 'Not provided') {
     month: 'short',
     day: 'numeric',
   })
+}
+
+function formatTeachingExperience(dateValue) {
+  if (!dateValue) return 'Not provided'
+
+  const startDate = new Date(dateValue)
+  const currentDate = new Date()
+
+  if (Number.isNaN(startDate.getTime()) || startDate > currentDate) {
+    return 'Not provided'
+  }
+
+  let totalMonths =
+    (currentDate.getFullYear() - startDate.getFullYear()) * 12 +
+    (currentDate.getMonth() - startDate.getMonth())
+
+  if (currentDate.getDate() < startDate.getDate()) {
+    totalMonths -= 1
+  }
+
+  const years = Math.floor(totalMonths / 12)
+  const months = totalMonths % 12
+
+  if (years === 0) {
+    return months === 0 ? 'Less than 1 month' : `${months} month${months === 1 ? '' : 's'}`
+  }
+
+  if (months === 0) {
+    return `${years} year${years === 1 ? '' : 's'}`
+  }
+
+  return `${years} year${years === 1 ? '' : 's'}, ${months} month${months === 1 ? '' : 's'}`
+}
+
+function formatAddress(address) {
+  if (!address) return 'Not provided'
+  if (typeof address === 'string') return address || 'Not provided'
+
+  const parts = [
+    address.addressLine ?? address.address_line,
+    address.barangayName ?? address.barangay_name,
+    address.cityMunicipalityName ?? address.city_municipality_name,
+    address.provinceName ?? address.province_name,
+    address.regionName ?? address.region_name,
+    address.postalCode ?? address.postal_code,
+    address.countryName ?? address.country_name ??
+      ((address.countryCode ?? address.country_code) === 'PH' ? 'Philippines' : ''),
+  ].filter(Boolean)
+
+  return [...new Set(parts)].join(', ') || 'Not provided'
 }
 
 function formatStatus(status) {
@@ -85,17 +132,17 @@ function getInitials(name) {
   )
 }
 
-function getReferenceLabel(records, id, idKey, labelKey) {
-  if (id === null || id === undefined) {
-    return 'Not provided'
-  }
-
-  return records.find((record) => String(record[idKey]) === String(id))?.[labelKey] ?? 'Not provided'
+function TeacherDetail({ label, value, wide = false }) {
+  return (
+    <div className={`principal-teacher-detail${wide ? ' is-wide' : ''}`}>
+      <dt>{label}</dt>
+      <dd>{value || 'Not provided'}</dd>
+    </div>
+  )
 }
 
 function TeacherApprovalPage({ token, user }) {
   const [teachers, setTeachers] = useState([])
-  const [referenceData, setReferenceData] = useState(emptyReferenceData)
   const [activeTab, setActiveTab] = useState('pending')
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedTeacher, setSelectedTeacher] = useState(null)
@@ -103,7 +150,10 @@ function TeacherApprovalPage({ token, user }) {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false)
+  const [detailError, setDetailError] = useState('')
   const [activeUserId, setActiveUserId] = useState(null)
+  const [rejectionReason, setRejectionReason] = useState('')
   const accessToken = token
   const hasPrincipalAccess = user?.role === 'principal'
 
@@ -111,26 +161,11 @@ function TeacherApprovalPage({ token, user }) {
     () =>
       teachers.map((teacher) => ({
         ...teacher,
-        genderLabel: getReferenceLabel(
-          referenceData.genders,
-          teacher.genderId,
-          'genderId',
-          'genderName',
-        ),
-        majorLabel: getReferenceLabel(
-          referenceData.majors,
-          teacher.majorId,
-          'majorId',
-          'majorName',
-        ),
-        educationalAttainmentLabel: getReferenceLabel(
-          referenceData.educationalAttainments,
-          teacher.educationalAttainmentId,
-          'educationalAttainmentId',
-          'educationalAttainmentName',
-        ),
+        genderLabel: teacher.genderName || 'Not provided',
+        majorLabel: teacher.majorName || 'View details',
+        educationalAttainmentLabel: teacher.educationalAttainmentName || 'View details',
       })),
-    [referenceData, teachers],
+    [teachers],
   )
 
   const tabCounts = useMemo(
@@ -169,7 +204,6 @@ function TeacherApprovalPage({ token, user }) {
   const loadTeachers = async ({ preserveSuccess = false } = {}) => {
     if (!hasPrincipalAccess) {
       setTeachers([])
-      setReferenceData(emptyReferenceData)
       setError('')
       setSuccess('')
       setIsLoading(false)
@@ -178,7 +212,6 @@ function TeacherApprovalPage({ token, user }) {
 
     if (!accessToken) {
       setTeachers([])
-      setReferenceData(emptyReferenceData)
       setSuccess('')
       setError('')
       setIsLoading(false)
@@ -192,29 +225,25 @@ function TeacherApprovalPage({ token, user }) {
       setSuccess('')
     }
 
-    const [teacherResult, referenceResult] = await Promise.allSettled([
-      getTeacherAccountsV2(accessToken),
-      getTeacherReferenceDataV2(accessToken),
+    const teacherResult = await Promise.allSettled([
+      getTeacherAccountsV3(accessToken, 'pending_approval'),
+      getTeacherAccountsV3(accessToken, 'active'),
+      getTeacherAccountsV3(accessToken, 'rejected'),
     ])
 
-    if (teacherResult.status === 'fulfilled') {
-      setTeachers(teacherResult.value)
+    const failedResult = teacherResult.find((result) => result.status === 'rejected')
+
+    if (!failedResult) {
+      setTeachers(teacherResult.flatMap((result) => result.value))
     } else {
       setTeachers([])
 
       if (
-        !teacherResult.reason?.isAuthenticationFailure &&
-        teacherResult.reason?.status !== 401
+        !failedResult.reason?.isAuthenticationFailure &&
+        failedResult.reason?.status !== 401
       ) {
-        setError(teacherResult.reason?.message || 'Unable to load teacher accounts.')
+        setError(failedResult.reason?.message || 'Unable to load teacher accounts.')
       }
-    }
-
-    if (referenceResult.status === 'fulfilled') {
-      setReferenceData(referenceResult.value)
-    } else {
-      // Reference labels improve the detail view but must not block the account list.
-      setReferenceData(emptyReferenceData)
     }
 
     setIsLoading(false)
@@ -226,24 +255,65 @@ function TeacherApprovalPage({ token, user }) {
   }, [hasPrincipalAccess, accessToken])
   /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
+  const openTeacherDetails = async (teacher) => {
+    if (!teacher?.userId || !accessToken) return
+
+    setSelectedTeacher(teacher)
+    setIsLoadingDetail(true)
+    setDetailError('')
+
+    try {
+      const detail = await getTeacherAccountV3(teacher.userId, accessToken)
+      setSelectedTeacher({
+        ...detail,
+        genderLabel: detail.genderName || 'Not provided',
+        majorLabel: detail.majorName || 'Not provided',
+        educationalAttainmentLabel: detail.educationalAttainmentName || 'Not provided',
+      })
+    } catch (loadError) {
+      if (!loadError.isAuthenticationFailure) {
+        setDetailError(loadError.message || 'Unable to load the teacher profile.')
+      }
+    } finally {
+      setIsLoadingDetail(false)
+    }
+  }
+
+  const openTeacherAction = (action, teacher) => {
+    setPendingAction({ action, teacher })
+    setRejectionReason('')
+    setError('')
+  }
+
   const handleConfirmAction = async () => {
     if (!pendingAction?.teacher?.userId || !accessToken) {
       return
     }
 
     const { action, teacher } = pendingAction
+
+    if (action === 'reject') {
+      const normalizedReason = rejectionReason.trim()
+
+      if (normalizedReason.length < 5 || normalizedReason.length > 500) {
+        setError('Enter a rejection reason between 5 and 500 characters.')
+        return
+      }
+    }
+
     setActiveUserId(teacher.userId)
     setError('')
     setSuccess('')
 
     try {
       if (action === 'approve') {
-        await approveTeacherV2(teacher.userId, accessToken)
+        await approveTeacherV3(teacher.userId, accessToken)
       } else {
-        await rejectTeacherV2(teacher.userId, accessToken)
+        await rejectTeacherV3(teacher.userId, rejectionReason.trim(), accessToken)
       }
 
       setPendingAction(null)
+      setRejectionReason('')
       setSelectedTeacher(null)
       setSuccess(
         `${teacher.name || 'Teacher account'} ${action === 'approve' ? 'approved' : 'rejected'} successfully.`,
@@ -403,7 +473,7 @@ function TeacherApprovalPage({ token, user }) {
                             <button
                               type="button"
                               className="principal-teacher-view-button"
-                              onClick={() => setSelectedTeacher(teacher)}
+                              onClick={() => openTeacherDetails(teacher)}
                             >
                               <Eye size={15} strokeWidth={2.2} aria-hidden="true" />
                               <span>View details</span>
@@ -414,7 +484,7 @@ function TeacherApprovalPage({ token, user }) {
                                   type="button"
                                   className="principal-approve-button"
                                   disabled={!teacher.userId || isUpdating}
-                                  onClick={() => setPendingAction({ action: 'approve', teacher })}
+                                  onClick={() => openTeacherAction('approve', teacher)}
                                   aria-label={`Approve ${teacher.name || 'teacher'}`}
                                   title="Approve teacher"
                                 >
@@ -424,7 +494,7 @@ function TeacherApprovalPage({ token, user }) {
                                   type="button"
                                   className="principal-reject-button"
                                   disabled={!teacher.userId || isUpdating}
-                                  onClick={() => setPendingAction({ action: 'reject', teacher })}
+                                  onClick={() => openTeacherAction('reject', teacher)}
                                   aria-label={`Reject ${teacher.name || 'teacher'}`}
                                   title="Reject teacher"
                                 >
@@ -474,39 +544,61 @@ function TeacherApprovalPage({ token, user }) {
               </button>
             </header>
 
-            <div className="principal-teacher-detail-grid">
-              <div>
-                <span>Email address</span>
-                <strong>{selectedTeacher.email || 'Not provided'}</strong>
-              </div>
-              <div>
-                <span>Contact number</span>
-                <strong>{selectedTeacher.contactNumber || 'Not provided'}</strong>
-              </div>
-              <div>
-                <span>Gender</span>
-                <strong>{selectedTeacher.genderLabel}</strong>
-              </div>
-              <div>
-                <span>Birth date</span>
-                <strong>{formatDate(selectedTeacher.birthDate)}</strong>
-              </div>
-              <div>
-                <span>Specialization</span>
-                <strong>{selectedTeacher.majorLabel}</strong>
-              </div>
-              <div>
-                <span>Educational attainment</span>
-                <strong>{selectedTeacher.educationalAttainmentLabel}</strong>
-              </div>
-              <div>
-                <span>Teaching start date</span>
-                <strong>{formatDate(selectedTeacher.teachingStartDate)}</strong>
-              </div>
-              <div>
-                <span>Registration date</span>
-                <strong>{formatDate(selectedTeacher.createdAt)}</strong>
-              </div>
+            <div className="principal-teacher-detail-sections">
+              {detailError ? (
+                <p className="form-message form-message-error" role="alert">
+                  {detailError}
+                </p>
+              ) : null}
+              {isLoadingDetail ? <p className="supporting-text">Loading teacher profile...</p> : null}
+              <section className="principal-teacher-detail-section">
+                <header>
+                  <UserRound size={18} aria-hidden="true" />
+                  <h4>Personal information</h4>
+                </header>
+                <dl className="principal-teacher-detail-grid">
+                  <TeacherDetail label="Gender" value={selectedTeacher.genderLabel} />
+                  <TeacherDetail label="Birth date" value={formatDate(selectedTeacher.birthDate)} />
+                </dl>
+              </section>
+
+              <section className="principal-teacher-detail-section">
+                <header>
+                  <GraduationCap size={19} aria-hidden="true" />
+                  <h4>Professional background</h4>
+                </header>
+                <dl className="principal-teacher-detail-grid">
+                  <TeacherDetail label="Major" value={selectedTeacher.majorLabel} />
+                  <TeacherDetail
+                    label="Educational attainment"
+                    value={selectedTeacher.educationalAttainmentLabel}
+                  />
+                  <TeacherDetail
+                    label="Years of teaching"
+                    value={formatTeachingExperience(selectedTeacher.teachingStartDate)}
+                  />
+                  <TeacherDetail
+                    label="Registration date"
+                    value={formatDate(selectedTeacher.createdAt)}
+                  />
+                </dl>
+              </section>
+
+              <section className="principal-teacher-detail-section">
+                <header>
+                  <MapPin size={18} aria-hidden="true" />
+                  <h4>Contact and address</h4>
+                </header>
+                <dl className="principal-teacher-detail-grid">
+                  <TeacherDetail label="Email address" value={selectedTeacher.email} />
+                  <TeacherDetail label="Contact number" value={selectedTeacher.contactNumber} />
+                  <TeacherDetail
+                    label="Registered address"
+                    value={formatAddress(selectedTeacher.address)}
+                    wide
+                  />
+                </dl>
+              </section>
             </div>
 
             <footer className="principal-teacher-modal-footer">
@@ -518,7 +610,7 @@ function TeacherApprovalPage({ token, user }) {
                   <button
                     type="button"
                     className="principal-reject-button"
-                    onClick={() => setPendingAction({ action: 'reject', teacher: selectedTeacher })}
+                    onClick={() => openTeacherAction('reject', selectedTeacher)}
                   >
                     <X size={15} strokeWidth={2.3} aria-hidden="true" />
                     Reject
@@ -526,7 +618,7 @@ function TeacherApprovalPage({ token, user }) {
                   <button
                     type="button"
                     className="principal-approve-button"
-                    onClick={() => setPendingAction({ action: 'approve', teacher: selectedTeacher })}
+                    onClick={() => openTeacherAction('approve', selectedTeacher)}
                   >
                     <Check size={15} strokeWidth={2.3} aria-hidden="true" />
                     Approve
@@ -566,11 +658,39 @@ function TeacherApprovalPage({ token, user }) {
                   : `${pendingAction.teacher.name || 'This teacher'} will not be allowed to access the system.`}
               </p>
             </div>
+            {pendingAction.action === 'reject' ? (
+              <label className="public-auth-field" htmlFor="teacherRejectionReason">
+                <span>Reason for rejection</span>
+                <textarea
+                  id="teacherRejectionReason"
+                  className="assignment-restore-reason"
+                  value={rejectionReason}
+                  onChange={(event) => {
+                    setRejectionReason(event.target.value)
+                    if (error) setError('')
+                  }}
+                  minLength="5"
+                  maxLength="500"
+                  rows="3"
+                  required
+                  disabled={activeUserId !== null}
+                />
+              </label>
+            ) : null}
+            {pendingAction.action === 'reject' && error ? (
+              <p className="form-message form-message-error" role="alert">
+                {error}
+              </p>
+            ) : null}
             <div className="principal-teacher-confirmation-actions">
               <button
                 type="button"
                 className="principal-teacher-cancel-button"
-                onClick={() => setPendingAction(null)}
+                onClick={() => {
+                  setPendingAction(null)
+                  setRejectionReason('')
+                  setError('')
+                }}
                 disabled={activeUserId !== null}
               >
                 Cancel
@@ -583,7 +703,11 @@ function TeacherApprovalPage({ token, user }) {
                     : 'principal-reject-button'
                 }
                 onClick={handleConfirmAction}
-                disabled={activeUserId !== null}
+                disabled={
+                  activeUserId !== null ||
+                  (pendingAction.action === 'reject' &&
+                    (rejectionReason.trim().length < 5 || rejectionReason.trim().length > 500))
+                }
               >
                 {activeUserId !== null
                   ? 'Updating...'

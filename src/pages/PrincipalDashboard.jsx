@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ClipboardCheck, GraduationCap, UsersRound } from 'lucide-react'
-import { getTeacherAccountsV2 } from '../api/apiV2Client'
+import {
+  getClassesV3,
+  getPrincipalClassStudentsV3,
+  getTeacherAccountsV3,
+} from '../api/apiV3Client'
 
 function getPrincipalName(user) {
   return user.name || [user.firstName, user.lastName].filter(Boolean).join(' ') || 'Principal'
@@ -9,40 +13,75 @@ function getPrincipalName(user) {
 function PrincipalDashboard({ user, token }) {
   const displayName = getPrincipalName(user)
   const [teachers, setTeachers] = useState([])
+  const [students, setStudents] = useState([])
   const [isLoadingTeachers, setIsLoadingTeachers] = useState(true)
+  const [isLoadingStudents, setIsLoadingStudents] = useState(true)
   const [teacherLoadWarning, setTeacherLoadWarning] = useState('')
+  const [studentLoadWarning, setStudentLoadWarning] = useState('')
 
   useEffect(() => {
     let isMounted = true
 
-    async function loadTeacherSummary() {
+    async function loadDashboardSummary() {
       setIsLoadingTeachers(true)
+      setIsLoadingStudents(true)
       setTeacherLoadWarning('')
+      setStudentLoadWarning('')
 
-      try {
-        const teacherList = await getTeacherAccountsV2(token)
+      const [teacherResult, classResult] = await Promise.allSettled([
+        getTeacherAccountsV3(token, 'active'),
+        getClassesV3({}, token),
+      ])
 
-        if (isMounted) {
-          setTeachers(teacherList)
-        }
-      } catch (loadError) {
-        if (isMounted) {
-          setTeachers([])
-          if (loadError.isAuthenticationFailure || loadError.status === 401) {
-            return
-          }
-          setTeacherLoadWarning(
-            'Teacher account summary is temporarily unavailable. Other dashboard sections are unaffected.',
-          )
-        }
-      } finally {
-        if (isMounted) {
-          setIsLoadingTeachers(false)
+      if (!isMounted) {
+        return
+      }
+
+      if (teacherResult.status === 'fulfilled') {
+        setTeachers(teacherResult.value)
+      } else {
+        const loadError = teacherResult.reason
+        setTeachers([])
+        if (!loadError.isAuthenticationFailure && loadError.status !== 401) {
+          setTeacherLoadWarning('Teacher account summary is temporarily unavailable.')
         }
       }
+
+      if (classResult.status === 'fulfilled') {
+        const activeClasses = classResult.value.filter(
+          (classRecord) => String(classRecord.status ?? '').toLowerCase() === 'active',
+        )
+        const rosterResults = await Promise.allSettled(
+          activeClasses.map((classRecord) =>
+            getPrincipalClassStudentsV3(classRecord.classId, token),
+          ),
+        )
+
+        if (!isMounted) return
+
+        setStudents(
+          rosterResults.flatMap((result) =>
+            result.status === 'fulfilled' ? result.value : [],
+          ),
+        )
+
+        const rosterFailure = rosterResults.find((result) => result.status === 'rejected')
+        if (rosterFailure && !rosterFailure.reason?.isAuthenticationFailure) {
+          setStudentLoadWarning('Some class rosters are temporarily unavailable.')
+        }
+      } else {
+        const loadError = classResult.reason
+        setStudents([])
+        if (!loadError.isAuthenticationFailure && loadError.status !== 401) {
+          setStudentLoadWarning('Student summary is temporarily unavailable.')
+        }
+      }
+
+      setIsLoadingTeachers(false)
+      setIsLoadingStudents(false)
     }
 
-    loadTeacherSummary()
+    loadDashboardSummary()
 
     return () => {
       isMounted = false
@@ -56,6 +95,20 @@ function PrincipalDashboard({ user, token }) {
       ).length,
     [teachers],
   )
+  const totalStudentCount = useMemo(() => {
+    const uniqueStudents = new Set()
+
+    students.forEach((student, index) => {
+      const studentKey =
+        student.studentId ?? student.id ?? student.studentLrn ?? student.classListId ?? index
+      uniqueStudents.add(String(studentKey))
+    })
+
+    return uniqueStudents.size
+  }, [students])
+  const dashboardWarning = [teacherLoadWarning, studentLoadWarning]
+    .filter(Boolean)
+    .join(' ')
 
   const dashboardStats = [
     {
@@ -67,14 +120,14 @@ function PrincipalDashboard({ user, token }) {
     },
     {
       label: 'Total Students',
-      value: 'Pending setup',
+      value: isLoadingStudents ? '...' : studentLoadWarning ? 'Unavailable' : totalStudentCount,
       icon: GraduationCap,
       tone: 'blue',
-      isPlaceholder: true,
+      isPlaceholder: Boolean(studentLoadWarning),
     },
     {
       label: 'Assessment Conducted',
-      value: 'Pending assessment results',
+      value: 'Not available',
       icon: ClipboardCheck,
       tone: 'orange',
       isPlaceholder: true,
@@ -88,9 +141,9 @@ function PrincipalDashboard({ user, token }) {
         <p>Here is a summary of the available school setup information.</p>
       </section>
 
-      {teacherLoadWarning ? (
+      {dashboardWarning ? (
         <p className="form-message form-message-warning" role="status">
-          {teacherLoadWarning}
+          {dashboardWarning} Other dashboard sections are unaffected.
         </p>
       ) : null}
 

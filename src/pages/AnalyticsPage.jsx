@@ -1,17 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  getClassAssignments,
-  getGradeLevels,
-  getItemAnalysis,
-  getLms,
-  getSchoolLms,
-  getSections,
-  getSubjects,
-  getSyncActivity,
-  getTeacherAssessments,
-  getTeachers,
-  getTrends,
-} from '../api/apiClient'
+  getAssessmentsV2,
+  getClassAssignmentsV2,
+  getItemAnalysisV2,
+  getLmsV2,
+  getSchoolAnalyticsV2,
+  getSchoolSetupReferenceDataV2,
+  getSyncActivityV2,
+  getTeacherAccountsV2,
+} from '../api/apiV2Client'
 import { VerticalMasteryChart } from '../components/AnalyticsCharts'
 
 const USER_STORAGE_KEY = 'assessment-user'
@@ -96,16 +93,15 @@ function getToneFromPercent(percent) {
   return 'weak'
 }
 
-function getAverageMastery(records) {
-  const values = records
-    .map((record) => parseNumber(record.averageScore))
-    .filter((value) => value !== null)
+function normalizeReferenceOption(record, idKeys, nameKeys, fallback) {
+  const id = idKeys.map((key) => record?.[key]).find((value) => value !== null && value !== undefined)
+  const name = nameKeys.map((key) => record?.[key]).find((value) => value)
 
-  if (!values.length) {
-    return null
+  return {
+    ...record,
+    id,
+    name: name || (id ? `${fallback} ${id}` : fallback),
   }
-
-  return values.reduce((total, value) => total + value, 0) / values.length
 }
 
 function getFilteredAssignments(assignments, filters) {
@@ -130,7 +126,7 @@ function getFilteredAssignments(assignments, filters) {
   })
 }
 
-function AnalyticsPage({ user, role }) {
+function AnalyticsPage({ user, role, token }) {
   const activeUser = user ?? readStoredUser()
   const effectiveRole = role ?? activeUser?.role ?? ''
   const teacherId = activeUser?.id
@@ -148,7 +144,7 @@ function AnalyticsPage({ user, role }) {
   })
   const [schoolLms, setSchoolLms] = useState([])
   const [gradeBars, setGradeBars] = useState([])
-  const [principalAssessments, setPrincipalAssessments] = useState([])
+  const [totalAssessments, setTotalAssessments] = useState(0)
   const [trends, setTrends] = useState([])
   const [syncActivity, setSyncActivity] = useState([])
   const [teacherAssessments, setTeacherAssessments] = useState([])
@@ -163,21 +159,8 @@ function AnalyticsPage({ user, role }) {
     () => getFilteredAssignments(classAssignments, filters),
     [classAssignments, filters],
   )
-  const filteredClassIds = useMemo(
-    () => new Set(filteredAssignments.map((assignment) => String(assignment.classId))),
-    [filteredAssignments],
-  )
   const selectedClassId =
     filteredAssignments.length === 1 ? filteredAssignments[0]?.classId : ''
-  const totalAssessments = useMemo(() => {
-    if (!Object.values(filters).some(Boolean)) {
-      return principalAssessments.length
-    }
-
-    return principalAssessments.filter((assessment) =>
-      filteredClassIds.has(String(assessment.classId)),
-    ).length
-  }, [filteredClassIds, filters, principalAssessments])
   const filteredSections = useMemo(() => {
     if (!filters.gradeLevelId) {
       return sections
@@ -206,36 +189,43 @@ function AnalyticsPage({ user, role }) {
     setMessage({ error: '', success: '' })
 
     try {
-      const [gradeLevelRecords, sectionRecords, teacherRecords, subjectRecords, assignmentRecords] =
-        await Promise.all([
-          getGradeLevels(),
-          getSections(),
-          getTeachers(),
-          getSubjects(),
-          getClassAssignments(),
-        ])
-
-      const assessmentResults = await Promise.allSettled(
-        teacherRecords
-          .filter((teacher) => teacher.id)
-          .map(async (teacher) => {
-            const records = await getTeacherAssessments(teacher.id)
-            return records.map((assessment) => ({
-              ...assessment,
-              teacherId: teacher.id,
-              teacherName: teacher.name,
-            }))
-          }),
+      const [referenceData, teacherRecords, assignmentRecords] = await Promise.all([
+        getSchoolSetupReferenceDataV2(token),
+        getTeacherAccountsV2(token, 'active'),
+        getClassAssignmentsV2(token),
+      ])
+      const gradeLevelRecords = (referenceData.gradeLevels ?? []).map((gradeLevel) =>
+        normalizeReferenceOption(
+          gradeLevel,
+          ['gradeLevelId', 'id'],
+          ['gradeLevelName', 'name', 'label'],
+          'Grade Level',
+        ),
       )
+      const subjectRecords = (referenceData.subjects ?? []).map((subject) =>
+        normalizeReferenceOption(
+          subject,
+          ['subjectId', 'id'],
+          ['subjectName', 'name', 'label'],
+          'Subject',
+        ),
+      )
+      const sectionMap = new Map()
+
+      assignmentRecords.forEach((assignment) => {
+        if (!assignment.sectionId || sectionMap.has(String(assignment.sectionId))) return
+        sectionMap.set(String(assignment.sectionId), {
+          id: assignment.sectionId,
+          name: assignment.sectionName || `Section ${assignment.sectionId}`,
+          gradeLevelId: assignment.gradeLevelId,
+        })
+      })
 
       setGradeLevels(gradeLevelRecords)
-      setSections(sectionRecords)
+      setSections(Array.from(sectionMap.values()))
       setTeachers(teacherRecords)
       setSubjects(subjectRecords)
       setClassAssignments(assignmentRecords)
-      setPrincipalAssessments(
-        assessmentResults.flatMap((result) => (result.status === 'fulfilled' ? result.value : [])),
-      )
     } catch (loadError) {
       setMessage({
         error: loadError.message || 'Unable to load analytics filter references.',
@@ -250,38 +240,36 @@ function AnalyticsPage({ user, role }) {
     setIsAnalyticsLoading(true)
     setMessage({ error: '', success: '' })
 
-    try {
-      const [lmsRecords, gradeLevelResults, trendRecords, syncRecords] = await Promise.all([
-        getSchoolLms(filters),
-        Promise.all(
-          gradeLevels.map(async (gradeLevel) => {
-            const records = await getSchoolLms({
-              ...filters,
-              gradeLevelId: gradeLevel.id,
-            })
+    const hasFilters = Object.values(filters).some(Boolean)
+    const analyticsFilters = {
+      gradeLevelId: filters.gradeLevelId,
+      sectionId: filters.sectionId,
+      teacherUserId: filters.teacherId,
+      subjectId: filters.subjectId,
+      classId: hasFilters ? selectedClassId : '',
+    }
 
-            return {
-              id: gradeLevel.id,
-              label: gradeLevel.name,
-              value: getAverageMastery(records),
-            }
-          }),
-        ),
-        selectedClassId ? getTrends(selectedClassId) : Promise.resolve([]),
-        filters.teacherId ? getSyncActivity(filters.teacherId) : Promise.resolve([]),
+    try {
+      const [overview, activity] = await Promise.all([
+        getSchoolAnalyticsV2(analyticsFilters, token),
+        filters.teacherId
+          ? getSyncActivityV2(analyticsFilters, token)
+          : Promise.resolve([]),
       ])
 
-      setSchoolLms(lmsRecords)
-      setGradeBars(gradeLevelResults)
-      setTrends(trendRecords)
-      setSyncActivity(syncRecords)
+      setTotalAssessments(overview.totalAssessments)
+      setSchoolLms(overview.lms)
+      setGradeBars(overview.gradeLevels)
+      setTrends(overview.trends)
+      setSyncActivity(activity)
     } catch (loadError) {
+      setTotalAssessments(0)
       setSchoolLms([])
       setGradeBars([])
       setTrends([])
       setSyncActivity([])
       setMessage({
-        error: loadError.message || 'Unable to load filtered analytics data.',
+        error: loadError.message || 'Unable to load school analytics.',
         success: '',
       })
     } finally {
@@ -301,8 +289,8 @@ function AnalyticsPage({ user, role }) {
 
     try {
       const [lmsRecords, itemRecords] = await Promise.all([
-        getLms(selectedTestId),
-        getItemAnalysis(selectedTestId),
+        getLmsV2(selectedTestId, token),
+        getItemAnalysisV2(selectedTestId, token),
       ])
 
       setTeacherLms(lmsRecords)
@@ -328,7 +316,7 @@ function AnalyticsPage({ user, role }) {
     setMessage({ error: '', success: '' })
 
     try {
-      const records = await getTeacherAssessments(teacherId)
+      const records = await getAssessmentsV2(token)
       setTeacherAssessments(records)
       setSelectedTestId((currentValue) => currentValue || String(records[0]?.id ?? ''))
     } catch (loadError) {
@@ -357,16 +345,24 @@ function AnalyticsPage({ user, role }) {
   }, [effectiveRole, teacherId])
 
   useEffect(() => {
-    if (effectiveRole === 'principal' && gradeLevels.length) {
-      loadPrincipalAnalytics()
-    }
-  }, [effectiveRole, filters, gradeLevels.length, selectedClassId])
-
-  useEffect(() => {
     if (effectiveRole === 'teacher' && selectedTestId) {
       loadTeacherAnalytics()
     }
   }, [effectiveRole, selectedTestId])
+
+  useEffect(() => {
+    if (effectiveRole === 'principal') {
+      loadPrincipalAnalytics()
+    }
+  }, [
+    effectiveRole,
+    filters.gradeLevelId,
+    filters.sectionId,
+    filters.teacherId,
+    filters.subjectId,
+    selectedClassId,
+    token,
+  ])
   /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
   if (effectiveRole === 'teacher') {

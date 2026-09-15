@@ -1,28 +1,32 @@
 import {
   BarChart3,
-  Bell,
   CalendarDays,
   ClipboardList,
   GraduationCap,
   LayoutDashboard,
   LogOut,
   Settings,
+  UserRoundCheck,
   UsersRound,
 } from 'lucide-react'
+import NotificationCenter from './NotificationCenter'
 
 const principalNavIcons = {
   'principal-dashboard': LayoutDashboard,
   'class-records': ClipboardList,
-  'teacher-approval': UsersRound,
-  analytics: BarChart3,
+  students: UsersRound,
+  'teacher-approval': UserRoundCheck,
+  reports: BarChart3,
   'principal-settings': Settings,
 }
 function AppLayout({
   user,
   navItems,
   activePage,
+  token,
   onNavigate,
   onLogout,
+  schoolYearLabel = '',
   isTeacherWorkspaceLayout = false,
   children,
 }) {
@@ -73,8 +77,10 @@ function AppLayout({
                   type="button"
                   className={`sidebar-link principal-sidebar-link ${
                     activePage === item.key ? 'is-active' : ''
-                  }`}
+                  } ${item.disabled ? 'is-disabled' : ''}`}
                   onClick={() => onNavigate(item.key)}
+                  disabled={item.disabled}
+                  title={item.title}
                 >
                   <NavIcon size={16} strokeWidth={2.2} aria-hidden="true" />
                   <span>{item.label}</span>
@@ -101,7 +107,7 @@ function AppLayout({
         </aside>
       ) : null}
 
-      {isTeacherWorkspaceLayout && activePage === 'teacher-dashboard' ? (
+      {isTeacherWorkspaceLayout ? (
         <header className="teacher-workspace-topbar">
           <div className="teacher-workspace-brand">
             <span className="teacher-system-mark" aria-hidden="true">
@@ -113,19 +119,39 @@ function AppLayout({
               onClick={() => onNavigate('teacher-dashboard')}
               aria-label="Go to home dashboard"
             >
-              <strong>Performance Analytics</strong>
+              <strong>SMART</strong>
               <span>Assessment System</span>
             </button>
-            <span className="teacher-app-divider" aria-hidden="true" />
-            <p className="teacher-app-context">Dashboard</p>
           </div>
 
+          <nav className="teacher-workspace-nav" aria-label="Teacher navigation">
+            {navItems.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                className={`teacher-nav-link ${activePage === item.key ? 'is-active' : ''}`}
+                onClick={() => onNavigate(item.key)}
+                disabled={item.disabled}
+                title={item.title}
+                aria-current={activePage === item.key ? 'page' : undefined}
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
+
           <div className="teacher-workspace-profile">
-            <span className="teacher-topbar-avatar" aria-hidden="true">
+            <NotificationCenter token={token} variant="teacher" />
+            <button
+              type="button"
+              className={`teacher-topbar-avatar ${
+                activePage === 'teacher-settings' ? 'is-active' : ''
+              }`}
+              onClick={() => onNavigate('teacher-settings')}
+              aria-label="Open account"
+              title="Open account"
+            >
               {teacherInitials}
-            </span>
-            <button type="button" className="teacher-logout-button" onClick={onLogout}>
-              Logout
             </button>
           </div>
         </header>
@@ -134,13 +160,13 @@ function AppLayout({
       <main className={`dashboard-main ${isTeacherWorkspaceLayout ? '' : 'principal-main'}`}>
         {!isTeacherWorkspaceLayout ? (
           <header className="principal-topbar">
-            <button type="button" className="principal-topbar-icon" aria-label="Notifications">
-              <Bell size={16} strokeWidth={2.2} />
-            </button>
-            <span className="principal-school-year">
-              <CalendarDays size={17} strokeWidth={2.2} aria-hidden="true" />
-              SY 2025-2026
-            </span>
+            <NotificationCenter token={token} variant="principal" />
+            {schoolYearLabel ? (
+              <span className="principal-school-year">
+                <CalendarDays size={17} strokeWidth={2.2} aria-hidden="true" />
+                SY {schoolYearLabel}
+              </span>
+            ) : null}
           </header>
         ) : null}
         {children}

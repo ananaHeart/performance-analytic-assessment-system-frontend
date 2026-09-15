@@ -1,36 +1,41 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
+  ArrowRight,
+  Archive,
+  AlertTriangle,
   BookOpen,
+  CalendarClock,
   ClipboardCheck,
   ClipboardList,
-  Download,
-  FileCheck2,
+  Clock3,
   FileText,
+  Pencil,
   Plus,
-  Target,
-  Users,
+  RefreshCw,
+  Save,
+  Trash2,
+  X,
 } from 'lucide-react'
 import {
-  downloadStudentScoresReport,
-  getAssessmentDetails,
-  getLms,
-  getPartSkillMappings,
-  getStudentSkillMastery,
-  getTeacherAssessments,
-  getTeacherInterventions,
-  getTestPartResults,
-  getSyncActivity,
-  createManualStudent,
-  getManualStudents,
-} from '../api/apiClient'
-import {
-  createClassAssignmentV2,
-  getAvailableClassesV2,
-  getClassAssignmentsV2,
-  getSchoolSetupReferenceDataV2,
-  getTeacherAccountsV2,
-} from '../api/apiV2Client'
-import { HorizontalMasteryChart } from '../components/AnalyticsCharts'
+  archiveClassAssignmentV3,
+  archiveClassAssignmentScheduleV3,
+  createClassAssignmentV3,
+  createClassAssignmentScheduleV3,
+  createClassV3,
+  getClassAssignmentsV3,
+  getClassAssignmentSchedulesV3,
+  getClassesV3,
+  getAssessmentReferenceDataV3,
+  getAssessmentsV3,
+  enrollStudentV3,
+  getPrincipalClassStudentsV3,
+  getSchoolSetupReferenceDataV3,
+  getTeacherClassStudentsV3,
+  updateStudentEnrollmentStatusV3,
+  updateStudentProfileV3,
+  updateClassAssignmentScheduleV3,
+} from '../api/apiV3Client'
+import V3Sf1ImportPanel from '../components/V3Sf1ImportPanel'
 
 const initialAssignmentForm = {
   teacherId: '',
@@ -39,29 +44,58 @@ const initialAssignmentForm = {
   classId: '',
 }
 
-const SF1_PENDING_MESSAGE = 'Smart Import (SF1): Pending V2 SF1 endpoint'
-
-const initialManualForm = {
-  sectionId: '',
-  academicYearId: '',
+const initialManualStudentForm = {
+  classId: '',
+  studentLrn: '',
+  firstName: '',
+  middleName: '',
+  lastName: '',
+  suffixId: '',
+  genderId: '',
+  birthDate: '',
 }
 
-const initialManualClassFilters = {
-  teacherId: '',
+const initialStudentProfileForm = {
+  firstName: '',
+  middleName: '',
+  lastName: '',
+  suffixId: '',
+  genderId: '',
+  birthDate: '',
+  reason: '',
+}
+
+const ENROLLMENT_STATUSES = ['enrolled', 'transferred', 'dropped', 'completed']
+
+const initialClassForm = {
   gradeLevelId: '',
-  subjectId: '',
+  sectionName: '',
 }
 
-const INTERVENTION_MASTERY_THRESHOLD = 75
+const initialScheduleForm = {
+  dayOfWeek: '',
+  startTime: '',
+  endTime: '',
+  effectiveFrom: '',
+  effectiveTo: '',
+}
 
-function createManualStudentRows(count = 8) {
-  return Array.from({ length: count }, (_, index) => ({
-    rowId: `manual-row-${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`,
-    studentLrn: '',
-    firstName: '',
-    lastName: '',
-    gender: '',
-  }))
+const WEEK_DAYS = [
+  [1, 'Monday'],
+  [2, 'Tuesday'],
+  [3, 'Wednesday'],
+  [4, 'Thursday'],
+  [5, 'Friday'],
+  [6, 'Saturday'],
+  [7, 'Sunday'],
+]
+
+function toTimeInput(value) {
+  return String(value ?? '').slice(0, 5)
+}
+
+function toApiTime(value) {
+  return value && value.length === 5 ? `${value}:00` : value
 }
 
 function formatStatus(status) {
@@ -73,6 +107,19 @@ function formatStatus(status) {
     .toString()
     .replace(/[_-]/g, ' ')
     .replace(/\b\w/g, (character) => character.toUpperCase())
+}
+
+function isActiveClassAssignment(assignment) {
+  const status = String(assignment?.status ?? '').trim().toLowerCase()
+  return !status || status === 'active'
+}
+
+function getAssignmentDeletePhrase(assignment) {
+  const gradeLevel = assignment?.gradeLevelName || 'Grade level'
+  const section = assignment?.sectionName || 'Section'
+  const subject = assignment?.subjectName || 'Subject'
+
+  return `DELETE CLASS ASSIGNMENT - ${gradeLevel} - ${section} - ${subject}`.toUpperCase()
 }
 
 function normalizeMatchText(value) {
@@ -87,6 +134,37 @@ function valuesMatch(leftValue, rightValue) {
   const right = normalizeMatchText(rightValue)
 
   return Boolean(left && right && left === right)
+}
+
+function findReferenceIdByName(records, value, idKey, nameKey) {
+  const match = records.find((record) => valuesMatch(record?.[nameKey], value))
+  return match?.[idKey] ?? ''
+}
+
+function getStudentLifecycleErrorMessage(error, fallback) {
+  const code = String(error?.code ?? '').trim().toUpperCase()
+
+  if (code === 'STUDENT_ALREADY_ENROLLED') {
+    return 'This learner is already enrolled in another class for the same academic year.'
+  }
+
+  if (code === 'STUDENT_PROFILE_REVIEW_REQUIRED') {
+    return 'This LRN already exists, but the identity details do not match. The existing profile was not overwritten; use Edit Student Profile after reviewing the learner record.'
+  }
+
+  if (code === 'STUDENT_LRN_OWNED_BY_ANOTHER_SCHOOL') {
+    return 'This LRN belongs to another school and cannot be enrolled here.'
+  }
+
+  if (code === 'STUDENT_ENROLLMENT_CONFLICT') {
+    return 'The enrollment changed during this request. Refresh the roster and try again.'
+  }
+
+  const fieldMessages = Object.entries(error?.errors ?? {})
+    .filter(([key, message]) => key !== 'code' && typeof message === 'string' && message.trim())
+    .map(([field, message]) => `${formatStatus(field)}: ${message.trim()}`)
+
+  return fieldMessages.join(' ') || error?.message || fallback
 }
 
 function isAcademicYearPlaceholder(value) {
@@ -304,27 +382,20 @@ function getClassDisplayLabel(assignment) {
   return `${assignment.gradeLevelName || 'Grade level'} - ${assignment.sectionName || 'Section'}`
 }
 
-function getUniqueClassOptions(assignments, valueKey, labelKey) {
-  const optionMap = new Map()
+function getClassSubjectSummary(assignments) {
+  const subjectNames = [
+    ...new Set(
+      assignments
+        .map((assignment) => assignment.subjectName)
+        .filter(Boolean),
+    ),
+  ]
 
-  assignments.forEach((assignment) => {
-    const value = assignment[valueKey]
-    const label = assignment[labelKey]
+  if (!subjectNames.length) {
+    return 'No subject assigned'
+  }
 
-    if (value === null || value === undefined || value === '' || !label) {
-      return
-    }
-
-    const key = String(value)
-
-    if (!optionMap.has(key)) {
-      optionMap.set(key, { value: key, label })
-    }
-  })
-
-  return Array.from(optionMap.values()).sort((left, right) =>
-    left.label.localeCompare(right.label),
-  )
+  return subjectNames.join(', ')
 }
 
 function getStudentInitials(student) {
@@ -389,305 +460,13 @@ function getAssessmentStatusClass(status) {
   return 'status-pending'
 }
 
-function isSuccessfulSyncActivity(activity) {
-  const details = normalizeMatchText(activity.details)
-
-  return !details || details.includes('success') || details.includes('completed') || details.includes('synced')
-}
-
-function isAssessmentSyncActivity(assessment, activity) {
-  if (!isSuccessfulSyncActivity(activity)) {
-    return false
-  }
-
-  if (activity.id && assessment.id && String(activity.id) === String(assessment.id)) {
-    return true
-  }
-
-  return Boolean(
-    assessment.testName &&
-      activity.activity &&
-      normalizeMatchText(assessment.testName) === normalizeMatchText(activity.activity),
-  )
-}
-
-function getAutomaticAssessmentStatus(assessment, syncActivity = []) {
-  return syncActivity.some((activity) => isAssessmentSyncActivity(assessment, activity))
-    ? 'Completed'
-    : 'Active'
-}
-
-function parseNumber(value) {
-  if (value === null || value === undefined || value === '') {
-    return null
-  }
-
-  const parsedValue = Number(value)
-
-  return Number.isFinite(parsedValue) ? parsedValue : null
-}
-
-function formatPercent(value) {
-  const parsedValue = parseNumber(value)
-
-  if (parsedValue === null) {
-    return 'No data'
-  }
-
-  return `${Math.round(parsedValue)}%`
-}
-
-function formatScore(value) {
-  const parsedValue = parseNumber(value)
-
-  if (parsedValue === null) {
-    return '0'
-  }
-
-  return String(Math.round(parsedValue))
-}
-
-function formatScoreWithMax(score, maxScore) {
-  const parsedScore = parseNumber(score)
-
-  if (parsedScore === null) {
-    return 'No data'
-  }
-
-  const formattedScore = formatScore(parsedScore)
-  const parsedMaxScore = parseNumber(maxScore)
-
-  if (parsedMaxScore === null) {
-    return formattedScore
-  }
-
-  return `${formattedScore} / ${formatScore(parsedMaxScore)}`
-}
-
-function formatStudentDisplayName(student) {
-  const firstName = String(student?.firstName ?? '').trim()
-  const middleName = String(student?.middleName ?? '').trim()
-  const lastName = String(student?.lastName ?? '').trim()
-
-  if (lastName && firstName) {
-    return `${lastName.toUpperCase()}, ${[firstName, middleName].filter(Boolean).join(' ').toUpperCase()}`
-  }
-
-  return String(student?.studentName ?? student?.name ?? 'Student').toUpperCase()
-}
-
-function getPerformanceLabel(percentage) {
-  const parsedValue = parseNumber(percentage)
-
-  if (parsedValue === null) {
-    return 'No data'
-  }
-
-  if (parsedValue >= 90) {
-    return 'Highly Proficient'
-  }
-
-  if (parsedValue >= 80) {
-    return 'Proficient'
-  }
-
-  if (parsedValue >= 70) {
-    return 'Developing'
-  }
-
-  return 'Needs Improvement'
-}
-
-function getPerformanceClass(percentage) {
-  const label = getPerformanceLabel(percentage)
-
-  return `is-${label.toLowerCase().replace(/\s+/g, '-')}`
-}
-
-function getPartMaxScore(part) {
-  const numberOfItems = parseNumber(part?.numberOfItems)
-  const pointsPerItem = parseNumber(part?.pointsPerItem)
-
-  if (numberOfItems === null || pointsPerItem === null) {
-    return null
-  }
-
-  return numberOfItems * pointsPerItem
-}
-
-function getStudentScoreKey(student) {
-  return String(student?.id ?? student?.studentId ?? student?.studentLrn ?? student?.studentName ?? '')
-}
-
-function mergeTestPartResults(partResultGroups = []) {
-  const studentMap = new Map()
-
-  partResultGroups.flat().forEach((student) => {
-    const key = getStudentScoreKey(student)
-
-    if (!key) {
-      return
-    }
-
-    const currentRecord =
-      studentMap.get(key) ?? {
-        ...student,
-        score: 0,
-        maxScore: 0,
-        percentage: '',
-      }
-    const nextScore = parseNumber(student.score) ?? 0
-    const nextMaxScore = parseNumber(student.maxScore) ?? 0
-    const totalScore = (parseNumber(currentRecord.score) ?? 0) + nextScore
-    const totalMaxScore = (parseNumber(currentRecord.maxScore) ?? 0) + nextMaxScore
-
-    studentMap.set(key, {
-      ...currentRecord,
-      ...student,
-      score: totalScore,
-      maxScore: totalMaxScore,
-      percentage: totalMaxScore > 0 ? (totalScore / totalMaxScore) * 100 : '',
-    })
-  })
-
-  return Array.from(studentMap.values())
-}
-
-function getPartBranchSkills(part) {
-  return Array.isArray(part?.skillMappings) ? part.skillMappings : []
-}
-
-function getPrimaryPartSkill(part) {
-  return getPartBranchSkills(part)[0] ?? null
-}
-
-function getUniqueTeacherInterventions(records = []) {
-  const interventionMap = new Map()
-
-  records.forEach((record) => {
-    const title = String(record.title ?? '').trim()
-    const description = String(record.description ?? '').trim()
-    const followUp = String(record.followUp ?? '').trim()
-
-    if (!description && (!title || title === 'Intervention')) {
-      return
-    }
-
-    const key = `${title}|${description}|${followUp}`
-
-    if (!interventionMap.has(key)) {
-      interventionMap.set(key, {
-        title: title || 'Teacher Intervention',
-        description,
-        targetGroup: record.targetGroup || '',
-        followUp,
-      })
-    }
-  })
-
-  return Array.from(interventionMap.values())
-}
-
-function getTeacherRecommendationForSkill(records = [], competencyId, competencyName) {
-  if (!records.length) {
-    return null
-  }
-
-  const normalizedCompetencyId =
-    competencyId !== null && competencyId !== undefined ? String(competencyId) : ''
-  const normalizedCompetencyName = normalizeMatchText(competencyName)
-
-  return (
-    records.find(
-      (record) =>
-        normalizedCompetencyId &&
-        record.competencyId !== null &&
-        String(record.competencyId) === normalizedCompetencyId,
-    ) ??
-    records.find(
-      (record) =>
-        normalizedCompetencyName &&
-        normalizeMatchText(record.competencyName) === normalizedCompetencyName,
-    ) ??
-    null
-  )
-}
-
-function hasTeacherRecommendationContent(record) {
-  return Boolean(
-    record?.recommendation ||
-      record?.recommendedAction ||
-      record?.targetGroup ||
-      record?.followUpActivity,
-  )
-}
-
-function getTeacherRecommendationAffectedCount(record) {
-  if (!record) {
-    return null
-  }
-
-  const count = parseNumber(record.affectedLearnersCount)
-
-  if (count !== null) {
-    return count
-  }
-
-  return Array.isArray(record.affectedStudents) ? record.affectedStudents.length : null
-}
-
-function isAffectedLearner(record) {
-  const percentage = parseNumber(record?.percentage)
-
-  if (percentage !== null) {
-    return percentage < INTERVENTION_MASTERY_THRESHOLD
-  }
-
-  const status = normalizeMatchText(
-    record?.lmsStatus ?? record?.status ?? record?.masteryLevel ?? record?.performanceStatus ?? '',
-  )
-
-  return (
-    status.includes('low') ||
-    status.includes('not mastered') ||
-    status.includes('intervention') ||
-    status.includes('remediation')
-  )
-}
-
-function getFallbackTeacherIntervention(masteryPercent, affectedLearnerCount) {
-  if (
-    masteryPercent === null ||
-    masteryPercent >= INTERVENTION_MASTERY_THRESHOLD ||
-    affectedLearnerCount <= 0
-  ) {
-    return []
-  }
-
-  return [
-    {
-      title: 'Focused Remediation Session',
-      description:
-        'Based on the synced results, the selected competency shows low mastery. Conduct a focused remediation session for the affected learners. Review the missed skill, provide guided examples, allow short practice activities, and give a quick reassessment to check improvement.',
-      targetGroup: 'Affected learners below mastery',
-      followUp: 'Give a short follow-up activity or quick reassessment after remediation.',
-    },
-  ]
-}
-
-function getLmsStatusLabel(masteryPercent) {
-  if (masteryPercent === null) {
-    return 'Waiting for synced LMS'
-  }
-
-  return masteryPercent < INTERVENTION_MASTERY_THRESHOLD
-    ? 'Low mastery'
-    : 'Mastery acceptable'
-}
-
 function studentBelongsToClass(student, assignment) {
   if (!student || !assignment) {
     return false
+  }
+
+  if (student.classId && assignment.classId) {
+    return Number(student.classId) === Number(assignment.classId)
   }
 
   const hasSectionIds = student.sectionId && assignment.sectionId
@@ -717,7 +496,9 @@ function ClassRecordsPage({
   token,
   onNavigate,
   initialClassId = null,
+  initialClassAssignmentId = null,
   initialTeacherTab = 'assessment',
+  principalSection = 'classes',
 }) {
   const teacherId = user?.id
   const [classAssignments, setClassAssignments] = useState([])
@@ -730,42 +511,78 @@ function ClassRecordsPage({
   const [sections, setSections] = useState([])
   const [assignmentSections, setAssignmentSections] = useState([])
   const [assessments, setAssessments] = useState([])
+  const [classSchedules, setClassSchedules] = useState([])
+  const [scheduleForm, setScheduleForm] = useState(initialScheduleForm)
+  const [editingScheduleId, setEditingScheduleId] = useState(null)
+  const [isScheduleFormOpen, setIsScheduleFormOpen] = useState(false)
+  const [isSchedulesLoading, setIsSchedulesLoading] = useState(false)
+  const [isScheduleSaving, setIsScheduleSaving] = useState(false)
+  const [scheduleMessage, setScheduleMessage] = useState({ error: '', success: '' })
+  const [schedulePendingArchive, setSchedulePendingArchive] = useState(null)
+  const [scheduleArchiveReason, setScheduleArchiveReason] = useState('')
+  const [isScheduleArchiving, setIsScheduleArchiving] = useState(false)
   const [selectedClassAssignment, setSelectedClassAssignment] = useState(null)
   const [assignmentForm, setAssignmentForm] = useState(initialAssignmentForm)
-  const [manualForm, setManualForm] = useState(initialManualForm)
-  const [manualClassFilters, setManualClassFilters] = useState(initialManualClassFilters)
-  const [manualRows, setManualRows] = useState(() => createManualStudentRows())
-  const [activeTeacherTab, setActiveTeacherTab] = useState(
-    initialTeacherTab === 'students' || initialTeacherTab === 'analytics'
-      ? initialTeacherTab
-      : 'assessment',
-  )
-  const [selectedAnalyticsTestId, setSelectedAnalyticsTestId] = useState('')
-  const [selectedAnalyticsPartId, setSelectedAnalyticsPartId] = useState('')
+  const [manualStudentForm, setManualStudentForm] = useState(initialManualStudentForm)
+  const [studentGenders, setStudentGenders] = useState([])
+  const [studentSuffixes, setStudentSuffixes] = useState([])
+  const [principalRosterClassId, setPrincipalRosterClassId] = useState('')
+  const [principalRosterStatus, setPrincipalRosterStatus] = useState('enrolled')
+  const [studentPendingEdit, setStudentPendingEdit] = useState(null)
+  const [studentProfileForm, setStudentProfileForm] = useState(initialStudentProfileForm)
+  const [studentProfileError, setStudentProfileError] = useState('')
+  const [isStudentProfileSaving, setIsStudentProfileSaving] = useState(false)
+  const [studentPendingStatus, setStudentPendingStatus] = useState(null)
+  const [studentNextStatus, setStudentNextStatus] = useState('')
+  const [studentStatusReason, setStudentStatusReason] = useState('')
+  const [studentStatusError, setStudentStatusError] = useState('')
+  const [isStudentStatusSaving, setIsStudentStatusSaving] = useState(false)
+  const activeTeacherTab = initialTeacherTab === 'students' ? initialTeacherTab : 'assessment'
   const [selectedStudentClassFilter, setSelectedStudentClassFilter] = useState('')
   const [studentNameSearch, setStudentNameSearch] = useState('')
   const [selectedStudentInfo, setSelectedStudentInfo] = useState(null)
-  const [analyticsDetails, setAnalyticsDetails] = useState(null)
-  const [analyticsLms, setAnalyticsLms] = useState([])
-  const [analyticsStudents, setAnalyticsStudents] = useState([])
-  const [teacherInterventionRecommendations, setTeacherInterventionRecommendations] = useState([])
-  const [studentSkillMasteryRows, setStudentSkillMasteryRows] = useState([])
   const [activePrincipalTool, setActivePrincipalTool] = useState(null)
+  const [schoolReferenceError, setSchoolReferenceError] = useState('')
   const [studentsError, setStudentsError] = useState('')
   const [assessmentsError, setAssessmentsError] = useState('')
   const [studentsSuccess, setStudentsSuccess] = useState('')
   const [assignmentMessage, setAssignmentMessage] = useState({ error: '', success: '' })
+  const [assignmentPendingCreation, setAssignmentPendingCreation] = useState(null)
+  const [assignmentCreateError, setAssignmentCreateError] = useState('')
+  const [assignmentPendingEdit, setAssignmentPendingEdit] = useState(null)
+  const [assignmentEditForm, setAssignmentEditForm] = useState(initialAssignmentForm)
+  const [assignmentEditSections, setAssignmentEditSections] = useState([])
+  const [assignmentEditError, setAssignmentEditError] = useState('')
+  const [assignmentPendingDeletion, setAssignmentPendingDeletion] = useState(null)
+  const [assignmentDeleteConfirmation, setAssignmentDeleteConfirmation] = useState('')
+  const [assignmentArchiveReason, setAssignmentArchiveReason] = useState('')
+  const [assignmentDeleteError, setAssignmentDeleteError] = useState('')
+  const [classForm, setClassForm] = useState(initialClassForm)
+  const [isClassDialogOpen, setIsClassDialogOpen] = useState(false)
+  const [classCreateError, setClassCreateError] = useState('')
+  const [isClassCreating, setIsClassCreating] = useState(false)
   const [manualMessage, setManualMessage] = useState({ error: '', success: '' })
   const [isStudentsLoading, setIsStudentsLoading] = useState(true)
   const [isAssessmentsLoading, setIsAssessmentsLoading] = useState(true)
-  const [, setIsSectionsLoading] = useState(true)
+  const [isSectionsLoading, setIsSectionsLoading] = useState(true)
   const [isAssignmentSubmitting, setIsAssignmentSubmitting] = useState(false)
+  const isAssignmentUpdating = false
+  const [isAssignmentEditSectionsLoading, setIsAssignmentEditSectionsLoading] = useState(false)
+  const [isAssignmentDeleting, setIsAssignmentDeleting] = useState(false)
   const [isManualSubmitting, setIsManualSubmitting] = useState(false)
-  const [isAnalyticsLoading, setIsAnalyticsLoading] = useState(false)
-  const [isAnalyticsExportLoading, setIsAnalyticsExportLoading] = useState(false)
-  const [isStudentSkillMasteryLoading, setIsStudentSkillMasteryLoading] = useState(false)
-  const [analyticsMessage, setAnalyticsMessage] = useState({ error: '', success: '' })
-  const [studentSkillMasteryMessage, setStudentSkillMasteryMessage] = useState('')
+  const activeClassAssignments = useMemo(
+    () => classAssignments.filter(isActiveClassAssignment),
+    [classAssignments],
+  )
+  const hasInitialTeacherClassSelection = Boolean(initialClassAssignmentId || initialClassId)
+  const assignmentDeletePhrase = assignmentPendingDeletion
+    ? getAssignmentDeletePhrase(assignmentPendingDeletion)
+    : ''
+  const canDeleteAssignment =
+    Boolean(assignmentDeletePhrase) &&
+    assignmentDeleteConfirmation === assignmentDeletePhrase &&
+    assignmentArchiveReason.trim().length >= 5 &&
+    assignmentArchiveReason.trim().length <= 255
 
   const sectionOptions = useMemo(
     () => sections.filter((section) => section.id !== null && section.id !== undefined),
@@ -811,6 +628,30 @@ function ClassRecordsPage({
       ) ?? null,
     [academicYears, selectedAcademicYearId],
   )
+  const selectedTeacherAssignments = useMemo(
+    () =>
+      assignmentForm.teacherId
+        ? activeClassAssignments.filter(
+            (assignment) =>
+              String(assignment.teacherId) === String(assignmentForm.teacherId) &&
+              String(assignment.academicYearId) === String(selectedAcademicYearId),
+          )
+        : [],
+    [activeClassAssignments, assignmentForm.teacherId, selectedAcademicYearId],
+  )
+  const duplicateClassAssignment = useMemo(
+    () =>
+      assignmentForm.teacherId && assignmentForm.subjectId && assignmentForm.classId
+        ? activeClassAssignments.find(
+            (assignment) =>
+              String(assignment.teacherId) === String(assignmentForm.teacherId) &&
+              String(assignment.subjectId) === String(assignmentForm.subjectId) &&
+              String(assignment.classId) === String(assignmentForm.classId) &&
+              String(assignment.academicYearId) === String(selectedAcademicYearId),
+          ) ?? null
+        : null,
+    [activeClassAssignments, assignmentForm, selectedAcademicYearId],
+  )
   const formatAcademicYear = (value, fallback = 'Academic Year') =>
     formatAcademicYearLabel(value, fallback, academicYears)
   const selectedAcademicYearLabel =
@@ -833,108 +674,77 @@ function ClassRecordsPage({
       return hasGradeMetadata ? sectionMatchesGrade(section, selectedAssignmentGradeLevel) : true
     })
   }, [assignmentForm.gradeLevelId, assignmentSections, selectedAssignmentGradeLevel])
-  const manualTeacherOptions = useMemo(
-    () => getUniqueClassOptions(classAssignments, 'teacherId', 'teacherName'),
-    [classAssignments],
-  )
-  const manualGradeOptions = useMemo(() => {
-    const filteredAssignments = manualClassFilters.teacherId
-      ? classAssignments.filter(
-          (assignment) => String(assignment.teacherId) === String(manualClassFilters.teacherId),
-        )
-      : classAssignments
-
-    return getUniqueClassOptions(filteredAssignments, 'gradeLevelId', 'gradeLevelName')
-  }, [classAssignments, manualClassFilters.teacherId])
-  const manualSubjectOptions = useMemo(() => {
-    const filteredAssignments = classAssignments.filter((assignment) => {
-      if (
-        manualClassFilters.teacherId &&
-        String(assignment.teacherId) !== String(manualClassFilters.teacherId)
-      ) {
-        return false
-      }
-
-      if (
-        manualClassFilters.gradeLevelId &&
-        String(assignment.gradeLevelId) !== String(manualClassFilters.gradeLevelId)
-      ) {
-        return false
-      }
-
-      return true
-    })
-
-    return getUniqueClassOptions(filteredAssignments, 'subjectId', 'subjectName')
-  }, [classAssignments, manualClassFilters.gradeLevelId, manualClassFilters.teacherId])
-  const manualSectionOptions = useMemo(() => {
-    const optionMap = new Map()
-
-    classAssignments.forEach((assignment) => {
-      if (
-        manualClassFilters.teacherId &&
-        String(assignment.teacherId) !== String(manualClassFilters.teacherId)
-      ) {
-        return
-      }
-
-      if (
-        manualClassFilters.gradeLevelId &&
-        String(assignment.gradeLevelId) !== String(manualClassFilters.gradeLevelId)
-      ) {
-        return
-      }
-
-      if (
-        manualClassFilters.subjectId &&
-        String(assignment.subjectId) !== String(manualClassFilters.subjectId)
-      ) {
-        return
-      }
-
-      if (!assignment.sectionId) {
-        return
-      }
-
-      const key = String(assignment.sectionId)
-
-      if (!optionMap.has(key)) {
-        optionMap.set(key, {
-          value: key,
-          label: assignment.sectionName || 'Section',
-          assignment,
-        })
-      }
-    })
-
-    return Array.from(optionMap.values()).sort((left, right) =>
-      left.label.localeCompare(right.label),
-    )
-  }, [
-    classAssignments,
-    manualClassFilters.gradeLevelId,
-    manualClassFilters.subjectId,
-    manualClassFilters.teacherId,
-  ])
-  const selectedManualClassOption =
-    manualSectionOptions.find((option) => String(option.value) === String(manualForm.sectionId)) ??
-    null
-  const effectiveManualSectionOptions = manualSectionOptions.length
-    ? manualSectionOptions
-    : sectionOptions.map((section) => ({
-        value: String(section.id),
-        label: section.name,
-        assignment: null,
-      }))
-  const startedManualRows = useMemo(
+  const selectedAssignmentEditGradeLevel = useMemo(
     () =>
-      manualRows.filter((row) =>
-        [row.studentLrn, row.firstName, row.lastName, row.gender].some((value) =>
-          String(value ?? '').trim(),
-        ),
-      ),
-    [manualRows],
+      assignmentGradeOptions.find(
+        (gradeLevel) => String(gradeLevel.id) === String(assignmentEditForm.gradeLevelId),
+      ) ?? null,
+    [assignmentEditForm.gradeLevelId, assignmentGradeOptions],
   )
+  const assignmentEditSectionOptions = useMemo(() => {
+    if (!selectedAssignmentEditGradeLevel) return []
+
+    return assignmentEditSections.filter((section) => {
+      const hasGradeMetadata =
+        (section.gradeLevelId !== null && section.gradeLevelId !== undefined) ||
+        Boolean(section.gradeLevelName)
+
+      return hasGradeMetadata
+        ? sectionMatchesGrade(section, selectedAssignmentEditGradeLevel)
+        : true
+    })
+  }, [assignmentEditSections, selectedAssignmentEditGradeLevel])
+  const duplicateEditedAssignment = useMemo(() => {
+    if (
+      !assignmentPendingEdit ||
+      !assignmentEditForm.teacherId ||
+      !assignmentEditForm.subjectId ||
+      !assignmentEditForm.classId
+    ) {
+      return null
+    }
+
+    const editingId = assignmentPendingEdit.classAssignmentId ?? assignmentPendingEdit.id
+    return activeClassAssignments.find((assignment) => {
+      const assignmentId = assignment.classAssignmentId ?? assignment.id
+      return (
+        String(assignmentId) !== String(editingId) &&
+        String(assignment.teacherId) === String(assignmentEditForm.teacherId) &&
+        String(assignment.subjectId) === String(assignmentEditForm.subjectId) &&
+        String(assignment.classId) === String(assignmentEditForm.classId)
+      )
+    }) ?? null
+  }, [activeClassAssignments, assignmentEditForm, assignmentPendingEdit])
+  const hasAssignmentEditChanges = Boolean(
+    assignmentPendingEdit &&
+      (String(assignmentEditForm.teacherId) !== String(assignmentPendingEdit.teacherId) ||
+        String(assignmentEditForm.subjectId) !== String(assignmentPendingEdit.subjectId) ||
+        String(assignmentEditForm.classId) !== String(assignmentPendingEdit.classId)),
+  )
+  const principalRosterClassOptions = useMemo(
+    () =>
+      sectionOptions
+        .filter(
+          (classRecord) =>
+            !selectedAcademicYearId ||
+            !classRecord.academicYearId ||
+            String(classRecord.academicYearId) === String(selectedAcademicYearId),
+        )
+        .sort((left, right) => {
+          const leftLabel = `${left.gradeLevelName ?? ''} ${left.sectionName ?? left.name ?? ''}`
+          const rightLabel = `${right.gradeLevelName ?? ''} ${right.sectionName ?? right.name ?? ''}`
+          return leftLabel.localeCompare(rightLabel)
+        }),
+    [sectionOptions, selectedAcademicYearId],
+  )
+  const selectedPrincipalRosterClass =
+    principalRosterClassOptions.find(
+      (classRecord) => String(classRecord.classId) === String(principalRosterClassId),
+    ) ?? null
+  const selectedManualClass =
+    principalRosterClassOptions.find(
+      (classRecord) => String(classRecord.classId) === String(manualStudentForm.classId),
+    ) ?? null
   const selectedClassStudents = useMemo(
     () => students.filter((student) => studentBelongsToClass(student, selectedClassAssignment)),
     [students, selectedClassAssignment],
@@ -949,9 +759,14 @@ function ClassRecordsPage({
         optionMap.set(key, {
           key,
           label: getClassDisplayLabel(assignment),
+          primaryAssignment: assignment,
           assignment,
+          assignments: [assignment],
         })
+        return
       }
+
+      optionMap.get(key).assignments.push(assignment)
     })
 
     return Array.from(optionMap.values())
@@ -1003,174 +818,11 @@ function ClassRecordsPage({
   const selectedClassAssessments = useMemo(
     () =>
       assessments.filter(
-        (assessment) => Number(assessment.classId) === Number(selectedClassAssignment?.classId),
+        (assessment) =>
+          Number(assessment.classAssignmentId) ===
+          Number(selectedClassAssignment?.classAssignmentId),
       ),
-    [assessments, selectedClassAssignment?.classId],
-  )
-  const selectedStudentProgressAssignment = useMemo(() => {
-    if (!selectedStudentInfo) {
-      return null
-    }
-
-    if (
-      selectedStudentClassAssignment &&
-      studentBelongsToClass(selectedStudentInfo, selectedStudentClassAssignment)
-    ) {
-      return selectedStudentClassAssignment
-    }
-
-    return classAssignments.find((assignment) =>
-      studentBelongsToClass(selectedStudentInfo, assignment),
-    ) ?? null
-  }, [classAssignments, selectedStudentClassAssignment, selectedStudentInfo])
-  const selectedAnalyticsAssessment =
-    selectedClassAssessments.find(
-      (assessment) => String(assessment.id) === String(selectedAnalyticsTestId),
-    ) ?? null
-  const analyticsParts = useMemo(() => analyticsDetails?.parts ?? [], [analyticsDetails?.parts])
-  const analyticsPartIds = useMemo(
-    () => analyticsParts.map((part) => String(part.id ?? '')).join('|'),
-    [analyticsParts],
-  )
-  const assessmentTotalItems = analyticsParts.reduce(
-    (total, part) => total + (parseNumber(part.numberOfItems) ?? 0),
-    0,
-  )
-  const assessmentMaxScore = analyticsParts.reduce(
-    (total, part) => total + (getPartMaxScore(part) ?? 0),
-    0,
-  )
-  const selectedAnalyticsPart =
-    analyticsParts.find((part) => String(part.id) === String(selectedAnalyticsPartId)) ??
-    analyticsParts[0] ??
-    null
-  const selectedPartPrimarySkill = getPrimaryPartSkill(selectedAnalyticsPart)
-  const selectedAnalyticsSkillId =
-    selectedPartPrimarySkill?.competencyId ?? selectedAnalyticsPart?.competencyId ?? null
-  const selectedAnalyticsSkillName =
-    selectedPartPrimarySkill?.competencyName ?? selectedAnalyticsPart?.competencyName ?? ''
-  const selectedPartLms =
-    analyticsLms.find(
-      (item) => String(item.competencyId) === String(selectedAnalyticsSkillId),
-    ) ?? null
-  const analyticsChartRows = useMemo(
-    () =>
-      analyticsLms
-        .map((item) => ({
-          id: item.competencyId ?? item.competencyName,
-          label: item.competencyName || 'Competency',
-          value: parseNumber(item.averageScore),
-          level: item.masteryLevel || '',
-        }))
-        .filter((item) => item.value !== null)
-        .slice(0, 5),
-    [analyticsLms],
-  )
-  const hasAnalyticsChartRows = analyticsChartRows.length > 0
-  const selectedPartMastery = parseNumber(selectedPartLms?.averageScore)
-  const analyticsStudentRows = useMemo(
-    () =>
-      analyticsStudents.map((student, index) => ({
-        ...student,
-        rowNumber: String(index + 1).padStart(2, '0'),
-        displayName: formatStudentDisplayName(student),
-        displayScore: parseNumber(student.score),
-        performance: getPerformanceLabel(student.percentage),
-        performanceClass: getPerformanceClass(student.percentage),
-      })),
-    [analyticsStudents],
-  )
-  const analyticsPercentages = analyticsStudentRows
-    .map((student) => parseNumber(student.percentage))
-    .filter((value) => value !== null)
-  const classAverage =
-    analyticsPercentages.length > 0
-      ? analyticsPercentages.reduce((total, value) => total + value, 0) / analyticsPercentages.length
-      : null
-  const rankedAnalyticsRows = [...analyticsStudentRows].sort(
-    (left, right) => (parseNumber(right.displayScore) ?? -1) - (parseNumber(left.displayScore) ?? -1),
-  )
-  const highestAnalyticsStudent = rankedAnalyticsRows[0] ?? null
-  const lowestAnalyticsStudent = rankedAnalyticsRows[rankedAnalyticsRows.length - 1] ?? null
-  const selectedInterventionCompetencyId =
-    selectedAnalyticsSkillId ?? selectedPartLms?.competencyId ?? null
-  const selectedInterventionCompetencyName =
-    selectedAnalyticsSkillName || selectedPartLms?.competencyName || ''
-  const selectedTeacherRecommendation = getTeacherRecommendationForSkill(
-    teacherInterventionRecommendations,
-    selectedInterventionCompetencyId,
-    selectedInterventionCompetencyName,
-  )
-  const legacyTeacherInterventions = useMemo(
-    () => getUniqueTeacherInterventions(analyticsStudents),
-    [analyticsStudents],
-  )
-  const affectedLearnerRecords = useMemo(
-    () => analyticsStudents.filter((student) => isAffectedLearner(student)),
-    [analyticsStudents],
-  )
-  const selectedRecommendationMastery = parseNumber(selectedTeacherRecommendation?.masteryRate)
-  const selectedInterventionMastery =
-    selectedRecommendationMastery !== null ? selectedRecommendationMastery : selectedPartMastery
-  const hasPerLearnerMasteryData = analyticsStudents.some(
-    (student) =>
-      parseNumber(student?.percentage) !== null ||
-      Boolean(student?.lmsStatus || student?.status || student?.masteryLevel),
-  )
-  const recommendationAffectedCount =
-    getTeacherRecommendationAffectedCount(selectedTeacherRecommendation)
-  const isLowMastery =
-    selectedInterventionMastery !== null &&
-    selectedInterventionMastery < INTERVENTION_MASTERY_THRESHOLD
-  const affectedLearnerCount =
-    recommendationAffectedCount !== null
-      ? recommendationAffectedCount
-      : hasPerLearnerMasteryData
-        ? affectedLearnerRecords.length
-        : legacyTeacherInterventions.length || isLowMastery
-          ? analyticsStudents.length
-          : 0
-  const hasSelectedTeacherRecommendation =
-    selectedTeacherRecommendation && hasTeacherRecommendationContent(selectedTeacherRecommendation)
-  const isInterventionRecommended =
-    Boolean(hasSelectedTeacherRecommendation) ||
-    legacyTeacherInterventions.length > 0 ||
-    (isLowMastery && affectedLearnerCount > 0)
-  const selectedInterventionStatusLabel = selectedTeacherRecommendation?.status
-    ? formatStatus(selectedTeacherRecommendation.status)
-    : getLmsStatusLabel(selectedInterventionMastery)
-  const teacherInterventions = hasSelectedTeacherRecommendation
-    ? [
-        {
-          title:
-            selectedTeacherRecommendation.recommendedAction ||
-            'Recommended Teaching Action',
-          description:
-            selectedTeacherRecommendation.recommendation ||
-            'Use this recommendation as the teacher action plan during the next remediation session.',
-          targetGroup: selectedTeacherRecommendation.targetGroup || '',
-          followUp: selectedTeacherRecommendation.followUpActivity || '',
-          affectedStudents: selectedTeacherRecommendation.affectedStudents ?? [],
-        },
-      ]
-    : legacyTeacherInterventions.length
-      ? legacyTeacherInterventions
-      : getFallbackTeacherIntervention(selectedInterventionMastery, affectedLearnerCount)
-  const studentAssessedSkillRows = useMemo(
-    () =>
-      studentSkillMasteryRows
-        .map((skill) => ({
-          id: skill.competencyId ?? skill.id ?? skill.competencyName,
-          label: skill.competencyName || 'Competency',
-          value: parseNumber(skill.masteryRate),
-          status: skill.status || '',
-          earnedPoints: skill.earnedPoints,
-          totalPoints: skill.totalPoints,
-          assessmentsCount: skill.assessmentsCount,
-        }))
-        .filter((skill) => skill.value !== null)
-        .sort((left, right) => left.label.localeCompare(right.label)),
-    [studentSkillMasteryRows],
+    [assessments, selectedClassAssignment?.classAssignmentId],
   )
   const selectedClassLabel = selectedClassAssignment
     ? getClassDisplayLabel(selectedClassAssignment)
@@ -1182,7 +834,11 @@ function ClassRecordsPage({
   const teacherHeaderStudentCount =
     activeTeacherTab === 'students' ? filteredTeacherStudents.length : selectedClassStudents.length
 
-  const loadStudents = async ({ preserveMessage = false } = {}) => {
+  const loadStudents = async ({
+    preserveMessage = false,
+    classId = principalRosterClassId,
+    enrollmentStatus = principalRosterStatus,
+  } = {}) => {
     setIsStudentsLoading(true)
     setStudentsError('')
 
@@ -1191,8 +847,45 @@ function ClassRecordsPage({
     }
 
     try {
-      const studentRecords = await getManualStudents()
-      setStudents(studentRecords)
+      if (role === 'teacher') {
+        if (!selectedClassAssignment?.classId) {
+          setStudents([])
+          return
+        }
+
+        const studentRecords = await getTeacherClassStudentsV3(
+          selectedClassAssignment.classId,
+          token,
+        )
+        setStudents(studentRecords)
+        return
+      }
+
+      if (!classId) {
+        setStudents([])
+        return
+      }
+
+      const classRecord = sectionOptions.find(
+        (option) => String(option.classId) === String(classId),
+      )
+      const studentRecords = await getPrincipalClassStudentsV3(
+        classId,
+        token,
+        enrollmentStatus,
+      )
+      setStudents(
+        studentRecords.map((student) => ({
+          ...student,
+          sectionId: classRecord?.sectionId,
+          section: classRecord?.sectionName,
+          sectionName: classRecord?.sectionName,
+          gradeLevel: classRecord?.gradeLevelName,
+          gradeLevelName: classRecord?.gradeLevelName,
+          academicYearId: classRecord?.academicYearId,
+          academicYear: classRecord?.academicYearName,
+        })),
+      )
     } catch (loadError) {
       setStudentsError(loadError.message || 'Unable to load student records.')
     } finally {
@@ -1203,11 +896,94 @@ function ClassRecordsPage({
   const loadSections = async () => {
     setIsSectionsLoading(true)
 
+    if (role === 'teacher') {
+      try {
+        const referenceData = await getAssessmentReferenceDataV3({}, token)
+        const nextTeacherAssignments = (referenceData.classAssignments ?? []).map(
+          (assignment) => ({
+            id: assignment.classAssignmentId,
+            classAssignmentId: assignment.classAssignmentId,
+            classId: assignment.classId,
+            academicYearId: assignment.academicYearId,
+            academicYear: assignment.yearName ?? '',
+            gradeLevelId: assignment.gradeLevelId,
+            gradeLevelName: assignment.gradeLevelName ?? '',
+            sectionId: assignment.sectionId,
+            sectionName: assignment.sectionName ?? '',
+            teacherId,
+            teacherName: user?.name ?? 'Teacher',
+            subjectId: assignment.subjectId,
+            subjectName: assignment.subjectName ?? '',
+            assignmentRole: assignment.assignmentRole ?? '',
+            status: 'active',
+          }),
+        )
+
+        const academicYearMap = new Map()
+        nextTeacherAssignments.forEach((assignment) => {
+          if (
+            assignment.academicYearId &&
+            !academicYearMap.has(String(assignment.academicYearId))
+          ) {
+            academicYearMap.set(String(assignment.academicYearId), {
+              id: assignment.academicYearId,
+              name: assignment.academicYear,
+              isActive: true,
+            })
+          }
+        })
+        const teacherAcademicYears = Array.from(academicYearMap.values())
+
+        setClassAssignments(nextTeacherAssignments)
+        setAcademicYears(teacherAcademicYears)
+        setSelectedAcademicYearId(
+          teacherAcademicYears[0]?.id ? String(teacherAcademicYears[0].id) : '',
+        )
+        setSections(
+          nextTeacherAssignments.map((assignment) => ({
+            id: assignment.sectionId,
+            name: assignment.sectionName,
+            gradeLevelId: assignment.gradeLevelId,
+            gradeLevelName: assignment.gradeLevelName,
+          })),
+        )
+        const initialTeacherAssignment =
+          hasInitialTeacherClassSelection
+            ? nextTeacherAssignments.find(
+                (assignment) =>
+                  Number(assignment.classAssignmentId) === Number(initialClassAssignmentId),
+              ) ??
+              nextTeacherAssignments.find(
+                (assignment) => Number(assignment.classId) === Number(initialClassId),
+              ) ??
+              null
+            : null
+
+        setSelectedClassAssignment(initialTeacherAssignment)
+      } catch (loadError) {
+        setClassAssignments([])
+        setSelectedClassAssignment(null)
+        setStudentsError(loadError.message || 'Unable to load assigned classes.')
+      } finally {
+        setIsSectionsLoading(false)
+      }
+      return
+    }
+
+    setSchoolReferenceError('')
+    setAssignmentMessage((currentMessage) => ({ ...currentMessage, error: '' }))
+
     try {
-      const [teacherRecords, referenceData] = await Promise.all([
-        getTeacherAccountsV2(token, 'active'),
-        getSchoolSetupReferenceDataV2(token),
+      const [referenceResult, classResult] = await Promise.allSettled([
+        getSchoolSetupReferenceDataV3(token),
+        getClassesV3({}, token),
       ])
+
+      if (referenceResult.status === 'rejected') {
+        throw referenceResult.reason
+      }
+
+      const referenceData = referenceResult.value
 
       const academicYearRecords = (referenceData.academicYears ?? referenceData.years ?? [])
         .map(normalizeAcademicYearRecord)
@@ -1222,11 +998,54 @@ function ClassRecordsPage({
         academicYearRecords.find((academicYear) => academicYear.isActive) ??
         academicYearRecords[0] ??
         null
+      const activeClassRecords =
+        classResult.status === 'fulfilled'
+          ? classResult.value
+              .filter((classRecord) => String(classRecord.status ?? '').toLowerCase() === 'active')
+              .map(normalizeAvailableClassOption)
+          : []
+      const defaultClass =
+        activeClassRecords.find(
+          (classRecord) => String(classRecord.classId) === String(initialClassId),
+        ) ??
+        activeClassRecords.find(
+          (classRecord) =>
+            !defaultAcademicYear?.id ||
+            String(classRecord.academicYearId) === String(defaultAcademicYear.id),
+        ) ??
+        activeClassRecords[0] ??
+        null
 
-      setSchoolTeachers(teacherRecords)
+      if (!gradeLevelRecords.length) {
+        throw new Error('School reference data did not return any grade levels.')
+      }
+
+      setSchoolTeachers(referenceData.teachers ?? [])
       setSubjects(subjectRecords)
       setSchoolGradeLevels(gradeLevelRecords)
+      setStudentGenders(referenceData.genders ?? [])
+      setStudentSuffixes(referenceData.suffixes ?? [])
       setAcademicYears(academicYearRecords)
+      setSections(activeClassRecords)
+      setPrincipalRosterClassId((currentClassId) =>
+        activeClassRecords.some(
+          (classRecord) => String(classRecord.classId) === String(currentClassId),
+        )
+          ? currentClassId
+          : defaultClass?.classId
+            ? String(defaultClass.classId)
+            : '',
+      )
+      setManualStudentForm((currentForm) => ({
+        ...currentForm,
+        classId: activeClassRecords.some(
+          (classRecord) => String(classRecord.classId) === String(currentForm.classId),
+        )
+          ? currentForm.classId
+          : defaultClass?.classId
+            ? String(defaultClass.classId)
+            : '',
+      }))
       setSelectedAcademicYearId((currentAcademicYearId) =>
         academicYearRecords.some(
           (academicYear) => String(academicYear.id) === String(currentAcademicYearId),
@@ -1236,15 +1055,28 @@ function ClassRecordsPage({
             ? String(defaultAcademicYear.id)
             : '',
       )
+
+      if (classResult.status === 'rejected' && !classResult.reason?.isAuthenticationFailure) {
+        setAssignmentMessage({
+          error: classResult.reason?.message || 'Unable to load active classes.',
+          success: '',
+        })
+      }
     } catch (loadError) {
       setSections([])
       setSchoolTeachers([])
       setSubjects([])
       setSchoolGradeLevels([])
+      setStudentGenders([])
+      setStudentSuffixes([])
       setAcademicYears([])
       setSelectedAcademicYearId('')
+      setPrincipalRosterClassId('')
+      setSchoolReferenceError(
+        loadError.message || 'Unable to load school setup reference data.',
+      )
       setAssignmentMessage({
-        error: loadError.message || 'Unable to load V2 school setup reference data.',
+        error: loadError.message || 'Unable to load school setup reference data.',
         success: '',
       })
     } finally {
@@ -1260,26 +1092,23 @@ function ClassRecordsPage({
     }
 
     try {
-      const assignments = await getClassAssignmentsV2(token, selectedAcademicYearId)
+      const assignments = (await getClassAssignmentsV3(token, selectedAcademicYearId)).filter(
+        isActiveClassAssignment,
+      )
       const nextTeacherAssignments =
         role === 'teacher'
           ? assignments.filter((assignment) => Number(assignment.teacherId) === Number(teacherId))
           : assignments
       setClassAssignments(nextTeacherAssignments)
-      setSections(
-        nextTeacherAssignments
-          .filter((assignment) => assignment.sectionId)
-          .map((assignment) => ({
-            id: assignment.sectionId,
-            name: assignment.sectionName,
-            gradeLevelId: assignment.gradeLevelId,
-            gradeLevelName: assignment.gradeLevelName,
-          })),
-      )
       setSelectedClassAssignment((currentAssignment) =>
         nextTeacherAssignments.find(
           (assignment) =>
-            Number(assignment.classId) === Number(currentAssignment?.classId),
+            Number(assignment.classAssignmentId) ===
+            Number(currentAssignment?.classAssignmentId),
+        ) ??
+        nextTeacherAssignments.find(
+          (assignment) =>
+            Number(assignment.classAssignmentId) === Number(initialClassAssignmentId),
         ) ??
         nextTeacherAssignments.find(
           (assignment) => Number(assignment.classId) === Number(initialClassId),
@@ -1291,15 +1120,18 @@ function ClassRecordsPage({
       setClassAssignments([])
       setSelectedClassAssignment(null)
       setAssignmentMessage({
-        error: loadError.message || 'Unable to load V2 class assignments.',
+        error: loadError.message || 'Unable to load class assignments.',
         success: '',
       })
     }
   }
 
   const loadTeacherAssessments = async () => {
-    if (!teacherId) {
+    const classAssignmentId = selectedClassAssignment?.classAssignmentId
+
+    if (role !== 'teacher' || !teacherId || !classAssignmentId) {
       setAssessments([])
+      setAssessmentsError('')
       setIsAssessmentsLoading(false)
       return
     }
@@ -1308,14 +1140,11 @@ function ClassRecordsPage({
     setAssessmentsError('')
 
     try {
-      const [assessmentRecords, syncActivity] = await Promise.all([
-        getTeacherAssessments(teacherId),
-        getSyncActivity(teacherId).catch(() => []),
-      ])
+      const assessmentRecords = await getAssessmentsV3(token, classAssignmentId)
       setAssessments(
         assessmentRecords.map((assessment) => ({
           ...assessment,
-          testStatus: getAutomaticAssessmentStatus(assessment, syncActivity),
+          testStatus: assessment.testStatus || assessment.status || 'draft',
         })),
       )
     } catch (loadError) {
@@ -1326,152 +1155,96 @@ function ClassRecordsPage({
     }
   }
 
-  const loadTeacherClassAnalytics = async (testId) => {
-    if (!testId) {
-      setAnalyticsDetails(null)
-      setAnalyticsLms([])
-      setAnalyticsStudents([])
-      setTeacherInterventionRecommendations([])
-      setSelectedAnalyticsPartId('')
-      return
-    }
-
-    setIsAnalyticsLoading(true)
-    setAnalyticsMessage({ error: '', success: '' })
-    setAnalyticsDetails(null)
-    setAnalyticsStudents([])
-
-    try {
-      const [details, lmsRecords, teacherRecommendations] = await Promise.all([
-        getAssessmentDetails(testId),
-        getLms(testId),
-        getTeacherInterventions(testId).catch(() => []),
-      ])
-      const partsWithSkillMappings = await Promise.all(
-        (details.parts ?? []).map(async (part) => ({
-          ...part,
-          skillMappings: part.id ? await getPartSkillMappings(part.id).catch(() => []) : [],
-        })),
-      )
-      const firstPartId = partsWithSkillMappings[0]?.id ?? ''
-
-      setAnalyticsDetails({ ...details, parts: partsWithSkillMappings })
-      setAnalyticsLms(lmsRecords)
-      setTeacherInterventionRecommendations(teacherRecommendations)
-      setSelectedAnalyticsPartId((currentPartId) =>
-        details.parts?.some((part) => String(part.id) === String(currentPartId))
-          ? currentPartId
-          : String(firstPartId),
-      )
-    } catch (loadError) {
-      setAnalyticsDetails(null)
-      setAnalyticsLms([])
-      setAnalyticsStudents([])
-      setTeacherInterventionRecommendations([])
-      setSelectedAnalyticsPartId('')
-      setAnalyticsMessage({
-        error: loadError.message || 'Unable to load analytics for the selected assessment.',
-        success: '',
-      })
-    } finally {
-      setIsAnalyticsLoading(false)
-    }
-  }
-
-  const loadAnalyticsStudents = async (testId, parts = []) => {
-    const partsWithIds = parts.filter((part) => part?.id)
-
-    if (!testId || !partsWithIds.length) {
-      setAnalyticsStudents([])
-      return
-    }
-
-    setIsAnalyticsLoading(true)
-    setAnalyticsMessage({ error: '', success: '' })
-
-    try {
-      const partResultGroups = await Promise.all(
-        partsWithIds.map((part) => getTestPartResults(testId, part.id)),
-      )
-      setAnalyticsStudents(mergeTestPartResults(partResultGroups))
-    } catch (loadError) {
-      setAnalyticsStudents([])
-      setAnalyticsMessage({
-        error: loadError.message || 'Unable to load student scores for this assessment.',
-        success: '',
-      })
-    } finally {
-      setIsAnalyticsLoading(false)
-    }
-  }
-
-  const loadStudentSkillMastery = async (studentRecord, classAssignment) => {
-    const studentId = studentRecord?.id
-    const classId = classAssignment?.classId
-
-    if (!studentId || !classId) {
-      setStudentSkillMasteryRows([])
-      setStudentSkillMasteryMessage('Student class context is incomplete.')
-      return
-    }
-
-    setIsStudentSkillMasteryLoading(true)
-    setStudentSkillMasteryMessage('')
-
-    try {
-      const skillRows = await getStudentSkillMastery(studentId, classId)
-      setStudentSkillMasteryRows(skillRows)
-    } catch (loadError) {
-      setStudentSkillMasteryRows([])
-      setStudentSkillMasteryMessage(
-        loadError.message || 'Unable to load student skill mastery from analytics.',
-      )
-    } finally {
-      setIsStudentSkillMasteryLoading(false)
-    }
-  }
-
-  const handleAnalyticsExport = async () => {
-    setAnalyticsMessage({ error: '', success: '' })
-
-    if (!selectedAnalyticsTestId) {
-      setAnalyticsMessage({
-        error: 'Select an assessment before exporting student scores.',
-        success: '',
-      })
-      return
-    }
-
-    setIsAnalyticsExportLoading(true)
-
-    try {
-      const filename = await downloadStudentScoresReport(selectedAnalyticsTestId)
-      setAnalyticsMessage({
-        error: '',
-        success: `${filename} downloaded successfully.`,
-      })
-    } catch (downloadError) {
-      setAnalyticsMessage({
-        error: downloadError.message || 'Unable to export the selected assessment student scores.',
-        success: '',
-      })
-    } finally {
-      setIsAnalyticsExportLoading(false)
-    }
-  }
-
   /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
   useEffect(() => {
-    loadStudents()
     loadSections()
-    loadTeacherAssessments()
+
   }, [])
 
   useEffect(() => {
-    if (selectedAcademicYearId) {
+    if (role !== 'teacher') return
+
+    if (!hasInitialTeacherClassSelection) {
+      setSelectedClassAssignment(null)
+      return
+    }
+
+    setSelectedClassAssignment(
+      classAssignments.find(
+        (assignment) =>
+          Number(assignment.classAssignmentId) === Number(initialClassAssignmentId),
+      ) ??
+        classAssignments.find(
+          (assignment) => Number(assignment.classId) === Number(initialClassId),
+        ) ??
+        null,
+    )
+  }, [
+    role,
+    classAssignments,
+    hasInitialTeacherClassSelection,
+    initialClassAssignmentId,
+    initialClassId,
+  ])
+
+  useEffect(() => {
+    if (role === 'principal' && principalRosterClassId) {
+      loadStudents()
+    }
+  }, [role, principalRosterClassId, principalRosterStatus])
+
+  useEffect(() => {
+    if (role !== 'principal' || isSectionsLoading) return
+
+    const fallbackClassId = principalRosterClassOptions[0]?.classId
+      ? String(principalRosterClassOptions[0].classId)
+      : ''
+
+    if (
+      !principalRosterClassOptions.some(
+        (classRecord) => String(classRecord.classId) === String(principalRosterClassId),
+      )
+    ) {
+      setPrincipalRosterClassId(fallbackClassId)
+    }
+
+    if (!fallbackClassId) {
+      setStudents([])
+      setIsStudentsLoading(false)
+    }
+
+    setManualStudentForm((currentForm) =>
+      principalRosterClassOptions.some(
+        (classRecord) => String(classRecord.classId) === String(currentForm.classId),
+      )
+        ? currentForm
+        : { ...currentForm, classId: fallbackClassId },
+    )
+  }, [role, isSectionsLoading, principalRosterClassOptions, principalRosterClassId])
+
+  useEffect(() => {
+    if (role === 'teacher') {
+      loadTeacherAssessments()
+    }
+  }, [role, selectedClassAssignment?.classAssignmentId])
+
+  useEffect(() => {
+    if (role === 'teacher') {
+      loadClassSchedules()
+    }
+  }, [role, selectedClassAssignment?.classAssignmentId])
+
+  useEffect(() => {
+    if (role === 'principal' && selectedAcademicYearId) {
       loadTeacherClasses()
     }
-  }, [selectedAcademicYearId])
+  }, [role, selectedAcademicYearId])
+
+  useEffect(() => {
+    if (role === 'teacher' && selectedClassAssignment?.classId) {
+      loadStudents()
+    }
+  }, [role, selectedClassAssignment?.classId])
 
   useEffect(() => {
     const { gradeLevelId, subjectId } = assignmentForm
@@ -1484,11 +1257,10 @@ function ClassRecordsPage({
 
     let shouldApplyResults = true
 
-    getAvailableClassesV2(
+    getClassesV3(
       {
         academicYearId: selectedAcademicYearId,
         gradeLevelId,
-        subjectId,
       },
       token,
     )
@@ -1512,63 +1284,19 @@ function ClassRecordsPage({
     }
   }, [assignmentForm.gradeLevelId, assignmentForm.subjectId, selectedAcademicYearId, token])
 
-  useEffect(() => {
-    if (role !== 'teacher') {
-      return
-    }
-
-    if (!selectedClassAssessments.length) {
-      setSelectedAnalyticsTestId('')
-      return
-    }
-
-    setSelectedAnalyticsTestId((currentTestId) =>
-      selectedClassAssessments.some((assessment) => String(assessment.id) === String(currentTestId))
-        ? currentTestId
-        : String(selectedClassAssessments[0].id),
-    )
-  }, [role, selectedClassAssessments])
-
-  useEffect(() => {
-    if (role === 'teacher' && activeTeacherTab === 'analytics') {
-      loadTeacherClassAnalytics(selectedAnalyticsTestId)
-    }
-  }, [role, activeTeacherTab, selectedAnalyticsTestId])
-
-  useEffect(() => {
-    if (role === 'teacher' && activeTeacherTab === 'analytics') {
-      loadAnalyticsStudents(selectedAnalyticsTestId, analyticsParts)
-    }
-  }, [
-    role,
-    activeTeacherTab,
-    selectedAnalyticsTestId,
-    analyticsPartIds,
-  ])
-
-  useEffect(() => {
-    if (role === 'teacher' && activeTeacherTab === 'students' && selectedStudentInfo) {
-      loadStudentSkillMastery(selectedStudentInfo, selectedStudentProgressAssignment)
-      return
-    }
-
-    setStudentSkillMasteryRows([])
-    setStudentSkillMasteryMessage('')
-  }, [
-    role,
-    activeTeacherTab,
-    selectedStudentInfo?.id,
-    selectedStudentProgressAssignment?.classId,
-  ])
   /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
-  const handleManualFormChange = (event) => {
+  const handleManualStudentChange = (event) => {
     const { name, value } = event.target
-    setManualForm((currentForm) => ({ ...currentForm, [name]: value }))
+    const nextValue = name === 'studentLrn' ? value.replace(/\D/g, '').slice(0, 12) : value
+
+    setManualMessage({ error: '', success: '' })
+    setManualStudentForm((currentForm) => ({ ...currentForm, [name]: nextValue }))
   }
 
   const handleAssignmentFormChange = (event) => {
     const { name, value } = event.target
+    setAssignmentMessage({ error: '', success: '' })
     setAssignmentForm((currentForm) => ({
       ...currentForm,
       [name]: value,
@@ -1578,7 +1306,7 @@ function ClassRecordsPage({
     }))
   }
 
-  const handleAssignmentSubmit = async (event) => {
+  const handleAssignmentSubmit = (event) => {
     event.preventDefault()
     setAssignmentMessage({ error: '', success: '' })
 
@@ -1596,106 +1324,557 @@ function ClassRecordsPage({
       return
     }
 
-    setIsAssignmentSubmitting(true)
+    if (duplicateClassAssignment) {
+      setAssignmentMessage({
+        error: `${duplicateClassAssignment.teacherName || 'This teacher'} is already assigned to ${duplicateClassAssignment.gradeLevelName || 'this grade level'} - ${duplicateClassAssignment.sectionName || 'this section'} for ${duplicateClassAssignment.subjectName || 'this subject'}. Select a different subject or class.`,
+        success: '',
+      })
+      return
+    }
 
-    try {
-      await createClassAssignmentV2({
+    const selectedTeacher = schoolTeachers.find(
+      (teacher) => String(teacher.userId ?? teacher.id) === String(assignmentForm.teacherId),
+    )
+    const selectedSubject = subjects.find(
+      (subject) => String(subject.id) === String(assignmentForm.subjectId),
+    )
+    const selectedSection = assignmentSectionOptions.find(
+      (section) => String(section.id) === String(assignmentForm.classId),
+    )
+
+    setAssignmentCreateError('')
+    setAssignmentPendingCreation({
+      payload: {
         classId: Number(assignmentForm.classId),
         teacherUserId: Number(assignmentForm.teacherId),
         subjectId: Number(assignmentForm.subjectId),
         assignmentRole: 'primary',
-      }, token)
+      },
+      teacherName: selectedTeacher?.name || 'Selected teacher',
+      subjectName: selectedSubject?.name || 'Selected subject',
+      gradeLevelName: selectedAssignmentGradeLevel?.name || 'Selected grade level',
+      sectionName: selectedSection?.name || 'Selected section',
+      academicYear: selectedAcademicYearLabel,
+    })
+  }
+
+  const closeAssignmentCreateDialog = () => {
+    if (isAssignmentSubmitting) return
+
+    setAssignmentPendingCreation(null)
+    setAssignmentCreateError('')
+  }
+
+  const handleAssignmentConfirm = async (event) => {
+    event.preventDefault()
+
+    if (!assignmentPendingCreation?.payload) return
+
+    setIsAssignmentSubmitting(true)
+    setAssignmentCreateError('')
+
+    try {
+      await createClassAssignmentV3(assignmentPendingCreation.payload, token)
+      setAssignmentPendingCreation(null)
       setAssignmentForm(initialAssignmentForm)
       setAssignmentMessage({ error: '', success: 'Teacher assigned to class successfully.' })
       await loadTeacherClasses()
     } catch (submitError) {
-      setAssignmentMessage({
-        error: submitError.message || 'Unable to assign teacher to this class.',
-        success: '',
-      })
+      setAssignmentCreateError(
+        submitError.message || 'Unable to assign teacher to this class.',
+      )
     } finally {
       setIsAssignmentSubmitting(false)
     }
   }
 
-  const handleManualRowChange = (rowId, fieldName, value) => {
-    setManualRows((currentRows) =>
-      currentRows.map((row) =>
-        row.rowId === rowId
-          ? {
-              ...row,
-              [fieldName]: value,
-            }
-          : row,
-      ),
-    )
+  async function loadClassSchedules({ preserveMessage = false } = {}) {
+    const classAssignmentId = selectedClassAssignment?.classAssignmentId
+
+    if (role !== 'teacher' || !classAssignmentId) {
+      setClassSchedules([])
+      setIsSchedulesLoading(false)
+      return
+    }
+
+    setIsSchedulesLoading(true)
+    if (!preserveMessage) setScheduleMessage({ error: '', success: '' })
+
+    try {
+      const records = await getClassAssignmentSchedulesV3(classAssignmentId, token)
+      setClassSchedules(records)
+    } catch (loadError) {
+      setClassSchedules([])
+      setScheduleMessage({
+        error: loadError.message || 'Unable to load the class timetable.',
+        success: '',
+      })
+    } finally {
+      setIsSchedulesLoading(false)
+    }
   }
 
-  const handleAddManualRow = () => {
-    setManualRows((currentRows) => [
-      ...currentRows,
-      ...createManualStudentRows(1),
-    ])
+  const openClassCreateDialog = () => {
+    setClassForm(initialClassForm)
+    setClassCreateError('')
+    setIsClassDialogOpen(true)
   }
 
-  const handleRemoveManualRow = (rowId) => {
-    setManualRows((currentRows) => {
-      if (currentRows.length <= 1) {
-        return createManualStudentRows(1)
+  const closeClassCreateDialog = () => {
+    if (isClassCreating) return
+
+    setIsClassDialogOpen(false)
+    setClassForm(initialClassForm)
+    setClassCreateError('')
+  }
+
+  const handleClassCreate = async (event) => {
+    event.preventDefault()
+    const sectionName = classForm.sectionName.trim()
+
+    if (!selectedAcademicYearId || !classForm.gradeLevelId || !sectionName) {
+      setClassCreateError('Select an academic year and grade level, then enter a section name.')
+      return
+    }
+
+    if (sectionName.length > 50) {
+      setClassCreateError('Section name must not exceed 50 characters.')
+      return
+    }
+
+    setIsClassCreating(true)
+    setClassCreateError('')
+
+    try {
+      const classRecord = await createClassV3(
+        {
+          academicYearId: Number(selectedAcademicYearId),
+          gradeLevelId: Number(classForm.gradeLevelId),
+          sectionName,
+        },
+        token,
+      )
+      setAssignmentMessage({
+        error: '',
+        success: classRecord.created
+          ? `${classRecord.gradeLevelName} - ${classRecord.sectionName} created successfully.`
+          : `${classRecord.gradeLevelName} - ${classRecord.sectionName} already exists and is ready to use.`,
+      })
+      setIsClassDialogOpen(false)
+      setClassForm(initialClassForm)
+      await loadSections()
+    } catch (createError) {
+      setClassCreateError(createError.message || 'Unable to create this class.')
+    } finally {
+      setIsClassCreating(false)
+    }
+  }
+
+  const loadAssignmentEditSections = async (assignment, subjectId, gradeLevelId) => {
+    setAssignmentEditSections([])
+
+    if (!assignment || !subjectId || !gradeLevelId) return
+
+    setIsAssignmentEditSectionsLoading(true)
+    try {
+      const classRecords = await getClassesV3(
+        {
+          academicYearId: assignment.academicYearId ?? selectedAcademicYearId,
+          gradeLevelId,
+        },
+        token,
+      )
+      const nextSections = classRecords
+        .map(normalizeAvailableClassOption)
+        .filter((classRecord) => classRecord.classId !== null && classRecord.classId !== undefined)
+
+      const editingSameSubjectAndGrade =
+        String(subjectId) === String(assignment.subjectId) &&
+        String(gradeLevelId) === String(assignment.gradeLevelId)
+      if (
+        editingSameSubjectAndGrade &&
+        !nextSections.some((section) => String(section.classId) === String(assignment.classId))
+      ) {
+        nextSections.push(
+          normalizeAvailableClassOption({
+            classId: assignment.classId,
+            sectionId: assignment.sectionId,
+            sectionName: assignment.sectionName,
+            gradeLevelId: assignment.gradeLevelId,
+            gradeLevelName: assignment.gradeLevelName,
+            subjectId: assignment.subjectId,
+          }),
+        )
       }
 
-      return currentRows.filter((row) => row.rowId !== rowId)
-    })
+      setAssignmentEditSections(nextSections)
+    } catch (loadError) {
+      setAssignmentEditError(loadError.message || 'Unable to load available classes for editing.')
+    } finally {
+      setIsAssignmentEditSectionsLoading(false)
+    }
   }
 
-  const handleClearManualRows = () => {
-    setManualRows(createManualStudentRows())
+  const openAssignmentEditDialog = (assignment) => {
+    const nextForm = {
+      teacherId: String(assignment.teacherId ?? ''),
+      subjectId: String(assignment.subjectId ?? ''),
+      gradeLevelId: String(assignment.gradeLevelId ?? ''),
+      classId: String(assignment.classId ?? ''),
+    }
+
+    setAssignmentPendingEdit(assignment)
+    setAssignmentEditForm(nextForm)
+    setAssignmentEditError('')
+    setAssignmentMessage({ error: '', success: '' })
+    loadAssignmentEditSections(assignment, nextForm.subjectId, nextForm.gradeLevelId)
   }
 
-  const handleManualClassFilterChange = (event) => {
+  const closeAssignmentEditDialog = () => {
+    if (isAssignmentUpdating) return
+
+    setAssignmentPendingEdit(null)
+    setAssignmentEditForm(initialAssignmentForm)
+    setAssignmentEditSections([])
+    setAssignmentEditError('')
+  }
+
+  const handleAssignmentEditFormChange = (event) => {
     const { name, value } = event.target
+    setAssignmentEditError('')
 
-    setManualClassFilters((currentFilters) => ({
-      ...currentFilters,
-      [name]: value,
-      ...(name === 'teacherId' ? { gradeLevelId: '', subjectId: '' } : {}),
-      ...(name === 'gradeLevelId' ? { subjectId: '' } : {}),
-    }))
-    setManualForm((currentForm) => ({
-      ...currentForm,
-      sectionId: '',
-      academicYearId: '',
-    }))
+    if (name === 'subjectId') {
+      setAssignmentEditForm((currentForm) => ({
+        ...currentForm,
+        subjectId: value,
+        gradeLevelId: '',
+        classId: '',
+      }))
+      setAssignmentEditSections([])
+      return
+    }
+
+    if (name === 'gradeLevelId') {
+      setAssignmentEditForm((currentForm) => ({
+        ...currentForm,
+        gradeLevelId: value,
+        classId: '',
+      }))
+      loadAssignmentEditSections(assignmentPendingEdit, assignmentEditForm.subjectId, value)
+      return
+    }
+
+    setAssignmentEditForm((currentForm) => ({ ...currentForm, [name]: value }))
   }
 
-  const handleManualSectionChange = (event) => {
-    const sectionId = event.target.value
-    const selectedOption = effectiveManualSectionOptions.find(
-      (option) => String(option.value) === String(sectionId),
+  const handleAssignmentUpdate = async (event) => {
+    event.preventDefault()
+    setAssignmentEditError(
+      'Active assignments cannot be edited. Archive it with a reason, then create the corrected assignment.',
     )
+  }
 
-    setManualForm((currentForm) => ({
+  const openAssignmentDeleteDialog = (assignment) => {
+    setAssignmentPendingDeletion(assignment)
+    setAssignmentDeleteConfirmation('')
+    setAssignmentArchiveReason('')
+    setAssignmentDeleteError('')
+    setAssignmentMessage({ error: '', success: '' })
+  }
+
+  const closeAssignmentDeleteDialog = () => {
+    if (isAssignmentDeleting) return
+
+    setAssignmentPendingDeletion(null)
+    setAssignmentDeleteConfirmation('')
+    setAssignmentArchiveReason('')
+    setAssignmentDeleteError('')
+  }
+
+  const handleAssignmentDelete = async (event) => {
+    event.preventDefault()
+
+    const classAssignmentId =
+      assignmentPendingDeletion?.classAssignmentId ?? assignmentPendingDeletion?.id
+
+    if (!classAssignmentId || !canDeleteAssignment) return
+
+    setIsAssignmentDeleting(true)
+    setAssignmentDeleteError('')
+    setAssignmentMessage({ error: '', success: '' })
+
+    try {
+      await archiveClassAssignmentV3(
+        classAssignmentId,
+        assignmentArchiveReason.trim(),
+        token,
+      )
+      setAssignmentPendingDeletion(null)
+      setAssignmentDeleteConfirmation('')
+      setAssignmentArchiveReason('')
+      setAssignmentDeleteError('')
+      setAssignmentMessage({
+        error: '',
+        success: 'Class assignment archived successfully.',
+      })
+      await loadTeacherClasses()
+    } catch (deleteError) {
+      setAssignmentDeleteError(
+        deleteError.message || 'Unable to archive this class assignment.',
+      )
+    } finally {
+      setIsAssignmentDeleting(false)
+    }
+  }
+
+  const handleSf1Imported = async (summary) => {
+    const outcome = summary?.replayed
+      ? 'The previous SF1 confirmation result was replayed safely.'
+      : `${summary?.createdStudents ?? 0} student(s) created, ${summary?.unchangedStudents ?? 0} unchanged, and ${summary?.conflictRows ?? 0} conflict row(s).`
+    setStudentsSuccess(outcome)
+    setActivePrincipalTool(null)
+    await Promise.all([loadSections(), loadStudents(), loadTeacherClasses()])
+  }
+
+  const handlePrincipalRefresh = async () => {
+    await Promise.all([loadSections(), loadStudents(), loadTeacherClasses()])
+  }
+
+  const openManualStudentPanel = () => {
+    setManualMessage({ error: '', success: '' })
+    setManualStudentForm((currentForm) => ({
       ...currentForm,
-      sectionId,
-      academicYearId: selectedOption?.assignment?.academicYear ?? currentForm.academicYearId,
+      classId: principalRosterClassId || currentForm.classId,
     }))
+    setActivePrincipalTool('manual')
+  }
+
+  const closeManualStudentPanel = () => {
+    if (isManualSubmitting) return
+    setActivePrincipalTool(null)
+    setManualMessage({ error: '', success: '' })
+  }
+
+  const openStudentProfileDialog = (student) => {
+    setStudentPendingEdit(student)
+    setStudentProfileForm({
+      firstName: student.firstName ?? '',
+      middleName: student.middleName ?? '',
+      lastName: student.lastName ?? '',
+      suffixId: findReferenceIdByName(
+        studentSuffixes,
+        student.suffixName,
+        'suffixId',
+        'suffixName',
+      ),
+      genderId: findReferenceIdByName(
+        studentGenders,
+        student.gender,
+        'genderId',
+        'genderName',
+      ),
+      birthDate: student.birthDate ?? '',
+      reason: '',
+    })
+    setStudentProfileError('')
+  }
+
+  const closeStudentProfileDialog = (force = false) => {
+    if (isStudentProfileSaving && !force) return
+    setStudentPendingEdit(null)
+    setStudentProfileForm(initialStudentProfileForm)
+    setStudentProfileError('')
+  }
+
+  const handleStudentProfileChange = (event) => {
+    const { name, value } = event.target
+    setStudentProfileError('')
+    setStudentProfileForm((currentForm) => ({ ...currentForm, [name]: value }))
+  }
+
+  const openStudentStatusDialog = (student) => {
+    const currentStatus = String(student.enrollmentStatus ?? 'enrolled').toLowerCase()
+    setStudentPendingStatus(student)
+    setStudentNextStatus(currentStatus === 'enrolled' ? 'transferred' : 'enrolled')
+    setStudentStatusReason('')
+    setStudentStatusError('')
+  }
+
+  const closeStudentStatusDialog = (force = false) => {
+    if (isStudentStatusSaving && !force) return
+    setStudentPendingStatus(null)
+    setStudentNextStatus('')
+    setStudentStatusReason('')
+    setStudentStatusError('')
   }
 
   const handleTeacherSubjectChange = (event) => {
-    const nextClassId = Number(event.target.value)
+    const nextClassAssignmentId = Number(event.target.value)
 
+    setIsScheduleFormOpen(false)
+    setEditingScheduleId(null)
+    setScheduleForm(initialScheduleForm)
+    setSchedulePendingArchive(null)
+    setScheduleArchiveReason('')
+    setScheduleMessage({ error: '', success: '' })
     setSelectedClassAssignment(
-      classAssignments.find((assignment) => Number(assignment.classId) === nextClassId) ?? null,
+      classAssignments.find(
+        (assignment) => Number(assignment.classAssignmentId) === nextClassAssignmentId,
+      ) ?? null,
     )
   }
 
-  const handleSmartImportPendingClick = (event) => {
-    event.preventDefault()
+  const handleTeacherClassSelect = (assignment) => {
+    if (!assignment) return
 
-    setAssignmentMessage({
-      error: 'Smart Import (SF1) is temporarily disabled in V2. Use Manual Input for now.',
-      success: '',
+    setIsScheduleFormOpen(false)
+    setEditingScheduleId(null)
+    setScheduleForm(initialScheduleForm)
+    setSchedulePendingArchive(null)
+    setScheduleArchiveReason('')
+    setScheduleMessage({ error: '', success: '' })
+    setSelectedClassAssignment(assignment)
+    onNavigate('class-records', {
+      classId: assignment.classId,
+      classAssignmentId: assignment.classAssignmentId,
+      initialTab: 'assessment',
     })
+  }
+
+  const openScheduleForm = (schedule = null) => {
+    setEditingScheduleId(schedule?.classAssignmentScheduleId ?? null)
+    setScheduleForm(
+      schedule
+        ? {
+            dayOfWeek: String(schedule.dayOfWeek ?? ''),
+            startTime: toTimeInput(schedule.startTime),
+            endTime: toTimeInput(schedule.endTime),
+            effectiveFrom: schedule.effectiveFrom ?? '',
+            effectiveTo: schedule.effectiveTo ?? '',
+          }
+        : initialScheduleForm,
+    )
+    setScheduleMessage({ error: '', success: '' })
+    setIsScheduleFormOpen(true)
+  }
+
+  const closeScheduleForm = () => {
+    if (isScheduleSaving) return
+    setIsScheduleFormOpen(false)
+    setEditingScheduleId(null)
+    setScheduleForm(initialScheduleForm)
+  }
+
+  const handleScheduleFormChange = (event) => {
+    const { name, value } = event.target
+    setScheduleForm((current) => ({ ...current, [name]: value }))
+    setScheduleMessage({ error: '', success: '' })
+  }
+
+  const handleScheduleSubmit = async (event) => {
+    event.preventDefault()
+    const classAssignmentId = selectedClassAssignment?.classAssignmentId
+
+    if (!classAssignmentId) {
+      setScheduleMessage({ error: 'Select a class assignment first.', success: '' })
+      return
+    }
+
+    if (
+      !scheduleForm.dayOfWeek ||
+      !scheduleForm.startTime ||
+      !scheduleForm.endTime ||
+      !scheduleForm.effectiveFrom ||
+      !scheduleForm.effectiveTo
+    ) {
+      setScheduleMessage({ error: 'Complete every timetable field.', success: '' })
+      return
+    }
+
+    if (scheduleForm.endTime <= scheduleForm.startTime) {
+      setScheduleMessage({ error: 'End time must be later than start time.', success: '' })
+      return
+    }
+
+    if (scheduleForm.effectiveTo < scheduleForm.effectiveFrom) {
+      setScheduleMessage({ error: 'Effective end date must not be before the start date.', success: '' })
+      return
+    }
+
+    const payload = {
+      dayOfWeek: Number(scheduleForm.dayOfWeek),
+      startTime: toApiTime(scheduleForm.startTime),
+      endTime: toApiTime(scheduleForm.endTime),
+      timezoneName: 'Asia/Manila',
+      effectiveFrom: scheduleForm.effectiveFrom,
+      effectiveTo: scheduleForm.effectiveTo,
+    }
+
+    setIsScheduleSaving(true)
+    setScheduleMessage({ error: '', success: '' })
+
+    try {
+      if (editingScheduleId) {
+        await updateClassAssignmentScheduleV3(
+          classAssignmentId,
+          editingScheduleId,
+          payload,
+          token,
+        )
+      } else {
+        await createClassAssignmentScheduleV3(classAssignmentId, payload, token)
+      }
+
+      setIsScheduleFormOpen(false)
+      setEditingScheduleId(null)
+      setScheduleForm(initialScheduleForm)
+      setScheduleMessage({
+        error: '',
+        success: editingScheduleId
+          ? 'Class timetable updated successfully.'
+          : 'Class timetable added successfully.',
+      })
+      await loadClassSchedules({ preserveMessage: true })
+    } catch (saveError) {
+      setScheduleMessage({
+        error: saveError.message || 'Unable to save the class timetable.',
+        success: '',
+      })
+    } finally {
+      setIsScheduleSaving(false)
+    }
+  }
+
+  const handleArchiveSchedule = async (event) => {
+    event.preventDefault()
+    const classAssignmentId = selectedClassAssignment?.classAssignmentId
+    const scheduleId = schedulePendingArchive?.classAssignmentScheduleId
+    const reason = scheduleArchiveReason.trim()
+
+    if (!classAssignmentId || !scheduleId) return
+
+    if (reason.length < 5 || reason.length > 255) {
+      setScheduleMessage({ error: 'Enter an archive reason between 5 and 255 characters.', success: '' })
+      return
+    }
+
+    setIsScheduleArchiving(true)
+    setScheduleMessage({ error: '', success: '' })
+
+    try {
+      await archiveClassAssignmentScheduleV3(classAssignmentId, scheduleId, reason, token)
+      setSchedulePendingArchive(null)
+      setScheduleArchiveReason('')
+      setScheduleMessage({ error: '', success: 'Timetable entry archived successfully.' })
+      await loadClassSchedules({ preserveMessage: true })
+    } catch (archiveError) {
+      setScheduleMessage({
+        error: archiveError.message || 'Unable to archive this timetable entry.',
+        success: '',
+      })
+    } finally {
+      setIsScheduleArchiving(false)
+    }
   }
 
   const handleManualSubmit = async (event) => {
@@ -1703,44 +1882,26 @@ function ClassRecordsPage({
     setManualMessage({ error: '', success: '' })
     setStudentsSuccess('')
 
+    if (!manualStudentForm.classId) {
+      setManualMessage({ error: 'Select the class that will receive this learner.', success: '' })
+      return
+    }
+
+    if (!/^\d{12}$/.test(manualStudentForm.studentLrn)) {
+      setManualMessage({
+        error: 'LRN must contain exactly 12 numeric digits.',
+        success: '',
+      })
+      return
+    }
+
     if (
-      classAssignments.length &&
-      (!manualClassFilters.teacherId ||
-        !manualClassFilters.gradeLevelId ||
-        !manualClassFilters.subjectId ||
-        !manualForm.sectionId)
+      !manualStudentForm.firstName.trim() ||
+      !manualStudentForm.lastName.trim() ||
+      !manualStudentForm.genderId
     ) {
       setManualMessage({
-        error: 'Select the teacher, grade level, subject, and class section before saving.',
-        success: '',
-      })
-      return
-    }
-
-    if (!manualForm.sectionId || !manualForm.academicYearId.trim()) {
-      setManualMessage({
-        error: 'Select a class section with an academic year before saving.',
-        success: '',
-      })
-      return
-    }
-
-    if (!startedManualRows.length) {
-      setManualMessage({ error: 'Enter at least one student row before saving.', success: '' })
-      return
-    }
-
-    const incompleteRowIndex = startedManualRows.findIndex(
-      (row) =>
-        !row.studentLrn.trim() ||
-        !row.firstName.trim() ||
-        !row.lastName.trim() ||
-        !row.gender,
-    )
-
-    if (incompleteRowIndex >= 0) {
-      setManualMessage({
-        error: `Complete all fields in student row ${incompleteRowIndex + 1} before saving.`,
+        error: 'First name, last name, and gender are required.',
         success: '',
       })
       return
@@ -1749,27 +1910,45 @@ function ClassRecordsPage({
     setIsManualSubmitting(true)
 
     try {
-      for (const row of startedManualRows) {
-        await createManualStudent({
-          studentLrn: row.studentLrn.trim(),
-          firstName: row.firstName.trim(),
-          lastName: row.lastName.trim(),
-          gender: row.gender,
-          sectionId: manualForm.sectionId,
-          academicYearId: manualForm.academicYearId.trim(),
-        })
-      }
+      const result = await enrollStudentV3(
+        manualStudentForm.classId,
+        {
+          studentLrn: manualStudentForm.studentLrn,
+          firstName: manualStudentForm.firstName.trim(),
+          middleName: manualStudentForm.middleName.trim() || null,
+          lastName: manualStudentForm.lastName.trim(),
+          suffixId: manualStudentForm.suffixId ? Number(manualStudentForm.suffixId) : null,
+          genderId: Number(manualStudentForm.genderId),
+          birthDate: manualStudentForm.birthDate || null,
+        },
+        token,
+      )
+      const successMessage = result.enrollmentReactivated
+        ? 'The existing learner enrollment was reactivated.'
+        : result.enrollmentCreated
+          ? result.studentCreated
+            ? 'Student profile created and enrolled successfully.'
+            : 'Existing student enrolled in this class successfully.'
+          : 'This student is already enrolled in the selected class.'
 
-      setManualRows(createManualStudentRows())
-      setManualMessage({
-        error: '',
-        success: `${startedManualRows.length} student record(s) saved to the selected class.`,
+      setManualMessage({ error: '', success: successMessage })
+      setManualStudentForm({
+        ...initialManualStudentForm,
+        classId: manualStudentForm.classId,
       })
-      setStudentsSuccess('Student records refreshed.')
-      await loadStudents({ preserveMessage: true })
-    } catch (submitError) {
+      setPrincipalRosterClassId(String(manualStudentForm.classId))
+      setPrincipalRosterStatus('enrolled')
+      await loadStudents({
+        preserveMessage: true,
+        classId: manualStudentForm.classId,
+        enrollmentStatus: 'enrolled',
+      })
+    } catch (saveError) {
       setManualMessage({
-        error: submitError.message || 'Unable to save manual student record.',
+        error: getStudentLifecycleErrorMessage(
+          saveError,
+          'Unable to enroll this student.',
+        ),
         success: '',
       })
     } finally {
@@ -1777,462 +1956,515 @@ function ClassRecordsPage({
     }
   }
 
+  const handleStudentProfileSubmit = async (event) => {
+    event.preventDefault()
+    const classId = studentPendingEdit?.classId ?? principalRosterClassId
+    const studentId = studentPendingEdit?.studentId
+    const reason = studentProfileForm.reason.trim()
+
+    if (!classId || !studentId) {
+      setStudentProfileError('The selected learner is missing its class or student identifier.')
+      return
+    }
+
+    if (
+      !studentProfileForm.firstName.trim() ||
+      !studentProfileForm.lastName.trim() ||
+      !studentProfileForm.genderId
+    ) {
+      setStudentProfileError('First name, last name, and gender are required.')
+      return
+    }
+
+    if (reason.length < 5 || reason.length > 255) {
+      setStudentProfileError('Enter a correction reason between 5 and 255 characters.')
+      return
+    }
+
+    setIsStudentProfileSaving(true)
+    setStudentProfileError('')
+
+    try {
+      await updateStudentProfileV3(
+        classId,
+        studentId,
+        {
+          firstName: studentProfileForm.firstName.trim(),
+          middleName: studentProfileForm.middleName.trim() || null,
+          lastName: studentProfileForm.lastName.trim(),
+          suffixId: studentProfileForm.suffixId ? Number(studentProfileForm.suffixId) : null,
+          genderId: Number(studentProfileForm.genderId),
+          birthDate: studentProfileForm.birthDate || null,
+          reason,
+        },
+        token,
+      )
+      closeStudentProfileDialog(true)
+      setStudentsSuccess('Student profile corrected successfully.')
+      await loadStudents({ preserveMessage: true })
+    } catch (saveError) {
+      setStudentProfileError(
+        getStudentLifecycleErrorMessage(saveError, 'Unable to correct this student profile.'),
+      )
+    } finally {
+      setIsStudentProfileSaving(false)
+    }
+  }
+
+  const handleStudentStatusSubmit = async (event) => {
+    event.preventDefault()
+    const classListId = studentPendingStatus?.classListId
+    const reason = studentStatusReason.trim()
+
+    if (!classListId) {
+      setStudentStatusError('The selected enrollment is missing its class-list identifier.')
+      return
+    }
+
+    if (!studentNextStatus) {
+      setStudentStatusError('Select the learner enrollment status.')
+      return
+    }
+
+    if (reason.length < 5 || reason.length > 255) {
+      setStudentStatusError('Enter a status reason between 5 and 255 characters.')
+      return
+    }
+
+    setIsStudentStatusSaving(true)
+    setStudentStatusError('')
+
+    try {
+      await updateStudentEnrollmentStatusV3(
+        classListId,
+        { enrollmentStatus: studentNextStatus, reason },
+        token,
+      )
+      closeStudentStatusDialog(true)
+      setStudentsSuccess(`Enrollment status changed to ${formatStatus(studentNextStatus)}.`)
+      await loadStudents({ preserveMessage: true })
+    } catch (saveError) {
+      setStudentStatusError(
+        getStudentLifecycleErrorMessage(saveError, 'Unable to change the enrollment status.'),
+      )
+    } finally {
+      setIsStudentStatusSaving(false)
+    }
+  }
+
   if (role === 'teacher') {
+    const shouldShowClassSelection =
+      activeTeacherTab === 'assessment' && !selectedClassAssignment
+
     return (
-      <div className="content-stack teacher-records-page">
+      <div className="content-stack teacher-records-page smart-ui">
         {studentsError ? <p className="form-message form-message-error">{studentsError}</p> : null}
 
         <section className="teacher-assessment-workspace-panel">
-          <button
-            type="button"
-            className="assessment-back-link"
-            onClick={() => onNavigate('teacher-dashboard')}
-          >
-            Back to Home
-          </button>
-
-          {activeTeacherTab !== 'students' ? (
-            <div className="teacher-assessment-topline">
-              <button
-                type="button"
-                className={activeTeacherTab === 'assessment' ? 'is-active' : ''}
-                onClick={() => setActiveTeacherTab('assessment')}
-              >
-                Assessment
-              </button>
-              <button
-                type="button"
-                className={activeTeacherTab === 'analytics' ? 'is-active' : ''}
-                onClick={() => setActiveTeacherTab('analytics')}
-              >
-                Analytics
-              </button>
-            </div>
-          ) : null}
-
           <div className="teacher-assessment-title-row">
             <div>
+              <p>Class workspace</p>
               <h2>{teacherHeaderLabel}</h2>
               <span>
-                {isStudentsLoading ? 'Loading students' : `${teacherHeaderStudentCount} students`}
+                {shouldShowClassSelection
+                  ? isSectionsLoading
+                    ? 'Loading assigned classes'
+                    : `${teacherClassOptions.length} assigned classes`
+                  : isStudentsLoading
+                    ? 'Loading students'
+                    : `${teacherHeaderStudentCount} students`}
               </span>
             </div>
           </div>
 
-          {activeTeacherTab === 'assessment' ? (
-            <>
-              <div className="teacher-assessment-toolbar">
-                <label className="teacher-subject-select" htmlFor="teacherClassSubject">
-                  <span>Subject:</span>
-                  <select
-                    id="teacherClassSubject"
-                    value={selectedClassAssignment?.classId ?? ''}
-                    onChange={handleTeacherSubjectChange}
-                    disabled={!selectedClassGroupAssignments.length}
-                  >
-                    {selectedClassGroupAssignments.map((assignment) => (
-                      <option key={assignment.classId ?? assignment.id} value={assignment.classId}>
-                        {assignment.subjectName || 'Subject not assigned'}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <button
-                  type="button"
-                  className="teacher-create-assessment-button"
-                  disabled={!selectedClassAssignment}
-                  onClick={() =>
-                    onNavigate('assessment-setup', { classId: selectedClassAssignment.classId })
-                  }
-                >
-                  <Plus size={18} strokeWidth={2.5} />
-                  <span>Create Assessment</span>
-                </button>
-              </div>
-
-              {assessmentsError ? (
-                <p className="form-message form-message-error">{assessmentsError}</p>
+          {shouldShowClassSelection ? (
+            <section className="teacher-records-class-grid" aria-label="Assigned classes">
+              {isSectionsLoading ? (
+                <article className="teacher-records-empty">
+                  <strong>Loading assigned classes...</strong>
+                  <span>Please wait while the class list is loaded.</span>
+                </article>
               ) : null}
 
-              <article className="teacher-assessment-panel">
-                <div className="teacher-assessment-panel-header">
-                  <strong>Assessments</strong>
-                  <div>
-                    <span>Status</span>
-                    <small>Total: {selectedClassAssessments.length}</small>
-                  </div>
-                </div>
-
-                <div className="teacher-assessment-list">
-                  {!selectedClassAssignment ? (
-                    <p className="teacher-assessment-empty">Select a class to view assessments.</p>
-                  ) : null}
-
-                  {selectedClassAssignment && isAssessmentsLoading ? (
-                    <p className="teacher-assessment-empty">Loading assessments...</p>
-                  ) : null}
-
-                  {selectedClassAssignment &&
-                  !isAssessmentsLoading &&
-                  !selectedClassAssessments.length ? (
-                    <p className="teacher-assessment-empty">
-                      No assessments added for this class yet.
-                    </p>
-                  ) : null}
-
-                  {selectedClassAssignment && !isAssessmentsLoading
-                    ? selectedClassAssessments.map((assessment, index) => (
-                        <button
-                          type="button"
-                          className="teacher-assessment-row"
-                          key={assessment.id ?? index}
-                          onClick={() =>
-                            onNavigate('assessment-setup', {
-                              classId: selectedClassAssignment.classId,
-                              assessmentId: assessment.id,
-                            })
-                          }
-                        >
-                          <span className="teacher-assessment-icon" aria-hidden="true">
-                            {index % 2 === 0 ? (
-                              <FileText size={18} strokeWidth={2.2} />
-                            ) : (
-                              <ClipboardList size={18} strokeWidth={2.2} />
-                            )}
-                          </span>
-                          <div className="teacher-assessment-copy">
-                            <strong>{assessment.testName || 'Untitled assessment'}</strong>
-                            <small>{formatDate(assessment.testDate)}</small>
-                          </div>
-                          <span
-                            className={`status-pill ${getAssessmentStatusClass(
-                              assessment.testStatus,
-                            )}`}
-                          >
-                            {assessment.testStatus || 'Status not set'}
-                          </span>
-                        </button>
-                      ))
-                    : null}
-                </div>
-              </article>
-            </>
-          ) : null}
-
-          {activeTeacherTab === 'analytics' ? (
-            <div className="teacher-class-analytics">
-              <div className="teacher-analytics-hero">
-                <div>
-                  <span>Assessment Overview & Learner Performance</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAnalyticsExport}
-                  disabled={isAnalyticsExportLoading || !selectedAnalyticsTestId}
-                >
-                  <Download size={15} strokeWidth={2.4} />
-                  <span>{isAnalyticsExportLoading ? 'Exporting...' : 'Export Report'}</span>
-                </button>
-              </div>
-
-              <div className="teacher-analytics-filter-row">
-                <label>
-                  <BookOpen size={20} strokeWidth={2.2} />
-                  <span>Subject</span>
-                  <select
-                    value={selectedClassAssignment?.classId ?? ''}
-                    onChange={handleTeacherSubjectChange}
-                    disabled={!selectedClassGroupAssignments.length}
-                  >
-                    {selectedClassGroupAssignments.map((assignment) => (
-                      <option key={assignment.classId ?? assignment.id} value={assignment.classId}>
-                        {assignment.subjectName || 'Subject not assigned'}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <div>
-                  <ClipboardList size={20} strokeWidth={2.2} />
-                  <span>Total Assessments</span>
-                  <strong>{selectedClassAssessments.length}</strong>
-                </div>
-
-                <label>
-                  <FileCheck2 size={20} strokeWidth={2.2} />
-                  <span>Assessment</span>
-                  <select
-                    value={selectedAnalyticsTestId}
-                    onChange={(event) => setSelectedAnalyticsTestId(event.target.value)}
-                  >
-                    <option value="">Select assessment</option>
-                    {selectedClassAssessments.map((assessment) => (
-                      <option key={assessment.id} value={assessment.id}>
-                        {assessment.testName}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-
-              {analyticsMessage.error ? (
-                <p className="form-message form-message-error">{analyticsMessage.error}</p>
+              {!isSectionsLoading && !teacherClassOptions.length ? (
+                <article className="teacher-records-empty">
+                  <strong>No assigned classes yet</strong>
+                  <span>Assigned classes from the backend will appear here.</span>
+                </article>
               ) : null}
 
-              {analyticsMessage.success ? (
-                <p className="form-message form-message-success">{analyticsMessage.success}</p>
-              ) : null}
+              {!isSectionsLoading
+                ? teacherClassOptions.map((classOption) => (
+                    <button
+                      type="button"
+                      className="teacher-records-class-card"
+                      key={classOption.key}
+                      onClick={() => handleTeacherClassSelect(classOption.primaryAssignment)}
+                    >
+                      <span className="teacher-records-class-card-top">
+                        <span className="teacher-class-icon" aria-hidden="true">
+                          <BookOpen size={18} strokeWidth={2.2} />
+                        </span>
+                        <ArrowRight size={17} strokeWidth={2.2} aria-hidden="true" />
+                      </span>
+                      <span>
+                        <strong>{classOption.label}</strong>
+                        <small>{classOption.primaryAssignment.academicYear || 'Academic year not set'}</small>
+                      </span>
+                      <span className="teacher-records-class-meta">
+                        <small>{getClassSubjectSummary(classOption.assignments)}</small>
+                        <small>
+                          {classOption.assignments.length}{' '}
+                          {classOption.assignments.length === 1 ? 'subject' : 'subjects'}
+                        </small>
+                      </span>
+                    </button>
+                  ))
+                : null}
+            </section>
+          ) : activeTeacherTab === 'assessment' ? (
+            <div className="teacher-class-workspace-grid">
+              <div className="teacher-class-main-column">
+                {assessmentsError ? (
+                  <p className="form-message form-message-error">{assessmentsError}</p>
+                ) : null}
 
-              <div className="teacher-analytics-top-grid">
-                <section className="teacher-performance-summary-card">
-                  <div className="teacher-section-title">
-                    <Users size={18} strokeWidth={2.3} />
+                <article className="teacher-assessment-panel">
+                  <div className="teacher-assessment-panel-header">
                     <div>
-                      <strong>Performance Summary</strong>
-                      <span>Class performance overview for this assessment</span>
+                      <p>Assessment library</p>
+                      <strong>Assessments</strong>
                     </div>
+                    <small>{selectedClassAssessments.length} total</small>
                   </div>
-                  <div className="teacher-performance-summary-metrics">
-                    <article>
-                      <span>Class Average</span>
-                      <strong>{formatPercent(classAverage)}</strong>
-                    </article>
-                    <article>
-                      <span>Highest Score</span>
-                      <strong>
-                        {formatScoreWithMax(
-                          highestAnalyticsStudent?.displayScore,
-                          highestAnalyticsStudent?.maxScore,
-                        )}
-                      </strong>
-                      <small>{highestAnalyticsStudent?.displayName || 'No data'}</small>
-                    </article>
-                    <article>
-                      <span>Lowest Score</span>
-                      <strong>
-                        {formatScoreWithMax(
-                          lowestAnalyticsStudent?.displayScore,
-                          lowestAnalyticsStudent?.maxScore,
-                        )}
-                      </strong>
-                      <small>{lowestAnalyticsStudent?.displayName || 'No data'}</small>
-                    </article>
-                  </div>
-                </section>
 
-                <section className="teacher-lms-chart-card">
-                  <div className="teacher-lms-chart-heading">
+                  <div className="teacher-assessment-list">
+                    {!selectedClassAssignment ? (
+                      <p className="teacher-assessment-empty">Select a class to view assessments.</p>
+                    ) : null}
+
+                    {selectedClassAssignment && isAssessmentsLoading ? (
+                      <p className="teacher-assessment-empty">Loading assessments...</p>
+                    ) : null}
+
+                    {selectedClassAssignment &&
+                    !isAssessmentsLoading &&
+                    !selectedClassAssessments.length ? (
+                      <div className="teacher-assessment-empty">
+                        <span aria-hidden="true">
+                          <ClipboardList size={20} />
+                        </span>
+                        <strong>No assessments yet</strong>
+                        <small>No assessments have been added for this class.</small>
+                      </div>
+                    ) : null}
+
+                    {selectedClassAssignment && !isAssessmentsLoading
+                      ? selectedClassAssessments.map((assessment, index) => (
+                          <button
+                            type="button"
+                            className="teacher-assessment-row"
+                            key={assessment.id ?? index}
+                            onClick={() =>
+                              onNavigate('assessment-setup', {
+                                classId: selectedClassAssignment.classId,
+                                classAssignmentId: selectedClassAssignment.classAssignmentId,
+                                assessmentId: assessment.id,
+                              })
+                            }
+                          >
+                            <span className="teacher-assessment-icon" aria-hidden="true">
+                              {index % 2 === 0 ? (
+                                <FileText size={18} strokeWidth={2.2} />
+                              ) : (
+                                <ClipboardList size={18} strokeWidth={2.2} />
+                              )}
+                            </span>
+                            <div className="teacher-assessment-copy">
+                              <strong>{assessment.testName || 'Untitled assessment'}</strong>
+                              <small>Assigned date: {formatDate(assessment.testDate)}</small>
+                            </div>
+                            <span
+                              className={`status-pill ${getAssessmentStatusClass(
+                                assessment.testStatus,
+                              )}`}
+                            >
+                              {assessment.testStatus || 'Status not set'}
+                            </span>
+                          </button>
+                        ))
+                      : null}
+                  </div>
+                </article>
+              </div>
+
+              <aside className="teacher-class-side-column" aria-label="Class controls">
+                <div className="teacher-assessment-toolbar">
+                  <label className="teacher-subject-select" htmlFor="teacherClassSubject">
+                    <span>Subject</span>
+                    <select
+                      id="teacherClassSubject"
+                      value={selectedClassAssignment?.classAssignmentId ?? ''}
+                      onChange={handleTeacherSubjectChange}
+                      disabled={!selectedClassGroupAssignments.length}
+                    >
+                      {selectedClassGroupAssignments.map((assignment) => (
+                        <option
+                          key={assignment.classAssignmentId ?? assignment.id}
+                          value={assignment.classAssignmentId}
+                        >
+                          {assignment.subjectName || 'Subject not assigned'}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <button
+                    type="button"
+                    className="teacher-create-assessment-button"
+                    disabled={!selectedClassAssignment}
+                    onClick={() =>
+                      onNavigate('assessment-setup', {
+                        classId: selectedClassAssignment.classId,
+                        classAssignmentId: selectedClassAssignment.classAssignmentId,
+                      })
+                    }
+                  >
+                    <Plus size={18} strokeWidth={2.5} />
+                    <span>Create Assessment</span>
+                  </button>
+                </div>
+
+                <article className="teacher-timetable-panel" aria-labelledby="classTimetableTitle">
+                  <header className="teacher-timetable-header">
                     <div>
-                      <Target size={18} strokeWidth={2.3} />
+                      <span className="teacher-timetable-icon" aria-hidden="true">
+                        <CalendarClock size={19} strokeWidth={2.2} />
+                      </span>
                       <div>
-                        <span>Least Mastered Skills</span>
-                        <strong>{selectedAnalyticsAssessment?.testName || 'Class analytics overview'}</strong>
+                        <p>Class timetable</p>
+                        <strong id="classTimetableTitle">Teaching schedule</strong>
                       </div>
                     </div>
-                    <small>
-                      {hasAnalyticsChartRows
-                        ? 'Based on synchronized LMS records'
-                        : 'Waiting for synchronized results'}
-                    </small>
-                  </div>
-
-                  {hasAnalyticsChartRows ? (
-                    <HorizontalMasteryChart data={analyticsChartRows.slice(0, 5)} />
-                  ) : (
-                    <div className="teacher-empty-chart">
-                      <p>No analytics data available yet for this selection.</p>
-                      <small>Once results are synced, LMS percentages will appear here.</small>
+                    <div className="teacher-timetable-actions">
+                      <button
+                        type="button"
+                        className="icon-action-button"
+                        title="Refresh timetable"
+                        aria-label="Refresh timetable"
+                        disabled={isSchedulesLoading || !selectedClassAssignment}
+                        onClick={() => loadClassSchedules()}
+                      >
+                        <RefreshCw size={16} aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        disabled={!selectedClassAssignment || isSchedulesLoading}
+                        onClick={() => openScheduleForm()}
+                      >
+                        <Plus size={16} aria-hidden="true" />
+                        Add schedule
+                      </button>
                     </div>
-                  )}
-                </section>
-              </div>
+                  </header>
 
-              {selectedAnalyticsTestId ? (
-                <>
-                  <div className="teacher-analytics-results-grid">
-                    <div className="teacher-analytics-main-column">
-                      <section className="teacher-part-details-card">
-                        <div className="teacher-section-title">
-                          <ClipboardCheck size={18} strokeWidth={2.3} />
+                {scheduleMessage.error ? (
+                  <p className="form-message form-message-error" role="alert">
+                    {scheduleMessage.error}
+                  </p>
+                ) : null}
+                {scheduleMessage.success ? (
+                  <p className="form-message form-message-success" role="status">
+                    {scheduleMessage.success}
+                  </p>
+                ) : null}
+
+                {isScheduleFormOpen ? (
+                  <form className="teacher-timetable-form" onSubmit={handleScheduleSubmit}>
+                    <label>
+                      <span>Day</span>
+                      <select
+                        name="dayOfWeek"
+                        value={scheduleForm.dayOfWeek}
+                        onChange={handleScheduleFormChange}
+                      >
+                        <option value="">Select day</option>
+                        {WEEK_DAYS.map(([value, label]) => (
+                          <option key={value} value={value}>{label}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Starts</span>
+                      <input
+                        type="time"
+                        name="startTime"
+                        value={scheduleForm.startTime}
+                        onChange={handleScheduleFormChange}
+                      />
+                    </label>
+                    <label>
+                      <span>Ends</span>
+                      <input
+                        type="time"
+                        name="endTime"
+                        value={scheduleForm.endTime}
+                        onChange={handleScheduleFormChange}
+                      />
+                    </label>
+                    <label>
+                      <span>Effective from</span>
+                      <input
+                        type="date"
+                        name="effectiveFrom"
+                        value={scheduleForm.effectiveFrom}
+                        onChange={handleScheduleFormChange}
+                      />
+                    </label>
+                    <label>
+                      <span>Effective to</span>
+                      <input
+                        type="date"
+                        name="effectiveTo"
+                        min={scheduleForm.effectiveFrom || undefined}
+                        value={scheduleForm.effectiveTo}
+                        onChange={handleScheduleFormChange}
+                      />
+                    </label>
+                    <div className="teacher-timetable-form-actions">
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        disabled={isScheduleSaving}
+                        onClick={closeScheduleForm}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="primary-button"
+                        disabled={isScheduleSaving}
+                      >
+                        <Save size={16} aria-hidden="true" />
+                        {isScheduleSaving
+                          ? 'Saving...'
+                          : editingScheduleId
+                            ? 'Save changes'
+                            : 'Add schedule'}
+                      </button>
+                    </div>
+                  </form>
+                ) : null}
+
+                {schedulePendingArchive ? (
+                  <form className="teacher-timetable-archive" onSubmit={handleArchiveSchedule}>
+                    <div>
+                      <strong>Archive this timetable entry?</strong>
+                      <span>
+                        {schedulePendingArchive.dayName} at{' '}
+                        {toTimeInput(schedulePendingArchive.startTime)} -{' '}
+                        {toTimeInput(schedulePendingArchive.endTime)}
+                      </span>
+                    </div>
+                    <label>
+                      <span>Reason</span>
+                      <input
+                        value={scheduleArchiveReason}
+                        minLength="5"
+                        maxLength="255"
+                        placeholder="Enter a reason for archiving"
+                        onChange={(event) => {
+                          setScheduleArchiveReason(event.target.value)
+                          setScheduleMessage({ error: '', success: '' })
+                        }}
+                      />
+                    </label>
+                    <div className="teacher-timetable-form-actions">
+                      <button
+                        type="button"
+                        className="secondary-button"
+                        disabled={isScheduleArchiving}
+                        onClick={() => {
+                          setSchedulePendingArchive(null)
+                          setScheduleArchiveReason('')
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="danger-button"
+                        disabled={isScheduleArchiving || scheduleArchiveReason.trim().length < 5}
+                      >
+                        <Archive size={16} aria-hidden="true" />
+                        {isScheduleArchiving ? 'Archiving...' : 'Archive'}
+                      </button>
+                    </div>
+                  </form>
+                ) : null}
+
+                {isSchedulesLoading ? (
+                  <p className="teacher-timetable-empty">Loading timetable...</p>
+                ) : classSchedules.length ? (
+                  <div className="teacher-timetable-list">
+                    {classSchedules.map((schedule) => {
+                      const scheduleStatus = String(schedule.scheduleStatus || 'active').toLowerCase()
+                      const isActiveSchedule = scheduleStatus === 'active'
+
+                      return (
+                        <div
+                          className={`teacher-timetable-row${isActiveSchedule ? '' : ' is-archived'}`}
+                          key={schedule.classAssignmentScheduleId ?? schedule.scheduleUuid}
+                        >
+                          <Clock3 size={17} aria-hidden="true" />
                           <div>
-                            <strong>Assessment Score Details</strong>
+                            <strong>{schedule.dayName || 'Scheduled day'}</strong>
                             <span>
-                              {selectedAnalyticsAssessment?.testName || 'Selected assessment'}
+                              {toTimeInput(schedule.startTime)} - {toTimeInput(schedule.endTime)}
                             </span>
                           </div>
-                        </div>
-
-                        <div className="teacher-part-details-layout">
-                          <div className="teacher-part-summary-card">
-                            <article>
-                              <span>Number of Items</span>
-                              <strong>{assessmentTotalItems}</strong>
-                            </article>
-                            <article>
-                              <span>Total Points</span>
-                              <strong>{formatScore(assessmentMaxScore)}</strong>
-                            </article>
-                          </div>
-                        </div>
-                      </section>
-
-                      <section className="teacher-analytics-student-panel">
-                        <div className="teacher-section-title">
-                          <Users size={18} strokeWidth={2.3} />
-                          <div>
-                            <strong>Student Results</strong>
-                            <span>Whole test scores for the selected assessment</span>
-                          </div>
-                        </div>
-
-                        <table>
-                          <thead>
-                            <tr>
-                              <th>Student Name</th>
-                              <th>Score</th>
-                              <th>Percentage</th>
-                              <th>Performance</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {isAnalyticsLoading ? (
-                              <tr>
-                                <td colSpan="4">Loading analytics records...</td>
-                              </tr>
-                            ) : null}
-
-                            {!isAnalyticsLoading && !analyticsStudentRows.length ? (
-                              <tr>
-                                <td colSpan="4">No student score records found for this assessment.</td>
-                              </tr>
-                            ) : null}
-
-                            {!isAnalyticsLoading
-                              ? analyticsStudentRows.map((student) => (
-                                  <tr
-                                    key={student.id ?? `${student.displayName}-${student.rowNumber}`}
-                                  >
-                                    <td>
-                                      <div className="teacher-student-result-name">
-                                        <span>
-                                          {getStudentInitials({ name: student.displayName })}
-                                        </span>
-                                        <strong>{student.displayName || 'Student'}</strong>
-                                      </div>
-                                    </td>
-                                    <td>{formatScoreWithMax(student.displayScore, student.maxScore)}</td>
-                                    <td>{formatPercent(student.percentage)}</td>
-                                    <td>
-                                      <span
-                                        className={`performance-pill ${student.performanceClass}`}
-                                      >
-                                        {student.performance}
-                                      </span>
-                                    </td>
-                                  </tr>
-                                ))
-                              : null}
-                          </tbody>
-                        </table>
-                      </section>
-                    </div>
-
-                    <section className="teacher-intervention-panel">
-                      <div className="teacher-intervention-heading">
-                        <div>
-                          <span>Recommended Intervention</span>
-                          <h3>
-                            {selectedTeacherRecommendation?.competencyName ||
-                              selectedAnalyticsSkillName ||
-                              selectedPartLms?.competencyName ||
-                              'Selected skill'}
-                          </h3>
-                        </div>
-                        <strong
-                          className={isInterventionRecommended ? 'is-triggered' : 'is-monitoring'}
-                        >
-                          {isInterventionRecommended
-                            ? 'Intervention recommended'
-                            : 'No intervention recommended'}
-                        </strong>
-                      </div>
-
-                      <div className="teacher-intervention-metrics">
-                        <article>
-                          <BookOpen size={18} strokeWidth={2.2} />
-                          <span>Selected Skill</span>
-                          <strong>
-                            {selectedTeacherRecommendation?.competencyName ||
-                              selectedAnalyticsSkillName ||
-                              selectedPartLms?.competencyName ||
-                              'Selected competency'}
-                          </strong>
-                        </article>
-                        <article>
-                          <Target size={18} strokeWidth={2.2} />
-                          <span>Mastery / LMS Status</span>
-                          <strong>
-                            {formatPercent(selectedInterventionMastery)} -{' '}
-                            {selectedInterventionStatusLabel}
-                          </strong>
-                        </article>
-                        <article>
-                          <Users size={18} strokeWidth={2.2} />
-                          <span>Affected Learners</span>
-                          <strong>{affectedLearnerCount || 'None'}</strong>
-                        </article>
-                      </div>
-
-                      <div className="teacher-intervention-list">
-                        {isInterventionRecommended && teacherInterventions.length ? (
-                          teacherInterventions.map((intervention, index) => (
-                            <article
-                              className="teacher-intervention-step"
-                              key={`${intervention.title}-${index}`}
+                          <small>
+                            {formatDate(schedule.effectiveFrom)} - {formatDate(schedule.effectiveTo)}
+                          </small>
+                          <span className={`status-pill status-${scheduleStatus}`}>
+                            {formatStatus(scheduleStatus)}
+                          </span>
+                          <div className="teacher-timetable-row-actions">
+                            <button
+                              type="button"
+                              className="icon-action-button"
+                              title="Edit timetable entry"
+                              aria-label={`Edit ${schedule.dayName || 'timetable'} entry`}
+                              disabled={!isActiveSchedule}
+                              onClick={() => openScheduleForm(schedule)}
                             >
-                              <span>{String(index + 1).padStart(2, '0')}</span>
-                              <div>
-                                <strong>{intervention.title}</strong>
-                                <p>
-                                  {intervention.description ||
-                                    'Use this recommendation as the teacher action plan during the next remediation session.'}
-                                </p>
-                                <small>
-                                  Target group:{' '}
-                                  {intervention.targetGroup ||
-                                    'Learners affected by this low-mastery competency'}
-                                </small>
-                                <small className="teacher-intervention-followup">
-                                  Follow-up:{' '}
-                                  {intervention.followUp ||
-                                    'Give a short practice activity or quick reassessment to confirm improvement.'}
-                                </small>
-                              </div>
-                            </article>
-                          ))
-                        ) : (
-                          <article className="teacher-intervention-neutral">
-                            <strong>
-                              No intervention is currently recommended for this competency.
-                            </strong>
-                            <p>
-                              Continue monitoring this skill after the next synced assessment.
-                            </p>
-                          </article>
-                        )}
-                      </div>
-                    </section>
+                              <Pencil size={15} aria-hidden="true" />
+                            </button>
+                            <button
+                              type="button"
+                              className="icon-action-button is-danger"
+                              title="Archive timetable entry"
+                              aria-label={`Archive ${schedule.dayName || 'timetable'} entry`}
+                              disabled={!isActiveSchedule}
+                              onClick={() => {
+                                setSchedulePendingArchive(schedule)
+                                setScheduleArchiveReason('')
+                                setScheduleMessage({ error: '', success: '' })
+                              }}
+                            >
+                              <Archive size={15} aria-hidden="true" />
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
-                </>
-              ) : (
-                <section className="teacher-analytics-empty-panel">
-                  <strong>No assessment selected yet.</strong>
-                  <span>
-                    Create or select an assessment to view part details and student LMS records.
-                  </span>
-                </section>
-              )}
+                ) : (
+                  <p className="teacher-timetable-empty">No timetable entries for this class.</p>
+                )}
+                </article>
+              </aside>
             </div>
           ) : null}
 
@@ -2356,43 +2588,11 @@ function ClassRecordsPage({
 
                   <div className="student-performance-column">
                     <section className="student-performance-card">
-                      <h4>Skill Mastery</h4>
+                      <h4>Performance Reports</h4>
                       <p className="student-performance-card-subtitle">
-                        All competency tags assessed across checked results in this class.
+                        Student scores, mastery, and interventions require the V3 reporting APIs.
                       </p>
-                      {isStudentSkillMasteryLoading ? (
-                        <div className="student-chart-empty">Loading skill mastery...</div>
-                      ) : studentSkillMasteryMessage ? (
-                        <div className="student-chart-empty">{studentSkillMasteryMessage}</div>
-                      ) : studentAssessedSkillRows.length ? (
-                        <div className="student-skill-list">
-                          {studentAssessedSkillRows.map((item) => (
-                            <div
-                              className={`student-skill-row ${getPerformanceClass(item.value)}`}
-                              key={item.id}
-                            >
-                              <div>
-                                <span>
-                                  {item.label}
-                                  {item.status ? <small>{formatStatus(item.status)}</small> : null}
-                                </span>
-                                <strong>{formatPercent(item.value)}</strong>
-                              </div>
-                              <div className="student-skill-track">
-                                <span
-                                  style={{
-                                    width: `${Math.max(4, Math.min(100, item.value))}%`,
-                                  }}
-                                />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="student-chart-empty">
-                          No assessed competency tags found for this student yet.
-                        </div>
-                      )}
+                      <div className="student-chart-empty">Not available in Class Records.</div>
                     </section>
                   </div>
                 </div>
@@ -2405,43 +2605,31 @@ function ClassRecordsPage({
   }
 
   return (
-    <div className="principal-class-records-page">
-      <section className="principal-class-header">
-        <h2>Teacher Class Assignment</h2>
-        <span>Manage and assign teachers to sections and subjects for the current academic year.</span>
-      </section>
+    <div
+      className={`principal-class-records-page ${
+        principalSection === 'students' ? 'is-student-workspace' : 'is-class-workspace'
+      }`}
+    >
+      {principalSection === 'classes' ? (
+        <>
+          <section className="principal-class-header">
+            <h2>Teacher Class Assignment</h2>
+            <span>Manage and assign teachers to sections and subjects for the current academic year.</span>
+          </section>
 
-      <section className="principal-assignment-card">
+          <section className="principal-assignment-card">
         <div className="section-toolbar">
           <div>
             <p className="content-card-tag">Assignment Creation Section</p>
             <h3>Assign teacher to a class</h3>
           </div>
           <div className="principal-assignment-toolbar-actions">
-            <button
-              type="button"
-              className="principal-smart-import-card"
-              onClick={handleSmartImportPendingClick}
-              title={SF1_PENDING_MESSAGE}
-              aria-label={SF1_PENDING_MESSAGE}
-            >
-              <span aria-hidden="true">
-                <FileText size={18} strokeWidth={2.3} />
-              </span>
-              <strong>Smart Import (SF1)</strong>
+            <button type="button" className="secondary-button" onClick={openClassCreateDialog}>
+              <Plus size={17} strokeWidth={2.4} aria-hidden="true" />
+              Create Class
             </button>
 
-            <button
-              type="button"
-              className={`principal-manual-input-card ${
-                activePrincipalTool === 'manual' ? 'is-active' : ''
-              }`}
-              onClick={() => setActivePrincipalTool('manual')}
-            >
-              Manual Input
-            </button>
-
-            <button type="button" className="secondary-button" onClick={() => loadTeacherClasses()}>
+            <button type="button" className="secondary-button" onClick={handlePrincipalRefresh}>
               Refresh
             </button>
           </div>
@@ -2453,10 +2641,20 @@ function ClassRecordsPage({
         {assignmentMessage.success ? (
           <p className="form-message form-message-success">{assignmentMessage.success}</p>
         ) : null}
-        {studentsSuccess ? (
-          <p className="form-message form-message-success">{studentsSuccess}</p>
+        {duplicateClassAssignment ? (
+          <p className="form-message form-message-error" role="alert">
+            Duplicate assignment blocked: {duplicateClassAssignment.teacherName || 'This teacher'}
+            {' '}already teaches {duplicateClassAssignment.subjectName || 'this subject'} in{' '}
+            {duplicateClassAssignment.gradeLevelName || 'this grade level'} -{' '}
+            {duplicateClassAssignment.sectionName || 'this section'}.
+          </p>
+        ) : selectedTeacherAssignments.length ? (
+          <p className="principal-assignment-rule-warning" role="status">
+            This teacher already has {selectedTeacherAssignments.length} active assignment(s) this
+            school year. Another class is allowed, and the same class is allowed only for a
+            different subject.
+          </p>
         ) : null}
-
         <form className="principal-assignment-form" onSubmit={handleAssignmentSubmit}>
           <label htmlFor="classAssignmentTeacherId">
             <span>Teacher</span>
@@ -2543,7 +2741,11 @@ function ClassRecordsPage({
             <strong>{selectedAcademicYearLabel}</strong>
           </div>
 
-          <button type="submit" className="primary-button" disabled={isAssignmentSubmitting}>
+          <button
+            type="submit"
+            className="primary-button"
+            disabled={isAssignmentSubmitting || Boolean(duplicateClassAssignment)}
+          >
             {isAssignmentSubmitting ? 'Assigning...' : 'Assign Teacher'}
           </button>
         </form>
@@ -2555,7 +2757,7 @@ function ClassRecordsPage({
             <p className="content-card-tag">Assignments Table</p>
             <h3>Existing class assignments</h3>
           </div>
-          <span>{classAssignments.length} assignment(s)</span>
+          <span>{activeClassAssignments.length} assignment(s)</span>
         </div>
 
         <div className="approval-table-wrap">
@@ -2565,19 +2767,20 @@ function ClassRecordsPage({
                 <th>Teacher</th>
                 <th>Subject</th>
                 <th>Section</th>
-                <th>Academic Year</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {!classAssignments.length ? (
-                <tr>
-                  <td className="approval-empty" colSpan="5">
-                    No class assignments found.
-                  </td>
+                 <th>Academic Year</th>
+                 <th>Status</th>
+                 <th aria-label="Actions">Actions</th>
+               </tr>
+             </thead>
+             <tbody>
+               {!activeClassAssignments.length ? (
+                 <tr>
+                   <td className="approval-empty" colSpan="6">
+                     No class assignments found.
+                   </td>
                 </tr>
               ) : (
-                classAssignments.map((assignment, index) => (
+                 activeClassAssignments.map((assignment, index) => (
                   <tr key={assignment.id ?? `${assignment.teacherName}-${assignment.sectionName}-${index}`}>
                     <td>{assignment.teacherName || 'Not assigned'}</td>
                     <td>{assignment.subjectName || 'Not assigned'}</td>
@@ -2586,28 +2789,623 @@ function ClassRecordsPage({
                       {assignment.sectionName || 'Section'}
                     </td>
                     <td>{formatAcademicYear(assignment, 'Not assigned')}</td>
-                    <td>
-                      <span className="status-pill status-active">Active</span>
-                    </td>
-                  </tr>
+                     <td>
+                       <span className="status-pill status-active">
+                         {formatStatus(assignment.status || 'active')}
+                       </span>
+                     </td>
+                     <td className="principal-assignment-action-cell">
+                       <div className="principal-assignment-row-actions">
+                         <button
+                           type="button"
+                         className="principal-assignment-edit-button"
+                           onClick={() => openAssignmentEditDialog(assignment)}
+                           disabled
+                           aria-label={`Edit ${assignment.teacherName || 'teacher'} class assignment`}
+                           title="Active assignment editing is not available in the current backend contract"
+                         >
+                           <Pencil size={16} aria-hidden="true" />
+                         </button>
+                         <button
+                           type="button"
+                           className="principal-assignment-delete-button"
+                           onClick={() => openAssignmentDeleteDialog(assignment)}
+                           aria-label={`Remove ${assignment.teacherName || 'teacher'} from ${assignment.gradeLevelName || 'grade level'} ${assignment.sectionName || 'section'}`}
+                           title="Remove class assignment"
+                         >
+                           <Trash2 size={16} aria-hidden="true" />
+                         </button>
+                       </div>
+                     </td>
+                   </tr>
                 ))
               )}
             </tbody>
           </table>
-        </div>
-      </section>
+         </div>
+       </section>
+
+       {isClassDialogOpen ? (
+         <div
+           className="assignment-delete-backdrop"
+           role="presentation"
+           onMouseDown={(event) => {
+             if (event.target === event.currentTarget) closeClassCreateDialog()
+           }}
+         >
+           <section
+             className="assignment-delete-dialog"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="classCreateTitle"
+           >
+             <header className="assignment-delete-header assignment-confirm-header">
+               <span className="assignment-delete-warning assignment-confirm-icon" aria-hidden="true">
+                 <Plus size={21} strokeWidth={2.4} />
+               </span>
+               <div>
+                 <p>Create class</p>
+                 <h3 id="classCreateTitle">Add a grade and section</h3>
+               </div>
+               <button
+                 type="button"
+                 className="assignment-delete-close"
+                 onClick={closeClassCreateDialog}
+                 disabled={isClassCreating}
+                 aria-label="Close create class dialog"
+               >
+                 <X size={18} aria-hidden="true" />
+               </button>
+             </header>
+
+             <div className="assignment-delete-body">
+               <form className="assignment-edit-form" onSubmit={handleClassCreate}>
+                 <div className="principal-assignment-readonly-field">
+                   <span>Academic year</span>
+                   <strong>{selectedAcademicYearLabel}</strong>
+                 </div>
+                 <label htmlFor="classCreateGradeLevel">
+                   <span>Grade level</span>
+                   <select
+                     id="classCreateGradeLevel"
+                     value={classForm.gradeLevelId}
+                     onChange={(event) =>
+                       setClassForm((current) => ({ ...current, gradeLevelId: event.target.value }))
+                     }
+                     disabled={isClassCreating}
+                     required
+                   >
+                     <option value="">Select grade level</option>
+                     {assignmentGradeOptions.map((gradeLevel) => (
+                       <option key={gradeLevel.id} value={gradeLevel.id}>
+                         {gradeLevel.name}
+                       </option>
+                     ))}
+                   </select>
+                 </label>
+                 <label htmlFor="classCreateSectionName">
+                   <span>Section name</span>
+                   <input
+                     id="classCreateSectionName"
+                     value={classForm.sectionName}
+                     onChange={(event) =>
+                       setClassForm((current) => ({ ...current, sectionName: event.target.value }))
+                     }
+                     maxLength="50"
+                     disabled={isClassCreating}
+                     required
+                   />
+                 </label>
+
+                 {classCreateError ? (
+                   <p className="form-message form-message-error assignment-edit-message" role="alert">
+                     {classCreateError}
+                   </p>
+                 ) : null}
+
+                 <div className="assignment-delete-actions assignment-edit-actions">
+                   <button
+                     type="button"
+                     className="secondary-button"
+                     onClick={closeClassCreateDialog}
+                     disabled={isClassCreating}
+                   >
+                     Cancel
+                   </button>
+                   <button
+                     type="submit"
+                     className="assignment-confirm-submit"
+                     disabled={
+                       isClassCreating ||
+                       !selectedAcademicYearId ||
+                       !classForm.gradeLevelId ||
+                       !classForm.sectionName.trim()
+                     }
+                   >
+                     <Plus size={16} aria-hidden="true" />
+                     {isClassCreating ? 'Creating...' : 'Create class'}
+                   </button>
+                 </div>
+               </form>
+             </div>
+           </section>
+         </div>
+       ) : null}
+
+       {assignmentPendingCreation ? (
+         <div
+           className="assignment-delete-backdrop"
+           role="presentation"
+           onMouseDown={(event) => {
+             if (event.target === event.currentTarget) closeAssignmentCreateDialog()
+           }}
+         >
+           <section
+             className="assignment-delete-dialog"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="assignmentCreateTitle"
+           >
+             <header className="assignment-delete-header assignment-confirm-header">
+               <span
+                 className="assignment-delete-warning assignment-confirm-icon"
+                 aria-hidden="true"
+               >
+                 <ClipboardCheck size={21} />
+               </span>
+               <div>
+                 <p>Confirm assignment</p>
+                 <h3 id="assignmentCreateTitle">Assign this teacher to the class?</h3>
+               </div>
+               <button
+                 type="button"
+                 className="assignment-delete-close"
+                 onClick={closeAssignmentCreateDialog}
+                 disabled={isAssignmentSubmitting}
+                 aria-label="Close assignment confirmation dialog"
+               >
+                 <X size={18} aria-hidden="true" />
+               </button>
+             </header>
+
+             <div className="assignment-delete-body">
+               <p className="assignment-confirm-instruction">
+                 Review the assignment details before confirming.
+               </p>
+               <dl className="assignment-delete-summary assignment-confirm-summary">
+                 <div>
+                   <dt>Teacher</dt>
+                   <dd>{assignmentPendingCreation.teacherName}</dd>
+                 </div>
+                 <div>
+                   <dt>Subject</dt>
+                   <dd>{assignmentPendingCreation.subjectName}</dd>
+                 </div>
+                 <div>
+                   <dt>Class</dt>
+                   <dd>
+                     {assignmentPendingCreation.gradeLevelName} -{' '}
+                     {assignmentPendingCreation.sectionName}
+                   </dd>
+                 </div>
+                 <div>
+                   <dt>Academic year</dt>
+                   <dd>{assignmentPendingCreation.academicYear}</dd>
+                 </div>
+               </dl>
+
+               {assignmentCreateError ? (
+                 <p className="form-message form-message-error" role="alert">
+                   {assignmentCreateError}
+                 </p>
+               ) : null}
+
+               <form onSubmit={handleAssignmentConfirm}>
+                 <div className="assignment-delete-actions">
+                   <button
+                     type="button"
+                     className="secondary-button"
+                     onClick={closeAssignmentCreateDialog}
+                     disabled={isAssignmentSubmitting}
+                   >
+                     Cancel
+                   </button>
+                   <button
+                     type="submit"
+                     className="assignment-confirm-submit"
+                     disabled={isAssignmentSubmitting}
+                   >
+                     <ClipboardCheck size={16} aria-hidden="true" />
+                     {isAssignmentSubmitting ? 'Assigning...' : 'Confirm assignment'}
+                   </button>
+                 </div>
+               </form>
+             </div>
+           </section>
+         </div>
+       ) : null}
+
+       {assignmentPendingEdit ? (
+         <div
+           className="assignment-delete-backdrop"
+           role="presentation"
+           onMouseDown={(event) => {
+             if (event.target === event.currentTarget) closeAssignmentEditDialog()
+           }}
+         >
+           <section
+             className="assignment-delete-dialog assignment-edit-dialog"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="assignmentEditTitle"
+           >
+             <header className="assignment-delete-header assignment-confirm-header">
+               <span
+                 className="assignment-delete-warning assignment-confirm-icon"
+                 aria-hidden="true"
+               >
+                 <Pencil size={20} />
+               </span>
+               <div>
+                 <p>Edit assignment</p>
+                 <h3 id="assignmentEditTitle">Update teacher class assignment</h3>
+               </div>
+               <button
+                 type="button"
+                 className="assignment-delete-close"
+                 onClick={closeAssignmentEditDialog}
+                 disabled={isAssignmentUpdating}
+                 aria-label="Close edit assignment dialog"
+               >
+                 <X size={18} aria-hidden="true" />
+               </button>
+             </header>
+
+             <div className="assignment-delete-body">
+               <form className="assignment-edit-form" onSubmit={handleAssignmentUpdate}>
+                 <label htmlFor="editAssignmentTeacherId">
+                   <span>Teacher</span>
+                   <select
+                     id="editAssignmentTeacherId"
+                     name="teacherId"
+                     value={assignmentEditForm.teacherId}
+                     onChange={handleAssignmentEditFormChange}
+                     disabled={isAssignmentUpdating}
+                   >
+                     <option value="">Select teacher</option>
+                     {schoolTeachers.map((teacher) => (
+                       <option key={teacher.userId ?? teacher.id} value={teacher.userId ?? teacher.id}>
+                         {teacher.name}
+                       </option>
+                     ))}
+                   </select>
+                 </label>
+
+                 <label htmlFor="editAssignmentSubjectId">
+                   <span>Subject</span>
+                   <select
+                     id="editAssignmentSubjectId"
+                     name="subjectId"
+                     value={assignmentEditForm.subjectId}
+                     onChange={handleAssignmentEditFormChange}
+                     disabled={isAssignmentUpdating || !assignmentEditForm.teacherId}
+                   >
+                     <option value="">Select subject</option>
+                     {subjects.map((subject) => (
+                       <option key={subject.id} value={subject.id}>
+                         {subject.name}
+                       </option>
+                     ))}
+                   </select>
+                 </label>
+
+                 <label htmlFor="editAssignmentGradeLevelId">
+                   <span>Grade level</span>
+                   <select
+                     id="editAssignmentGradeLevelId"
+                     name="gradeLevelId"
+                     value={assignmentEditForm.gradeLevelId}
+                     onChange={handleAssignmentEditFormChange}
+                     disabled={isAssignmentUpdating || !assignmentEditForm.subjectId}
+                   >
+                     <option value="">Select grade level</option>
+                     {assignmentGradeOptions.map((gradeLevel) => (
+                       <option key={gradeLevel.id} value={gradeLevel.id}>
+                         {gradeLevel.name}
+                       </option>
+                     ))}
+                   </select>
+                 </label>
+
+                 <label htmlFor="editAssignmentClassId">
+                   <span>Section</span>
+                   <select
+                     id="editAssignmentClassId"
+                     name="classId"
+                     value={assignmentEditForm.classId}
+                     onChange={handleAssignmentEditFormChange}
+                     disabled={
+                       isAssignmentUpdating ||
+                       isAssignmentEditSectionsLoading ||
+                       !assignmentEditForm.gradeLevelId
+                     }
+                   >
+                     <option value="">
+                       {isAssignmentEditSectionsLoading ? 'Loading sections...' : 'Select section'}
+                     </option>
+                     {assignmentEditSectionOptions.map((section) => (
+                       <option key={section.classId} value={section.classId}>
+                         {section.sectionName || section.name}
+                       </option>
+                     ))}
+                   </select>
+                 </label>
+
+                 <div className="principal-assignment-readonly-field assignment-edit-year">
+                   <span>Academic year</span>
+                   <strong>{formatAcademicYear(assignmentPendingEdit, 'Academic Year')}</strong>
+                 </div>
+
+                 {duplicateEditedAssignment ? (
+                   <p className="form-message form-message-error assignment-edit-message" role="alert">
+                     This teacher already has the same active class and subject assignment.
+                   </p>
+                 ) : null}
+                 {assignmentEditError ? (
+                   <p className="form-message form-message-error assignment-edit-message" role="alert">
+                     {assignmentEditError}
+                   </p>
+                 ) : null}
+
+                 <div className="assignment-delete-actions assignment-edit-actions">
+                   <button
+                     type="button"
+                     className="secondary-button"
+                     onClick={closeAssignmentEditDialog}
+                     disabled={isAssignmentUpdating}
+                   >
+                     Cancel
+                   </button>
+                   <button
+                     type="submit"
+                     className="assignment-confirm-submit"
+                     disabled={
+                       isAssignmentUpdating ||
+                       !assignmentEditForm.teacherId ||
+                       !assignmentEditForm.subjectId ||
+                       !assignmentEditForm.gradeLevelId ||
+                       !assignmentEditForm.classId ||
+                       !hasAssignmentEditChanges ||
+                       Boolean(duplicateEditedAssignment)
+                     }
+                   >
+                     <Pencil size={16} aria-hidden="true" />
+                     {isAssignmentUpdating ? 'Saving...' : 'Save changes'}
+                   </button>
+                 </div>
+               </form>
+             </div>
+           </section>
+         </div>
+       ) : null}
+
+       {assignmentPendingDeletion ? (
+         <div
+           className="assignment-delete-backdrop"
+           role="presentation"
+           onMouseDown={(event) => {
+             if (event.target === event.currentTarget) closeAssignmentDeleteDialog()
+           }}
+         >
+           <section
+             className="assignment-delete-dialog"
+             role="alertdialog"
+             aria-modal="true"
+             aria-labelledby="assignmentDeleteTitle"
+           >
+             <header className="assignment-delete-header">
+               <span className="assignment-delete-warning" aria-hidden="true">
+                 <AlertTriangle size={21} />
+               </span>
+               <div>
+                 <p>Remove assignment</p>
+                 <h3 id="assignmentDeleteTitle">Remove this teacher assignment?</h3>
+               </div>
+               <button
+                 type="button"
+                 className="assignment-delete-close"
+                 onClick={closeAssignmentDeleteDialog}
+                 disabled={isAssignmentDeleting}
+                 aria-label="Close remove assignment dialog"
+               >
+                 <X size={18} aria-hidden="true" />
+               </button>
+             </header>
+
+             <div className="assignment-delete-body">
+               <dl className="assignment-delete-summary">
+                 <div>
+                   <dt>Teacher</dt>
+                   <dd>{assignmentPendingDeletion.teacherName || 'Not assigned'}</dd>
+                 </div>
+                 <div>
+                   <dt>Class and subject</dt>
+                   <dd>
+                     {assignmentPendingDeletion.gradeLevelName || 'Grade level'} -{' '}
+                     {assignmentPendingDeletion.sectionName || 'Section'} ·{' '}
+                     {assignmentPendingDeletion.subjectName || 'Subject'}
+                   </dd>
+                 </div>
+               </dl>
+
+               <p className="assignment-delete-instruction">
+                 Type the exact phrase below and provide a reason to archive this assignment:
+               </p>
+               <code className="assignment-delete-phrase">{assignmentDeletePhrase}</code>
+
+               {assignmentDeleteError ? (
+                 <p className="form-message form-message-error" role="alert">
+                   {assignmentDeleteError}
+                 </p>
+               ) : null}
+
+               <form onSubmit={handleAssignmentDelete}>
+                 <label htmlFor="assignmentDeleteConfirmation">Confirmation phrase</label>
+                 <input
+                   id="assignmentDeleteConfirmation"
+                   value={assignmentDeleteConfirmation}
+                   onChange={(event) => setAssignmentDeleteConfirmation(event.target.value)}
+                   autoComplete="off"
+                   spellCheck="false"
+                   disabled={isAssignmentDeleting}
+                   autoFocus
+                 />
+
+                 <label htmlFor="assignmentArchiveReason">Reason for archiving</label>
+                 <textarea
+                   id="assignmentArchiveReason"
+                   className="assignment-restore-reason"
+                   value={assignmentArchiveReason}
+                   onChange={(event) => setAssignmentArchiveReason(event.target.value)}
+                   minLength="5"
+                   maxLength="255"
+                   rows="3"
+                   required
+                   disabled={isAssignmentDeleting}
+                 />
+                 <span className="assignment-restore-reason-count">
+                   {assignmentArchiveReason.length}/255
+                 </span>
+
+                 <div className="assignment-delete-actions">
+                   <button
+                     type="button"
+                     className="secondary-button"
+                     onClick={closeAssignmentDeleteDialog}
+                     disabled={isAssignmentDeleting}
+                   >
+                     Cancel
+                   </button>
+                   <button
+                     type="submit"
+                     className="assignment-delete-confirm"
+                     disabled={!canDeleteAssignment || isAssignmentDeleting}
+                   >
+                     <Trash2 size={16} aria-hidden="true" />
+                     {isAssignmentDeleting ? 'Archiving...' : 'Archive assignment'}
+                   </button>
+                 </div>
+               </form>
+             </div>
+           </section>
+         </div>
+       ) : null}
+
+        </>
+      ) : null}
+
+      {principalSection === 'students' ? (
+        <>
+          <section className="principal-class-header">
+            <h2>Students</h2>
+            <span>Manage learner profiles, class enrollment, and roster status for your school.</span>
+          </section>
 
       <section className="content-card principal-student-table-panel">
         <div className="section-toolbar">
           <div>
             <p className="content-card-tag">Student Records Table</p>
-            <h3>Existing student records</h3>
+            <h3>Class roster</h3>
           </div>
-          <button type="button" className="secondary-button" onClick={() => loadStudents()}>
-            Refresh
-          </button>
+          <div className="principal-assignment-toolbar-actions">
+            <button
+              type="button"
+              className={`principal-smart-import-card ${
+                activePrincipalTool === 'sf1' ? 'is-active' : ''
+              }`}
+              onClick={() => setActivePrincipalTool('sf1')}
+            >
+              <span aria-hidden="true">
+                <FileText size={18} strokeWidth={2.3} />
+              </span>
+              <strong>Smart Import (SF1)</strong>
+            </button>
+
+            <button
+              type="button"
+              className={`principal-manual-input-card ${
+                activePrincipalTool === 'manual' ? 'is-active' : ''
+              }`}
+              onClick={openManualStudentPanel}
+              title="Enroll a student in an active class"
+            >
+              Manual Input
+            </button>
+
+            <button type="button" className="secondary-button" onClick={handlePrincipalRefresh}>
+              <RefreshCw size={16} aria-hidden="true" />
+              Refresh
+            </button>
+          </div>
         </div>
 
+        <div className="principal-roster-controls">
+          <label htmlFor="principalRosterClassId">
+            <span>Class</span>
+            <select
+              id="principalRosterClassId"
+              value={principalRosterClassId}
+              onChange={(event) => {
+                setStudentsSuccess('')
+                setPrincipalRosterClassId(event.target.value)
+              }}
+            >
+              <option value="">Select class</option>
+              {principalRosterClassOptions.map((classRecord) => (
+                <option key={classRecord.classId} value={classRecord.classId}>
+                  {classRecord.gradeLevelName || 'Grade level'} -{' '}
+                  {classRecord.sectionName || classRecord.name || 'Section'} |{' '}
+                  {formatAcademicYear(classRecord, 'Academic year')}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <div className="principal-roster-status-group" aria-label="Enrollment status filter">
+            <span>Enrollment status</span>
+            <div role="group">
+              {ENROLLMENT_STATUSES.map((status) => (
+                <button
+                  type="button"
+                  key={status}
+                  className={principalRosterStatus === status ? 'is-active' : ''}
+                  aria-pressed={principalRosterStatus === status}
+                  onClick={() => {
+                    setStudentsSuccess('')
+                    setPrincipalRosterStatus(status)
+                  }}
+                >
+                  {formatStatus(status)}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {selectedPrincipalRosterClass ? (
+          <p className="principal-roster-context">
+            Showing {formatStatus(principalRosterStatus).toLowerCase()} learners in{' '}
+            <strong>
+              {selectedPrincipalRosterClass.gradeLevelName || 'Grade level'} -{' '}
+              {selectedPrincipalRosterClass.sectionName || selectedPrincipalRosterClass.name}
+            </strong>
+            .
+          </p>
+        ) : null}
+
+        {studentsSuccess ? (
+          <p className="form-message form-message-success">{studentsSuccess}</p>
+        ) : null}
         {studentsError ? <p className="form-message form-message-error">{studentsError}</p> : null}
 
         <div className="approval-table-wrap">
@@ -2619,13 +3417,15 @@ function ClassRecordsPage({
                 <th>Gender</th>
                 <th>Section</th>
                 <th>Grade Level</th>
-                <th>Academic Year</th>
+                <th>Status</th>
+                <th>Source</th>
+                <th aria-label="Actions">Actions</th>
               </tr>
             </thead>
             <tbody>
               {isStudentsLoading ? (
                 <tr>
-                  <td className="approval-empty" colSpan="6">
+                  <td className="approval-empty" colSpan="8">
                     Loading student records...
                   </td>
                 </tr>
@@ -2633,21 +3433,50 @@ function ClassRecordsPage({
 
               {!isStudentsLoading && !students.length ? (
                 <tr>
-                  <td className="approval-empty" colSpan="6">
-                    No student records found.
+                  <td className="approval-empty" colSpan="8">
+                    {principalRosterClassId
+                      ? `No ${principalRosterStatus} learners found in this class.`
+                      : 'No active class is available for roster management.'}
                   </td>
                 </tr>
               ) : null}
 
               {!isStudentsLoading
                 ? students.map((student) => (
-                    <tr key={student.id ?? `${student.studentLrn}-${student.name}`}>
+                    <tr key={student.classListId ?? `${student.studentLrn}-${student.name}`}>
                       <td>{student.studentLrn || 'Not provided'}</td>
                       <td>{student.name}</td>
                       <td>{student.gender}</td>
                       <td>{student.section || 'Not assigned'}</td>
                       <td>{student.gradeLevel || 'Not assigned'}</td>
-                    <td>{formatAcademicYear(student, 'Not assigned')}</td>
+                      <td>
+                        <span className={`status-pill status-${student.enrollmentStatus || 'pending'}`}>
+                          {formatStatus(student.enrollmentStatus)}
+                        </span>
+                      </td>
+                      <td>{formatStatus(student.enrollmentSource || 'manual')}</td>
+                      <td className="principal-student-action-cell">
+                        <div className="principal-assignment-row-actions">
+                          <button
+                            type="button"
+                            className="principal-assignment-edit-button"
+                            onClick={() => openStudentProfileDialog(student)}
+                            aria-label={`Edit ${student.name} profile`}
+                            title="Edit Student Profile"
+                          >
+                            <Pencil size={16} aria-hidden="true" />
+                          </button>
+                          <button
+                            type="button"
+                            className="principal-student-status-button"
+                            onClick={() => openStudentStatusDialog(student)}
+                            aria-label={`Change ${student.name} enrollment status`}
+                            title="Change enrollment status"
+                          >
+                            <RefreshCw size={16} aria-hidden="true" />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))
                 : null}
@@ -2656,225 +3485,539 @@ function ClassRecordsPage({
         </div>
       </section>
 
+      {activePrincipalTool === 'sf1' ? (
+        <V3Sf1ImportPanel
+          token={token}
+          gradeLevels={assignmentGradeOptions}
+          academicYears={academicYears}
+          classes={sectionOptions}
+          initialAcademicYearId={selectedAcademicYearId}
+          isGradeLevelsLoading={isSectionsLoading}
+          gradeLevelsError={schoolReferenceError}
+          onRetryGradeLevels={loadSections}
+          onImported={handleSf1Imported}
+          onClose={() => setActivePrincipalTool(null)}
+        />
+      ) : null}
+
       <div className="principal-class-tool-panels">
         <section
           className={`content-card principal-tool-panel ${
             activePrincipalTool === 'manual' ? 'is-active' : ''
           }`}
         >
-          <p className="content-card-tag">Manual Student Input</p>
-          <h3>Add student to a class</h3>
+          <div className="section-toolbar manual-student-panel-header">
+            <div>
+              <p className="content-card-tag">Manual Student Input</p>
+              <h3>Enroll one student</h3>
+            </div>
+            <button
+              type="button"
+              className="assignment-delete-close"
+              onClick={closeManualStudentPanel}
+              disabled={isManualSubmitting}
+              aria-label="Close manual student input"
+              title="Close"
+            >
+              <X size={18} aria-hidden="true" />
+            </button>
+          </div>
           <p className="supporting-text">
-            Select the teacher, grade level, subject, and class section first so the student record
-            is saved under the correct class context.
+            Select the learner's class, then enter the profile details. Enrollment belongs to the
+            class and is shared by its teacher-subject assignments.
           </p>
 
+          {schoolReferenceError ? (
+            <div className="manual-reference-error">
+              <p className="form-message form-message-error">{schoolReferenceError}</p>
+              <button type="button" className="secondary-button" onClick={loadSections}>
+                <RefreshCw size={16} aria-hidden="true" />
+                Retry reference data
+              </button>
+            </div>
+          ) : null}
           {manualMessage.error ? (
-            <p className="form-message form-message-error">{manualMessage.error}</p>
+            <p className="form-message form-message-error" role="alert">{manualMessage.error}</p>
           ) : null}
           {manualMessage.success ? (
-            <p className="form-message form-message-success">{manualMessage.success}</p>
+            <p className="form-message form-message-success" role="status">{manualMessage.success}</p>
           ) : null}
 
-          <form className="manual-student-table-form" onSubmit={handleManualSubmit}>
-            <div className="manual-class-filter-bar">
-              <label htmlFor="manualTeacherId">
-                <span>Teacher</span>
-                <select
-                  id="manualTeacherId"
-                  name="teacherId"
-                  value={manualClassFilters.teacherId}
-                  onChange={handleManualClassFilterChange}
-                >
-                  <option value="">Select teacher</option>
-                  {manualTeacherOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+          <form className="manual-student-profile-form" onSubmit={handleManualSubmit}>
+            <label className="manual-student-class-field" htmlFor="manualStudentClassId">
+              <span>Class</span>
+              <select
+                id="manualStudentClassId"
+                name="classId"
+                value={manualStudentForm.classId}
+                onChange={handleManualStudentChange}
+                disabled={isManualSubmitting || !principalRosterClassOptions.length}
+                required
+              >
+                <option value="">Select class</option>
+                {principalRosterClassOptions.map((classRecord) => (
+                  <option key={classRecord.classId} value={classRecord.classId}>
+                    {classRecord.gradeLevelName || 'Grade level'} -{' '}
+                    {classRecord.sectionName || classRecord.name || 'Section'} |{' '}
+                    {formatAcademicYear(classRecord, 'Academic year')}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-              <label htmlFor="manualGradeLevelId">
-                <span>Grade Level</span>
-                <select
-                  id="manualGradeLevelId"
-                  name="gradeLevelId"
-                  value={manualClassFilters.gradeLevelId}
-                  onChange={handleManualClassFilterChange}
-                  disabled={!manualClassFilters.teacherId && Boolean(manualTeacherOptions.length)}
-                >
-                  <option value="">Select grade level</option>
-                  {manualGradeOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label htmlFor="manualSubjectId">
-                <span>Subject</span>
-                <select
-                  id="manualSubjectId"
-                  name="subjectId"
-                  value={manualClassFilters.subjectId}
-                  onChange={handleManualClassFilterChange}
-                  disabled={!manualClassFilters.gradeLevelId && Boolean(manualGradeOptions.length)}
-                >
-                  <option value="">Select subject</option>
-                  {manualSubjectOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label htmlFor="manualSectionId">
-                <span>Section</span>
-                <select
-                  id="manualSectionId"
-                  name="sectionId"
-                  value={manualForm.sectionId}
-                  onChange={handleManualSectionChange}
-                  disabled={!manualClassFilters.subjectId && Boolean(manualSubjectOptions.length)}
-                >
-                  <option value="">Select section</option>
-                  {effectiveManualSectionOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label htmlFor="manualAcademicYearId">
-                <span>Academic Year</span>
-                <input
-                  id="manualAcademicYearId"
-                  name="academicYearId"
-                  value={manualForm.academicYearId}
-                  onChange={handleManualFormChange}
-                  placeholder="Select class"
-                  readOnly={Boolean(selectedManualClassOption?.assignment)}
-                />
-              </label>
-            </div>
-
-            {selectedManualClassOption?.assignment ? (
+            {selectedManualClass ? (
               <div className="manual-class-summary">
                 <span>Selected Class</span>
                 <strong>
-                  {selectedManualClassOption.assignment.gradeLevelName || 'Grade level'} -{' '}
-                  {selectedManualClassOption.assignment.sectionName || 'Section'}
+                  {selectedManualClass.gradeLevelName || 'Grade level'} -{' '}
+                  {selectedManualClass.sectionName || selectedManualClass.name || 'Section'}
                 </strong>
                 <small>
-                  {selectedManualClassOption.assignment.teacherName || 'Teacher'} /{' '}
-                  {selectedManualClassOption.assignment.subjectName || 'Subject'} /{' '}
-                  {formatAcademicYear(
-                    selectedManualClassOption.assignment,
-                    'Academic year',
-                  )}
+                  {formatAcademicYear(selectedManualClass, 'Academic year')} / Active class
                 </small>
               </div>
             ) : null}
 
-            <div className="manual-table-heading">
-              <div>
-                <span>Input Student Manually</span>
-                <strong>{startedManualRows.length} row(s) ready</strong>
-              </div>
-              <div className="manual-table-actions">
-                <button type="button" className="secondary-button" onClick={handleAddManualRow}>
-                  Add Row
-                </button>
-                <button type="button" className="secondary-button" onClick={handleClearManualRows}>
-                  Clear
-                </button>
-              </div>
-            </div>
+            <div className="manual-student-profile-grid">
+              <label htmlFor="manualStudentLrn">
+                <span>LRN</span>
+                <input
+                  id="manualStudentLrn"
+                  name="studentLrn"
+                  value={manualStudentForm.studentLrn}
+                  onChange={handleManualStudentChange}
+                  inputMode="numeric"
+                  pattern="[0-9]{12}"
+                  minLength="12"
+                  maxLength="12"
+                  placeholder="12-digit learner reference number"
+                  disabled={isManualSubmitting}
+                  required
+                />
+                <small>{manualStudentForm.studentLrn.length}/12 digits</small>
+              </label>
 
-            <div className="manual-student-table-wrap">
-              <table className="manual-student-table">
-                <thead>
-                  <tr>
-                    <th>No.</th>
-                    <th>LRN</th>
-                    <th>First Name</th>
-                    <th>Last Name</th>
-                    <th>Gender</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {manualRows.map((row, index) => (
-                    <tr key={row.rowId}>
-                      <td>{String(index + 1).padStart(2, '0')}</td>
-                      <td>
-                        <input
-                          value={row.studentLrn}
-                          onChange={(event) =>
-                            handleManualRowChange(row.rowId, 'studentLrn', event.target.value)
-                          }
-                          placeholder="Enter LRN"
-                        />
-                      </td>
-                      <td>
-                        <input
-                          value={row.firstName}
-                          onChange={(event) =>
-                            handleManualRowChange(row.rowId, 'firstName', event.target.value)
-                          }
-                          placeholder="First name"
-                        />
-                      </td>
-                      <td>
-                        <input
-                          value={row.lastName}
-                          onChange={(event) =>
-                            handleManualRowChange(row.rowId, 'lastName', event.target.value)
-                          }
-                          placeholder="Last name"
-                        />
-                      </td>
-                      <td>
-                        <select
-                          value={row.gender}
-                          onChange={(event) =>
-                            handleManualRowChange(row.rowId, 'gender', event.target.value)
-                          }
-                        >
-                          <option value="">Select</option>
-                          <option value="Male">Male</option>
-                          <option value="Female">Female</option>
-                        </select>
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="manual-row-remove"
-                          onClick={() => handleRemoveManualRow(row.rowId)}
-                          aria-label={`Remove row ${index + 1}`}
-                        >
-                          Remove
-                        </button>
-                      </td>
-                    </tr>
+              <label htmlFor="manualStudentFirstName">
+                <span>First name</span>
+                <input
+                  id="manualStudentFirstName"
+                  name="firstName"
+                  value={manualStudentForm.firstName}
+                  onChange={handleManualStudentChange}
+                  maxLength="50"
+                  disabled={isManualSubmitting}
+                  required
+                />
+              </label>
+
+              <label htmlFor="manualStudentMiddleName">
+                <span>Middle name <small>(optional)</small></span>
+                <input
+                  id="manualStudentMiddleName"
+                  name="middleName"
+                  value={manualStudentForm.middleName}
+                  onChange={handleManualStudentChange}
+                  maxLength="50"
+                  disabled={isManualSubmitting}
+                />
+              </label>
+
+              <label htmlFor="manualStudentLastName">
+                <span>Last name</span>
+                <input
+                  id="manualStudentLastName"
+                  name="lastName"
+                  value={manualStudentForm.lastName}
+                  onChange={handleManualStudentChange}
+                  maxLength="50"
+                  disabled={isManualSubmitting}
+                  required
+                />
+              </label>
+
+              <label htmlFor="manualStudentSuffixId">
+                <span>Suffix <small>(optional)</small></span>
+                <select
+                  id="manualStudentSuffixId"
+                  name="suffixId"
+                  value={manualStudentForm.suffixId}
+                  onChange={handleManualStudentChange}
+                  disabled={isManualSubmitting}
+                >
+                  <option value="">No suffix</option>
+                  {studentSuffixes.map((suffix) => (
+                    <option key={suffix.suffixId} value={suffix.suffixId}>
+                      {suffix.suffixName}
+                    </option>
                   ))}
-                </tbody>
-              </table>
+                </select>
+              </label>
+
+              <label htmlFor="manualStudentGenderId">
+                <span>Gender</span>
+                <select
+                  id="manualStudentGenderId"
+                  name="genderId"
+                  value={manualStudentForm.genderId}
+                  onChange={handleManualStudentChange}
+                  disabled={isManualSubmitting || !studentGenders.length}
+                  required
+                >
+                  <option value="">Select gender</option>
+                  {studentGenders.map((gender) => (
+                    <option key={gender.genderId} value={gender.genderId}>
+                      {gender.genderName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label htmlFor="manualStudentBirthDate">
+                <span>Birth date <small>(optional)</small></span>
+                <input
+                  id="manualStudentBirthDate"
+                  name="birthDate"
+                  type="date"
+                  value={manualStudentForm.birthDate}
+                  onChange={handleManualStudentChange}
+                  max={new Date(Date.now() - 86400000).toISOString().slice(0, 10)}
+                  disabled={isManualSubmitting}
+                />
+              </label>
             </div>
 
             <div className="manual-save-row">
-              <button type="submit" className="primary-button" disabled={isManualSubmitting}>
-                {isManualSubmitting ? 'Saving...' : 'Save Students'}
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={closeManualStudentPanel}
+                disabled={isManualSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="primary-button"
+                disabled={
+                  isManualSubmitting ||
+                  Boolean(schoolReferenceError) ||
+                  !studentGenders.length ||
+                  !principalRosterClassOptions.length
+                }
+              >
+                {isManualSubmitting ? 'Enrolling...' : 'Enroll student'}
               </button>
             </div>
           </form>
         </section>
-
       </div>
+
+      {studentPendingEdit ? (
+        <div
+          className="assignment-delete-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeStudentProfileDialog()
+          }}
+        >
+          <section
+            className="assignment-delete-dialog student-lifecycle-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="studentProfileEditTitle"
+          >
+            <header className="assignment-delete-header assignment-confirm-header">
+              <span className="assignment-delete-warning assignment-confirm-icon" aria-hidden="true">
+                <Pencil size={20} />
+              </span>
+              <div>
+                <p>Student profile</p>
+                <h3 id="studentProfileEditTitle">Correct learner details</h3>
+              </div>
+              <button
+                type="button"
+                className="assignment-delete-close"
+                onClick={() => closeStudentProfileDialog()}
+                disabled={isStudentProfileSaving}
+                aria-label="Close student profile dialog"
+              >
+                <X size={18} aria-hidden="true" />
+              </button>
+            </header>
+
+            <div className="assignment-delete-body">
+              <form className="student-lifecycle-form" onSubmit={handleStudentProfileSubmit}>
+                <label className="student-lifecycle-wide" htmlFor="studentProfileLrn">
+                  <span>LRN</span>
+                  <input
+                    id="studentProfileLrn"
+                    value={studentPendingEdit.studentLrn ?? ''}
+                    readOnly
+                    aria-readonly="true"
+                  />
+                  <small>LRN cannot be changed from profile correction.</small>
+                </label>
+
+                <label htmlFor="studentProfileFirstName">
+                  <span>First name</span>
+                  <input
+                    id="studentProfileFirstName"
+                    name="firstName"
+                    value={studentProfileForm.firstName}
+                    onChange={handleStudentProfileChange}
+                    maxLength="50"
+                    disabled={isStudentProfileSaving}
+                    required
+                  />
+                </label>
+
+                <label htmlFor="studentProfileMiddleName">
+                  <span>Middle name <small>(optional)</small></span>
+                  <input
+                    id="studentProfileMiddleName"
+                    name="middleName"
+                    value={studentProfileForm.middleName}
+                    onChange={handleStudentProfileChange}
+                    maxLength="50"
+                    disabled={isStudentProfileSaving}
+                  />
+                </label>
+
+                <label htmlFor="studentProfileLastName">
+                  <span>Last name</span>
+                  <input
+                    id="studentProfileLastName"
+                    name="lastName"
+                    value={studentProfileForm.lastName}
+                    onChange={handleStudentProfileChange}
+                    maxLength="50"
+                    disabled={isStudentProfileSaving}
+                    required
+                  />
+                </label>
+
+                <label htmlFor="studentProfileSuffixId">
+                  <span>Suffix <small>(optional)</small></span>
+                  <select
+                    id="studentProfileSuffixId"
+                    name="suffixId"
+                    value={studentProfileForm.suffixId}
+                    onChange={handleStudentProfileChange}
+                    disabled={isStudentProfileSaving}
+                  >
+                    <option value="">No suffix</option>
+                    {studentSuffixes.map((suffix) => (
+                      <option key={suffix.suffixId} value={suffix.suffixId}>
+                        {suffix.suffixName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label htmlFor="studentProfileGenderId">
+                  <span>Gender</span>
+                  <select
+                    id="studentProfileGenderId"
+                    name="genderId"
+                    value={studentProfileForm.genderId}
+                    onChange={handleStudentProfileChange}
+                    disabled={isStudentProfileSaving || !studentGenders.length}
+                    required
+                  >
+                    <option value="">Select gender</option>
+                    {studentGenders.map((gender) => (
+                      <option key={gender.genderId} value={gender.genderId}>
+                        {gender.genderName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label htmlFor="studentProfileBirthDate">
+                  <span>Birth date <small>(optional)</small></span>
+                  <input
+                    id="studentProfileBirthDate"
+                    name="birthDate"
+                    type="date"
+                    value={studentProfileForm.birthDate}
+                    onChange={handleStudentProfileChange}
+                    max={new Date(Date.now() - 86400000).toISOString().slice(0, 10)}
+                    disabled={isStudentProfileSaving}
+                  />
+                </label>
+
+                <label className="student-lifecycle-wide" htmlFor="studentProfileReason">
+                  <span>Correction reason</span>
+                  <textarea
+                    id="studentProfileReason"
+                    name="reason"
+                    value={studentProfileForm.reason}
+                    onChange={handleStudentProfileChange}
+                    minLength="5"
+                    maxLength="255"
+                    rows="3"
+                    disabled={isStudentProfileSaving}
+                    required
+                  />
+                  <small>{studentProfileForm.reason.length}/255 characters</small>
+                </label>
+
+                {studentProfileError ? (
+                  <p className="form-message form-message-error student-lifecycle-wide" role="alert">
+                    {studentProfileError}
+                  </p>
+                ) : null}
+
+                <div className="assignment-delete-actions student-lifecycle-wide">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => closeStudentProfileDialog()}
+                    disabled={isStudentProfileSaving}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="assignment-confirm-submit"
+                    disabled={
+                      isStudentProfileSaving ||
+                      studentProfileForm.reason.trim().length < 5 ||
+                      studentProfileForm.reason.trim().length > 255
+                    }
+                  >
+                    <Save size={16} aria-hidden="true" />
+                    {isStudentProfileSaving ? 'Saving...' : 'Save correction'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {studentPendingStatus ? (
+        <div
+          className="assignment-delete-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeStudentStatusDialog()
+          }}
+        >
+          <section
+            className="assignment-delete-dialog student-status-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="studentStatusTitle"
+          >
+            <header className="assignment-delete-header assignment-confirm-header">
+              <span className="assignment-delete-warning assignment-confirm-icon" aria-hidden="true">
+                <RefreshCw size={20} />
+              </span>
+              <div>
+                <p>Enrollment lifecycle</p>
+                <h3 id="studentStatusTitle">Change enrollment status</h3>
+              </div>
+              <button
+                type="button"
+                className="assignment-delete-close"
+                onClick={() => closeStudentStatusDialog()}
+                disabled={isStudentStatusSaving}
+                aria-label="Close enrollment status dialog"
+              >
+                <X size={18} aria-hidden="true" />
+              </button>
+            </header>
+
+            <div className="assignment-delete-body">
+              <dl className="assignment-delete-summary">
+                <div>
+                  <dt>Student</dt>
+                  <dd>{studentPendingStatus.name}</dd>
+                </div>
+                <div>
+                  <dt>Current status</dt>
+                  <dd>{formatStatus(studentPendingStatus.enrollmentStatus)}</dd>
+                </div>
+              </dl>
+
+              <form className="student-status-form" onSubmit={handleStudentStatusSubmit}>
+                <label htmlFor="studentNextStatus">
+                  <span>New enrollment status</span>
+                  <select
+                    id="studentNextStatus"
+                    value={studentNextStatus}
+                    onChange={(event) => {
+                      setStudentNextStatus(event.target.value)
+                      setStudentStatusError('')
+                    }}
+                    disabled={isStudentStatusSaving}
+                    required
+                  >
+                    {ENROLLMENT_STATUSES.filter(
+                      (status) => status !== studentPendingStatus.enrollmentStatus,
+                    ).map((status) => (
+                      <option key={status} value={status}>
+                        {formatStatus(status)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label htmlFor="studentStatusReason">
+                  <span>Reason</span>
+                  <textarea
+                    id="studentStatusReason"
+                    value={studentStatusReason}
+                    onChange={(event) => {
+                      setStudentStatusReason(event.target.value)
+                      setStudentStatusError('')
+                    }}
+                    minLength="5"
+                    maxLength="255"
+                    rows="3"
+                    disabled={isStudentStatusSaving}
+                    required
+                  />
+                  <small>{studentStatusReason.length}/255 characters</small>
+                </label>
+
+                {studentStatusError ? (
+                  <p className="form-message form-message-error" role="alert">
+                    {studentStatusError}
+                  </p>
+                ) : null}
+
+                <div className="assignment-delete-actions">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => closeStudentStatusDialog()}
+                    disabled={isStudentStatusSaving}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="assignment-confirm-submit"
+                    disabled={
+                      isStudentStatusSaving ||
+                      !studentNextStatus ||
+                      studentStatusReason.trim().length < 5 ||
+                      studentStatusReason.trim().length > 255
+                    }
+                  >
+                    <RefreshCw size={16} aria-hidden="true" />
+                    {isStudentStatusSaving ? 'Updating...' : 'Update enrollment'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </section>
+        </div>
+      ) : null}
+        </>
+      ) : null}
     </div>
   )
 }

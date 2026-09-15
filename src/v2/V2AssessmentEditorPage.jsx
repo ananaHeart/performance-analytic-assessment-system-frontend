@@ -7,17 +7,18 @@ import {
   CirclePlus,
   CopyPlus,
   LoaderCircle,
+  Printer,
   Save,
   Trash2,
 } from 'lucide-react'
 
 import {
-  activateAssessmentV2,
-  createAssessmentV2,
-  getAssessmentReferenceDataV2,
-  getAssessmentV2,
-  updateAssessmentV2,
-} from '@/api/apiV2Client'
+  activateAssessmentV3,
+  createAssessmentV3,
+  getAssessmentReferenceDataV3,
+  getAssessmentV3,
+  updateAssessmentV3,
+} from '@/api/apiV3Client'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -27,10 +28,16 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { DateTimePicker } from '@/components/ui/date-time-picker'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { navigateV2, V2_ROUTES } from '@/v2/v2Routes'
-
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 const TEST_TYPES = [
   ['quiz', 'Quiz'],
   ['exam', 'Exam'],
@@ -39,87 +46,381 @@ const TEST_TYPES = [
   ['other', 'Other'],
 ]
 
-const SELECT_CLASS = 'h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground shadow-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/20 disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-70'
+const SUPPORTED_QUESTION_TYPE_CODES = new Set([
+  'multiple_choice',
+  'true_false',
+  'identification',
+  'enumeration',
+  'essay',
+])
+
+const MATCHING_MODES = [
+  ['normalized', 'Normalized'],
+  ['exact', 'Exact'],
+]
+
 const TEXTAREA_CLASS = 'min-h-20 w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20 disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-70'
 
-function emptyQuestion(itemNumber, partType = 'multiple_choice') {
+function formatCodeLabel(value) {
+  if (!value) return ''
+  return String(value)
+    .split('_')
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+function emptyRubricCriterion(criterionOrder, maximumPoints = 1) {
   return {
-    itemNumber,
-    questionText: '',
-    optionA: partType === 'true_false' ? 'True' : '',
-    optionB: partType === 'true_false' ? 'False' : '',
-    optionC: '',
-    optionD: '',
-    optionE: '',
-    correctOption: 'A',
+    criterionOrder,
+    criterionName: '',
+    criterionDescription: '',
+    maximumPoints,
+    required: true,
   }
+}
+
+function emptyEnumerationAnswer(answerOrder, points = 0) {
+  return {
+    answerOrder,
+    primaryAnswer: '',
+    variants: [],
+    points,
+  }
+}
+
+function emptyQuestion(itemNumber, partType = '', maximumPoints = 1, questionText = '') {
+  const common = {
+    itemNumber,
+    questionText,
+  }
+
+  if (partType === 'multiple_choice') {
+    return {
+      ...common,
+      optionA: '',
+      optionB: '',
+      optionC: '',
+      optionD: '',
+      correctOption: '',
+      answerExplanation: '',
+    }
+  }
+
+  if (partType === 'true_false') {
+    return {
+      ...common,
+      correctOption: '',
+    }
+  }
+
+  if (partType === 'identification') {
+    return {
+      ...common,
+      acceptedAnswers: [{ acceptedText: '' }],
+      matchingMode: 'normalized',
+      caseSensitive: false,
+      maximumResponseLength: '',
+      responseRegionSize: '',
+    }
+  }
+
+  if (partType === 'enumeration') {
+    return {
+      ...common,
+      expectedResponseCount: 1,
+      enumerationAnswers: [emptyEnumerationAnswer(1, maximumPoints)],
+      matchingMode: 'normalized',
+      caseSensitive: false,
+      maximumResponseLength: '',
+      responseRegionSize: '',
+    }
+  }
+
+  if (partType === 'essay') {
+    return {
+      ...common,
+      responseInstructions: '',
+      maximumResponseLength: '',
+      responseRegionSize: '',
+      forcePageBreakBefore: false,
+      scoringMode: 'manual',
+      rubricSource: 'existing',
+      rubricId: '',
+      inlineRubric: {
+        rubricName: '',
+        description: '',
+        criteria: [emptyRubricCriterion(1, maximumPoints)],
+      },
+    }
+  }
+
+  return common
 }
 
 function emptyPart(partOrder) {
   return {
     partOrder,
-    partName: `Part ${partOrder}`,
-    partType: 'multiple_choice',
+    partName: '',
+    partType: '',
     pointsPerItem: 1,
     questions: [emptyQuestion(1)],
-    skillMappings: [{ fromItemNumber: 1, toItemNumber: 1, skillIds: [] }],
+    skillMappings: [
+      { fromItemNumber: 1, toItemNumber: 1, rootTagId: '', skillIds: [] },
+    ],
     expanded: true,
   }
 }
 
-function groupQuestionSkills(questions = []) {
-  const mappings = []
-  const sorted = [...questions].sort((a, b) => a.itemNumber - b.itemNumber)
-
-  sorted.forEach((question) => {
-    const skillIds = [...(question.skillIds ?? [])].map(Number).sort((a, b) => a - b)
-    const key = skillIds.join(',')
-    const previous = mappings[mappings.length - 1]
-
-    if (previous && previous.key === key && previous.toItemNumber + 1 === question.itemNumber) {
-      previous.toItemNumber = question.itemNumber
-      return
-    }
-
-    mappings.push({
-      key,
-      fromItemNumber: question.itemNumber,
-      toItemNumber: question.itemNumber,
-      skillIds,
-    })
-  })
-
-  return mappings.length
-    ? mappings.map(({ fromItemNumber, toItemNumber, skillIds }) => ({
-        fromItemNumber,
-        toItemNumber,
-        skillIds,
-      }))
-    : [{ fromItemNumber: 1, toItemNumber: 1, skillIds: [] }]
+function supportedQuestionTypes(referenceData) {
+  return (referenceData.questionTypes ?? []).filter((type) => (
+    SUPPORTED_QUESTION_TYPE_CODES.has(type.code)
+  ))
 }
 
-function hydrateAssessment(assessment) {
-  const parts = (assessment.parts ?? []).map((part, index) => {
-    const partType = part.partType ?? 'multiple_choice'
-    const questions = (part.questions ?? []).map((question, questionIndex) => ({
-      itemNumber: question.itemNumber ?? questionIndex + 1,
-      questionText: question.questionText ?? '',
-      optionA: question.optionA ?? (partType === 'true_false' ? 'True' : ''),
-      optionB: question.optionB ?? (partType === 'true_false' ? 'False' : ''),
-      optionC: question.optionC ?? '',
-      optionD: question.optionD ?? '',
-      optionE: question.optionE ?? '',
-      correctOption: question.correctOption ?? 'A',
-      skillIds: question.skillIds ?? [],
+function toDateTimeLocal(value) {
+  if (!value) return ''
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+  return localDate.toISOString().slice(0, 16)
+}
+
+function toInstant(value) {
+  if (!value) return null
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
+}
+
+function hydrateSkillMappings(part, skills) {
+  const groupedMappings = new Map()
+
+  ;(part.skillMappings ?? []).forEach((mapping) => {
+    const fromItemNumber = mapping.startItemNumber ?? mapping.fromItemNumber
+    const toItemNumber = mapping.endItemNumber ?? mapping.toItemNumber
+    const key = `${fromItemNumber}:${toItemNumber}`
+    const current = groupedMappings.get(key) ?? {
+      fromItemNumber,
+      toItemNumber,
+      rootTagId: '',
+      skillIds: [],
+    }
+
+    if (mapping.skillId) current.skillIds.push(Number(mapping.skillId))
+    if (Array.isArray(mapping.skillIds)) {
+      current.skillIds.push(...mapping.skillIds.map(Number))
+    }
+    groupedMappings.set(key, current)
+  })
+
+  const mappings = Array.from(groupedMappings.values())
+    .map((mapping) => ({
+      ...mapping,
+      skillIds: [...new Set(mapping.skillIds.map(Number))].sort((left, right) => left - right),
     }))
+    .sort(
+      (left, right) =>
+        Number(left.fromItemNumber) - Number(right.fromItemNumber) ||
+        Number(left.toItemNumber) - Number(right.toItemNumber),
+    )
+
+  const compactedMappings = mappings.reduce((ranges, mapping) => {
+    const previous = ranges[ranges.length - 1]
+    const hasSameSkills =
+      previous && previous.skillIds.join(':') === mapping.skillIds.join(':')
+    const isNextRange =
+      previous && Number(previous.toItemNumber) + 1 === Number(mapping.fromItemNumber)
+
+    if (hasSameSkills && isNextRange) {
+      ranges[ranges.length - 1] = {
+        ...previous,
+        toItemNumber: mapping.toItemNumber,
+      }
+      return ranges
+    }
+
+    ranges.push(mapping)
+    return ranges
+  }, [])
+
+  const hydratedMappings = compactedMappings.map((mapping) => {
+    const selectedSkill = skills.find(
+      (skill) => String(skill.skillId) === String(mapping.skillIds[0]),
+    )
+    return {
+      ...mapping,
+      rootTagId: selectedSkill?.rootTagId ? String(selectedSkill.rootTagId) : '',
+    }
+  })
+
+  return hydratedMappings.length
+    ? hydratedMappings
+    : [{ fromItemNumber: 1, toItemNumber: 1, rootTagId: '', skillIds: [] }]
+}
+
+function optionText(question, optionKey) {
+  return question.options?.find((option) => option.optionKey === optionKey)?.optionText ??
+    question[`option${optionKey}`] ??
+    ''
+}
+
+function hydrateEnumerationAnswers(question, maximumPoints) {
+  const acceptedAnswers = question.acceptedAnswers ?? []
+  const largestOrder = acceptedAnswers.reduce(
+    (largest, answer) => Math.max(largest, Number(answer.answerOrder) || 0),
+    0,
+  )
+  const expectedResponseCount = Math.max(
+    1,
+    Number(question.expectedResponseCount) || largestOrder || 1,
+  )
+
+  return {
+    expectedResponseCount,
+    enumerationAnswers: Array.from({ length: expectedResponseCount }, (_, index) => {
+      const answerOrder = index + 1
+      const variants = acceptedAnswers
+        .filter((answer) => Number(answer.answerOrder) === answerOrder)
+        .sort((left, right) => Number(right.primary) - Number(left.primary))
+      const primary = variants.find((answer) => answer.primary) ?? variants[0]
+
+      return {
+        answerOrder,
+        primaryAnswer: primary?.acceptedText ?? '',
+        variants: variants
+          .filter((answer) => answer !== primary)
+          .map((answer) => ({ acceptedText: answer.acceptedText ?? '' })),
+        points: primary?.points ?? (expectedResponseCount === 1 ? maximumPoints : 0),
+      }
+    }),
+  }
+}
+
+function hydrateQuestion(question, questionIndex, partType, pointsPerItem, rubrics) {
+  const itemNumber = question.itemNumber ?? questionIndex + 1
+  const questionText = question.questionText ?? ''
+
+  if (partType === 'multiple_choice') {
+    return {
+      itemNumber,
+      questionText,
+      optionA: optionText(question, 'A'),
+      optionB: optionText(question, 'B'),
+      optionC: optionText(question, 'C'),
+      optionD: optionText(question, 'D'),
+      correctOption:
+        question.answerKey?.correctOptionKey ?? question.correctOptionKey ?? question.correctOption ?? '',
+      answerExplanation:
+        question.answerKey?.answerExplanation ?? question.answerExplanation ?? '',
+    }
+  }
+
+  if (partType === 'true_false') {
+    return {
+      itemNumber,
+      questionText,
+      correctOption:
+        question.answerKey?.correctOptionKey ?? question.correctOptionKey ?? question.correctOption ?? '',
+    }
+  }
+
+  if (partType === 'identification') {
+    const acceptedAnswers = [...(question.acceptedAnswers ?? [])]
+      .sort((left, right) => Number(right.primary) - Number(left.primary))
+
+    return {
+      itemNumber,
+      questionText,
+      acceptedAnswers: acceptedAnswers.length
+        ? acceptedAnswers.map((answer) => ({ acceptedText: answer.acceptedText ?? '' }))
+        : [{ acceptedText: '' }],
+      matchingMode:
+        acceptedAnswers[0]?.matchingMode ?? question.matchingMode ?? 'normalized',
+      caseSensitive: acceptedAnswers.length
+        ? acceptedAnswers.every((answer) => Boolean(answer.caseSensitive))
+        : false,
+      maximumResponseLength: question.maximumResponseLength ?? '',
+      responseRegionSize: question.responseRegionSize === 'none'
+        ? ''
+        : question.responseRegionSize ?? '',
+    }
+  }
+
+  if (partType === 'enumeration') {
+    const enumeration = hydrateEnumerationAnswers(question, pointsPerItem)
+    const acceptedAnswers = question.acceptedAnswers ?? []
+    return {
+      itemNumber,
+      questionText,
+      ...enumeration,
+      matchingMode:
+        acceptedAnswers[0]?.matchingMode ?? question.matchingMode ?? 'normalized',
+      caseSensitive: acceptedAnswers.length
+        ? acceptedAnswers.every((answer) => Boolean(answer.caseSensitive))
+        : false,
+      maximumResponseLength: question.maximumResponseLength ?? '',
+      responseRegionSize: question.responseRegionSize === 'none'
+        ? ''
+        : question.responseRegionSize ?? '',
+    }
+  }
+
+  if (partType === 'essay') {
+    const savedRubric = question.rubric ?? null
+    const savedRubricId = savedRubric?.rubricId ?? question.rubricId ?? ''
+    const usesReusableRubric = Boolean(
+      savedRubricId && rubrics.some((rubric) => String(rubric.rubricId) === String(savedRubricId)),
+    )
+
+    return {
+      itemNumber,
+      questionText,
+      responseInstructions: question.responseInstructions ?? '',
+      maximumResponseLength: question.maximumResponseLength ?? '',
+      responseRegionSize: question.responseRegionSize === 'none'
+        ? ''
+        : question.responseRegionSize ?? '',
+      forcePageBreakBefore: Boolean(question.forcePageBreakBefore),
+      scoringMode: savedRubric ? 'rubric' : 'manual',
+      rubricSource: usesReusableRubric ? 'existing' : 'inline',
+      rubricId: usesReusableRubric ? String(savedRubricId) : '',
+      inlineRubric: {
+        rubricName: usesReusableRubric ? '' : savedRubric?.rubricName ?? '',
+        description: usesReusableRubric ? '' : savedRubric?.description ?? '',
+        criteria: !usesReusableRubric && savedRubric?.criteria?.length
+          ? savedRubric.criteria.map((criterion, criterionIndex) => ({
+              criterionOrder: criterionIndex + 1,
+              criterionName: criterion.criterionName ?? '',
+              criterionDescription: criterion.criterionDescription ?? '',
+              maximumPoints: criterion.maximumPoints ?? 1,
+              required: criterion.required !== false,
+            }))
+          : [emptyRubricCriterion(1, pointsPerItem)],
+      },
+    }
+  }
+
+  return emptyQuestion(itemNumber, partType, pointsPerItem, questionText)
+}
+
+function hydrateAssessment(assessment, referenceData = {}) {
+  const skills = referenceData.skills ?? []
+  const rubrics = referenceData.rubrics ?? []
+  const parts = (assessment.parts ?? []).map((part, index) => {
+    const partType = part.questionTypeCode ?? part.partType ?? ''
+    const pointsPerItem = Math.max(1, Math.round(Number(part.pointsPerItem ?? 1)))
+    const questions = (part.questions ?? []).map((question, questionIndex) => (
+      hydrateQuestion(question, questionIndex, partType, pointsPerItem, rubrics)
+    ))
 
     return {
       partOrder: part.partOrder ?? index + 1,
-      partName: part.partName ?? `Part ${index + 1}`,
+      partName: part.partName ?? '',
       partType,
-      pointsPerItem: Number(part.pointsPerItem ?? 1),
-      questions: questions.length ? questions : [emptyQuestion(1, partType)],
-      skillMappings: groupQuestionSkills(questions),
+      pointsPerItem,
+      questions: questions.length ? questions : [emptyQuestion(1, partType, pointsPerItem)],
+      skillMappings: hydrateSkillMappings(part, skills),
       expanded: true,
     }
   })
@@ -129,15 +430,189 @@ function hydrateAssessment(assessment) {
     termPeriodId: String(assessment.termPeriodId ?? ''),
     testName: assessment.testName ?? '',
     testType: assessment.testType ?? 'quiz',
-    testDate: assessment.testDate ?? '',
+    openAt: toDateTimeLocal(assessment.openAt ?? assessment.testDate),
+    closeAt: toDateTimeLocal(assessment.closeAt),
+    allowLateCapture: Boolean(assessment.allowLateCapture),
+    confirmOutsideClassSchedule: Boolean(
+      assessment.confirmOutsideClassSchedule ?? assessment.outsideClassScheduleConfirmed,
+    ),
+    outsideClassScheduleReason: assessment.outsideClassScheduleReason ?? '',
     instructions: assessment.instructions ?? '',
     parts: parts.length ? parts : [emptyPart(1)],
   }
 }
 
-function validateDraft(form) {
-  if (!form.classAssignmentId || !form.termPeriodId || !form.testName.trim() || !form.testDate) {
-    return 'Complete the class assignment, term period, assessment name, and test date.'
+function optionalPositiveIntegerIsValid(value) {
+  return value === '' || value === null || value === undefined ||
+    (Number.isInteger(Number(value)) && Number(value) > 0)
+}
+
+function normalizedAnswer(value, matchingMode, caseSensitive) {
+  const trimmed = value.trim()
+  const comparable = matchingMode === 'normalized'
+    ? trimmed.replace(/\s+/g, ' ')
+    : trimmed
+  return caseSensitive ? comparable : comparable.toLocaleLowerCase()
+}
+
+function duplicateAnswerExists(values, matchingMode, caseSensitive) {
+  const normalized = values.map((value) => normalizedAnswer(value, matchingMode, caseSensitive))
+  return new Set(normalized).size !== normalized.length
+}
+
+function questionValidationError(part, question, itemNumber, rubrics = []) {
+  const prefix = `${part.partName.trim() || `Part ${part.partOrder}`}, item ${itemNumber}`
+
+  if (!question.questionText.trim()) {
+    return `${prefix}: enter the question text.`
+  }
+
+  if (part.partType === 'multiple_choice') {
+    const requiredOptions = [question.optionA, question.optionB, question.optionC, question.optionD]
+    if (requiredOptions.some((value) => !value?.trim())) {
+      return `${prefix}: options A to D are required.`
+    }
+    if (!['A', 'B', 'C', 'D'].includes(question.correctOption)) {
+      return `${prefix}: select a correct answer from A to D.`
+    }
+    return ''
+  }
+
+  if (part.partType === 'true_false') {
+    return ['A', 'B'].includes(question.correctOption)
+      ? ''
+      : `${prefix}: select True or False.`
+  }
+
+  if (part.partType === 'identification') {
+    const answers = (question.acceptedAnswers ?? []).map((answer) => answer.acceptedText?.trim() ?? '')
+    if (!answers.length || answers.some((answer) => !answer)) {
+      return `${prefix}: enter at least one complete accepted answer.`
+    }
+    if (!['exact', 'normalized'].includes(question.matchingMode)) {
+      return `${prefix}: select an accepted-answer matching mode.`
+    }
+    if (duplicateAnswerExists(answers, question.matchingMode, question.caseSensitive)) {
+      return `${prefix}: accepted answer variants must be unique.`
+    }
+    if (!optionalPositiveIntegerIsValid(question.maximumResponseLength)) {
+      return `${prefix}: response length must be a whole number greater than zero.`
+    }
+    return ''
+  }
+
+  if (part.partType === 'enumeration') {
+    const expectedCount = Number(question.expectedResponseCount)
+    if (!Number.isInteger(expectedCount) || expectedCount < 1) {
+      return `${prefix}: expected answers must be a whole number greater than zero.`
+    }
+    if ((question.enumerationAnswers ?? []).length !== expectedCount) {
+      return `${prefix}: configure exactly ${expectedCount} ordered answers.`
+    }
+    if (!['exact', 'normalized'].includes(question.matchingMode)) {
+      return `${prefix}: select an accepted-answer matching mode.`
+    }
+    if (!optionalPositiveIntegerIsValid(question.maximumResponseLength)) {
+      return `${prefix}: response length must be a whole number greater than zero.`
+    }
+
+    let pointTotal = 0
+    for (const [answerIndex, answer] of question.enumerationAnswers.entries()) {
+      const values = [
+        answer.primaryAnswer?.trim() ?? '',
+        ...(answer.variants ?? []).map((variant) => variant.acceptedText?.trim() ?? ''),
+      ]
+      if (values.some((value) => !value)) {
+        return `${prefix}: answer ${answerIndex + 1} and all its variants must be complete.`
+      }
+      if (duplicateAnswerExists(values, question.matchingMode, question.caseSensitive)) {
+        return `${prefix}: variants for answer ${answerIndex + 1} must be unique.`
+      }
+      const points = Number(answer.points)
+      if (!Number.isFinite(points) || points < 0) {
+        return `${prefix}: answer ${answerIndex + 1} needs explicit non-negative points.`
+      }
+      pointTotal += points
+    }
+
+    if (Math.abs(pointTotal - Number(part.pointsPerItem)) > 0.000001) {
+      return `${prefix}: ordered-answer points must total ${part.pointsPerItem}.`
+    }
+    return ''
+  }
+
+  if (part.partType === 'essay') {
+    if (!question.responseInstructions?.trim()) {
+      return `${prefix}: enter response instructions.`
+    }
+    if (!optionalPositiveIntegerIsValid(question.maximumResponseLength) || !question.maximumResponseLength) {
+      return `${prefix}: enter a valid maximum response length.`
+    }
+    if (!question.responseRegionSize) {
+      return `${prefix}: select a written-region size.`
+    }
+    if (question.scoringMode === 'manual') return ''
+    if (question.scoringMode !== 'rubric') {
+      return `${prefix}: select manual or rubric scoring.`
+    }
+
+    if (question.rubricSource === 'existing') {
+      const selectedRubric = rubrics.find(
+        (rubric) => String(rubric.rubricId) === String(question.rubricId),
+      )
+      if (!selectedRubric) return `${prefix}: select an available rubric.`
+      if (Math.abs(Number(selectedRubric.totalPoints) - Number(part.pointsPerItem)) > 0.000001) {
+        return `${prefix}: the selected rubric must total ${part.pointsPerItem} points.`
+      }
+      return ''
+    }
+
+    if (question.rubricSource !== 'inline') {
+      return `${prefix}: select an existing or inline rubric.`
+    }
+    const inlineRubric = question.inlineRubric ?? {}
+    if (!inlineRubric.rubricName?.trim()) return `${prefix}: enter the inline rubric name.`
+    if (!inlineRubric.criteria?.length) return `${prefix}: add at least one rubric criterion.`
+
+    let criterionTotal = 0
+    for (const [criterionIndex, criterion] of inlineRubric.criteria.entries()) {
+      if (!criterion.criterionName?.trim() || !criterion.criterionDescription?.trim()) {
+        return `${prefix}: complete rubric criterion ${criterionIndex + 1}.`
+      }
+      const points = Number(criterion.maximumPoints)
+      if (!Number.isFinite(points) || points <= 0) {
+        return `${prefix}: rubric criterion ${criterionIndex + 1} needs points greater than zero.`
+      }
+      criterionTotal += points
+    }
+
+    if (Math.abs(criterionTotal - Number(part.pointsPerItem)) > 0.000001) {
+      return `${prefix}: rubric criterion points must total ${part.pointsPerItem}.`
+    }
+    return ''
+  }
+
+  return `${prefix}: select a supported question type.`
+}
+
+function validateDraft(form, rubrics = []) {
+  if (!form.classAssignmentId || !form.termPeriodId) {
+    return 'Assessment class or active term context is unavailable. Return to the class and try again.'
+  }
+
+  if (!form.testName.trim()) {
+    return 'Enter the assessment name.'
+  }
+
+  if (form.openAt && form.closeAt && new Date(form.closeAt) <= new Date(form.openAt)) {
+    return 'Assessment closing time must be later than its opening time.'
+  }
+
+  if (
+    form.confirmOutsideClassSchedule &&
+    form.outsideClassScheduleReason.trim().length < 5
+  ) {
+    return 'Enter at least five characters explaining the outside-timetable schedule.'
   }
 
   if (!form.parts.length) return 'Add at least one assessment part.'
@@ -150,8 +625,12 @@ function validateDraft(form) {
       return `Complete ${partName} and add at least one question.`
     }
 
-    if (!Number.isFinite(pointsPerItem) || pointsPerItem < 0.01) {
-      return `${partName}: points per item must be greater than zero.`
+    if (!SUPPORTED_QUESTION_TYPE_CODES.has(part.partType)) {
+      return `${partName}: select a question type.`
+    }
+
+    if (!Number.isInteger(pointsPerItem) || pointsPerItem < 1) {
+      return `${partName}: points per item must be a whole number greater than zero.`
     }
 
     const coveredItems = new Set()
@@ -172,30 +651,121 @@ function validateDraft(form) {
 
     for (const [questionIndex, question] of part.questions.entries()) {
       const itemNumber = questionIndex + 1
-
-      if (!question.questionText.trim()) {
-        return `${partName}, item ${itemNumber}: enter the question text.`
-      }
-
-      if (part.partType === 'true_false') {
-        if (!['A', 'B'].includes(question.correctOption)) {
-          return `${partName}, item ${itemNumber}: True/False must use A for True or B for False.`
-        }
-        continue
-      }
-
-      const requiredOptions = [question.optionA, question.optionB, question.optionC, question.optionD]
-      if (requiredOptions.some((value) => !value.trim())) {
-        return `${partName}, item ${itemNumber}: options A to D are required.`
-      }
-
-      if (question.correctOption === 'E' && !question.optionE.trim()) {
-        return `${partName}, item ${itemNumber}: enter option E or select another correct answer.`
-      }
+      const questionError = questionValidationError(part, question, itemNumber, rubrics)
+      if (questionError) return questionError
     }
   }
 
   return ''
+}
+
+function optionalPositiveNumber(value) {
+  return value === '' || value === null || value === undefined
+    ? null
+    : Number(value)
+}
+
+function toQuestionPayload(part, question, questionIndex) {
+  const maximumPoints = Number(part.pointsPerItem)
+  const common = {
+    itemNumber: questionIndex + 1,
+    questionText: question.questionText.trim(),
+    maximumPoints,
+  }
+
+  if (part.partType === 'multiple_choice') {
+    return {
+      ...common,
+      options: ['A', 'B', 'C', 'D'].map((optionKey, optionIndex) => ({
+        optionKey,
+        optionText: question[`option${optionKey}`].trim(),
+        optionOrder: optionIndex + 1,
+      })),
+      correctOptionKey: question.correctOption,
+      answerExplanation: question.answerExplanation?.trim() || null,
+    }
+  }
+
+  if (part.partType === 'true_false') {
+    return {
+      ...common,
+      correctOptionKey: question.correctOption,
+    }
+  }
+
+  if (part.partType === 'identification') {
+    return {
+      ...common,
+      ...(optionalPositiveNumber(question.maximumResponseLength)
+        ? { maximumResponseLength: Number(question.maximumResponseLength) }
+        : {}),
+      expectedResponseCount: 1,
+      ...(question.responseRegionSize ? { responseRegionSize: question.responseRegionSize } : {}),
+      matchingMode: question.matchingMode,
+      acceptedAnswers: question.acceptedAnswers.map((answer, answerIndex) => ({
+        acceptedText: answer.acceptedText.trim(),
+        points: maximumPoints,
+        primary: answerIndex === 0,
+        caseSensitive: Boolean(question.caseSensitive),
+      })),
+    }
+  }
+
+  if (part.partType === 'enumeration') {
+    return {
+      ...common,
+      ...(optionalPositiveNumber(question.maximumResponseLength)
+        ? { maximumResponseLength: Number(question.maximumResponseLength) }
+        : {}),
+      expectedResponseCount: Number(question.expectedResponseCount),
+      ...(question.responseRegionSize ? { responseRegionSize: question.responseRegionSize } : {}),
+      matchingMode: question.matchingMode,
+      acceptedAnswers: question.enumerationAnswers.flatMap((answer, answerIndex) => (
+        [
+          { acceptedText: answer.primaryAnswer },
+          ...answer.variants,
+        ].map((variant, variantIndex) => ({
+          answerOrder: answerIndex + 1,
+          acceptedText: variant.acceptedText?.trim() ?? variant.acceptedText ?? '',
+          points: Number(answer.points),
+          primary: variantIndex === 0,
+          caseSensitive: Boolean(question.caseSensitive),
+        }))
+      )),
+    }
+  }
+
+  if (part.partType === 'essay') {
+    const essay = {
+      ...common,
+      responseInstructions: question.responseInstructions.trim(),
+      maximumResponseLength: Number(question.maximumResponseLength),
+      responseRegionSize: question.responseRegionSize,
+      forcePageBreakBefore: Boolean(question.forcePageBreakBefore),
+    }
+
+    if (question.scoringMode !== 'rubric') return essay
+    if (question.rubricSource === 'existing') {
+      return { ...essay, rubricId: Number(question.rubricId) }
+    }
+
+    return {
+      ...essay,
+      rubric: {
+        rubricName: question.inlineRubric.rubricName.trim(),
+        description: question.inlineRubric.description.trim() || null,
+        criteria: question.inlineRubric.criteria.map((criterion, criterionIndex) => ({
+          criterionOrder: criterionIndex + 1,
+          criterionName: criterion.criterionName.trim(),
+          criterionDescription: criterion.criterionDescription.trim(),
+          maximumPoints: Number(criterion.maximumPoints),
+          required: criterion.required !== false,
+        })),
+      },
+    }
+  }
+
+  return common
 }
 
 function toPayload(form) {
@@ -204,27 +774,27 @@ function toPayload(form) {
     termPeriodId: Number(form.termPeriodId),
     testName: form.testName.trim(),
     testType: form.testType,
-    testDate: form.testDate,
     instructions: form.instructions.trim() || null,
+    openAt: toInstant(form.openAt),
+    closeAt: toInstant(form.closeAt),
+    allowLateCapture: Boolean(form.allowLateCapture),
+    confirmOutsideClassSchedule: Boolean(form.confirmOutsideClassSchedule),
+    outsideClassScheduleReason: form.confirmOutsideClassSchedule
+      ? form.outsideClassScheduleReason.trim()
+      : null,
     parts: form.parts.map((part, partIndex) => ({
       partOrder: partIndex + 1,
       partName: part.partName.trim(),
-      partType: part.partType,
+      questionTypeCode: part.partType,
+      numberOfItems: part.questions.length,
       pointsPerItem: Number(part.pointsPerItem),
-      questions: part.questions.map((question, questionIndex) => ({
-        itemNumber: questionIndex + 1,
-        questionText: question.questionText.trim(),
-        optionA: part.partType === 'true_false' ? 'True' : question.optionA.trim(),
-        optionB: part.partType === 'true_false' ? 'False' : question.optionB.trim(),
-        optionC: part.partType === 'true_false' ? null : question.optionC.trim(),
-        optionD: part.partType === 'true_false' ? null : question.optionD.trim(),
-        optionE: part.partType === 'true_false' ? null : question.optionE.trim() || null,
-        correctOption: question.correctOption,
-        skillIds: [],
-      })),
+      partInstructions: null,
+      questions: part.questions.map((question, questionIndex) => (
+        toQuestionPayload(part, question, questionIndex)
+      )),
       skillMappings: part.skillMappings.map((mapping) => ({
-        fromItemNumber: Number(mapping.fromItemNumber),
-        toItemNumber: Number(mapping.toItemNumber),
+        startItemNumber: Number(mapping.fromItemNumber),
+        endItemNumber: Number(mapping.toItemNumber),
         skillIds: mapping.skillIds.map(Number),
       })),
     })),
@@ -237,54 +807,723 @@ function assignmentLabel(assignment = {}) {
   return [className || 'Assigned class', details].filter(Boolean).join(' | ')
 }
 
-function skillLabel(skill = {}) {
-  return [skill.competencyName || 'Unnamed skill', skill.rootTagName].filter(Boolean).join(' | ')
+function ToggleField({ id, checked, onChange, label }) {
+  return (
+    <label
+      className="flex min-h-10 cursor-pointer items-center gap-3 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm"
+      htmlFor={id}
+    >
+      <input
+        id={id}
+        type="checkbox"
+        className="size-4 accent-primary"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      <span>{label}</span>
+    </label>
+  )
 }
 
-function adjustMappingsAfterQuestionRemoval(mappings, removedItemNumber, nextQuestionCount) {
-  const adjusted = mappings.flatMap((mapping) => {
-    let start = Number(mapping.fromItemNumber)
-    let end = Number(mapping.toItemNumber)
+function WrittenResponseSettings({
+  idPrefix,
+  question,
+  onChange,
+  responseRegionSizes,
+  required = false,
+}) {
+  const regionSizes = responseRegionSizes.filter((size) => size !== 'none')
 
-    if (removedItemNumber < start) {
-      start -= 1
-      end -= 1
-    } else if (removedItemNumber <= end) {
-      if (start === end) return []
-      end -= 1
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      <div className="space-y-2">
+        <Label htmlFor={`${idPrefix}-response-length`}>
+          Maximum response length{required ? '' : ' (optional)'}
+        </Label>
+        <Input
+          id={`${idPrefix}-response-length`}
+          type="number"
+          min="1"
+          step="1"
+          value={question.maximumResponseLength}
+          placeholder={required ? 'Enter maximum characters' : 'No character limit'}
+          onChange={(event) => onChange({ maximumResponseLength: event.target.value })}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor={`${idPrefix}-response-region`}>
+          Written-region size{required ? '' : ' (optional)'}
+        </Label>
+        <Select
+          value={question.responseRegionSize || '__default'}
+          onValueChange={(value) => onChange({
+            responseRegionSize: value === '__default' ? '' : value,
+          })}
+        >
+          <SelectTrigger id={`${idPrefix}-response-region`}>
+            <SelectValue placeholder="Select written-region size" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__default">
+              {required ? 'Select written-region size' : 'Use backend default'}
+            </SelectItem>
+            {regionSizes.map((size) => (
+              <SelectItem key={size} value={size}>{formatCodeLabel(size)}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+  )
+}
+
+function QuestionTypeEditor({
+  part,
+  partIndex,
+  question,
+  questionIndex,
+  onChange,
+  rubrics,
+  responseRegionSizes,
+}) {
+  const idPrefix = `part-${partIndex}-question-${questionIndex}`
+
+  if (part.partType === 'multiple_choice') {
+    return (
+      <>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {['A', 'B', 'C', 'D'].map((option) => (
+            <div className="space-y-2" key={option}>
+              <Label htmlFor={`${idPrefix}-option-${option}`}>Option {option}</Label>
+              <Input
+                id={`${idPrefix}-option-${option}`}
+                value={question[`option${option}`]}
+                maxLength="2000"
+                onChange={(event) => onChange({ [`option${option}`]: event.target.value })}
+              />
+            </div>
+          ))}
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-[minmax(180px,0.7fr)_minmax(0,1.3fr)]">
+          <div className="space-y-2">
+            <Label htmlFor={`${idPrefix}-answer`}>Correct option</Label>
+            <Select
+              value={question.correctOption || undefined}
+              onValueChange={(value) => onChange({ correctOption: value })}
+            >
+              <SelectTrigger id={`${idPrefix}-answer`}>
+                <SelectValue placeholder="Select correct option" />
+              </SelectTrigger>
+              <SelectContent>
+                {['A', 'B', 'C', 'D'].map((option) => (
+                  <SelectItem key={option} value={option}>{option}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor={`${idPrefix}-explanation`}>Answer explanation (optional)</Label>
+            <textarea
+              id={`${idPrefix}-explanation`}
+              className={TEXTAREA_CLASS}
+              rows="2"
+              value={question.answerExplanation}
+              placeholder="Explain why the selected option is correct"
+              onChange={(event) => onChange({ answerExplanation: event.target.value })}
+            />
+          </div>
+        </div>
+      </>
+    )
+  }
+
+  if (part.partType === 'true_false') {
+    return (
+      <div className="max-w-sm space-y-2">
+        <Label htmlFor={`${idPrefix}-answer`}>Correct answer</Label>
+        <Select
+          value={question.correctOption || undefined}
+          onValueChange={(value) => onChange({ correctOption: value })}
+        >
+          <SelectTrigger id={`${idPrefix}-answer`}>
+            <SelectValue placeholder="Select True or False" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="A">True</SelectItem>
+            <SelectItem value="B">False</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="m-0 text-xs text-muted-foreground">
+          SMART sends A for True and B for False. Options are generated by the backend.
+        </p>
+      </div>
+    )
+  }
+
+  if (part.partType === 'identification') {
+    return (
+      <div className="space-y-5">
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <Label>Accepted-answer variants</Label>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onChange({
+                acceptedAnswers: [
+                  ...question.acceptedAnswers,
+                  { acceptedText: '' },
+                ],
+              })}
+            >
+              <CirclePlus />
+              Add variant
+            </Button>
+          </div>
+
+          <div className="divide-y divide-border rounded-md border border-border">
+            {question.acceptedAnswers.map((answer, answerIndex) => (
+              <div
+                className="grid gap-3 p-3 sm:grid-cols-[minmax(0,1fr)_auto]"
+                key={`${idPrefix}-accepted-${answerIndex}`}
+              >
+                <div className="space-y-2">
+                  <Label htmlFor={`${idPrefix}-accepted-${answerIndex}`}>
+                    {answerIndex === 0 ? 'Primary accepted answer' : `Accepted variant ${answerIndex}`}
+                  </Label>
+                  <Input
+                    id={`${idPrefix}-accepted-${answerIndex}`}
+                    value={answer.acceptedText}
+                    maxLength="500"
+                    onChange={(event) => onChange({
+                      acceptedAnswers: question.acceptedAnswers.map((item, index) => (
+                        index === answerIndex
+                          ? { ...item, acceptedText: event.target.value }
+                          : item
+                      )),
+                    })}
+                  />
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="self-end"
+                  disabled={question.acceptedAnswers.length === 1}
+                  title="Remove accepted variant"
+                  aria-label={`Remove accepted variant ${answerIndex + 1}`}
+                  onClick={() => onChange({
+                    acceptedAnswers: question.acceptedAnswers.filter((_, index) => index !== answerIndex),
+                  })}
+                >
+                  <Trash2 className="text-destructive" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor={`${idPrefix}-matching`}>Matching mode</Label>
+            <Select
+              value={question.matchingMode}
+              onValueChange={(value) => onChange({ matchingMode: value })}
+            >
+              <SelectTrigger id={`${idPrefix}-matching`}>
+                <SelectValue placeholder="Select matching mode" />
+              </SelectTrigger>
+              <SelectContent>
+                {MATCHING_MODES.map(([value, label]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Letter case</Label>
+            <ToggleField
+              id={`${idPrefix}-case-sensitive`}
+              checked={question.caseSensitive}
+              onChange={(caseSensitive) => onChange({ caseSensitive })}
+              label="Case-sensitive answers"
+            />
+          </div>
+        </div>
+
+        <WrittenResponseSettings
+          idPrefix={idPrefix}
+          question={question}
+          onChange={onChange}
+          responseRegionSizes={responseRegionSizes}
+        />
+      </div>
+    )
+  }
+
+  if (part.partType === 'enumeration') {
+    const resizeExpectedAnswers = (value) => {
+      if (value === '') {
+        onChange({ expectedResponseCount: '', enumerationAnswers: [] })
+        return
+      }
+
+      const expectedResponseCount = Number(value)
+      if (!Number.isInteger(expectedResponseCount) || expectedResponseCount < 1) return
+
+      const maximumPoints = Number(part.pointsPerItem) || 0
+      const basePoints = Math.floor(maximumPoints / expectedResponseCount)
+      const extraPoints = maximumPoints - basePoints * expectedResponseCount
+      const enumerationAnswers = Array.from({ length: expectedResponseCount }, (_, index) => {
+        const existing = question.enumerationAnswers[index]
+        return {
+          ...(existing ?? emptyEnumerationAnswer(index + 1)),
+          answerOrder: index + 1,
+          points: basePoints + (index < extraPoints ? 1 : 0),
+        }
+      })
+
+      onChange({ expectedResponseCount, enumerationAnswers })
     }
 
-    if (start > nextQuestionCount) return []
+    return (
+      <div className="space-y-5">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="space-y-2">
+            <Label htmlFor={`${idPrefix}-expected-count`}>Expected number of answers</Label>
+            <Input
+              id={`${idPrefix}-expected-count`}
+              type="number"
+              min="1"
+              step="1"
+              value={question.expectedResponseCount}
+              onChange={(event) => resizeExpectedAnswers(event.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={`${idPrefix}-matching`}>Matching mode</Label>
+            <Select
+              value={question.matchingMode}
+              onValueChange={(value) => onChange({ matchingMode: value })}
+            >
+              <SelectTrigger id={`${idPrefix}-matching`}>
+                <SelectValue placeholder="Select matching mode" />
+              </SelectTrigger>
+              <SelectContent>
+                {MATCHING_MODES.map(([value, label]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Letter case</Label>
+            <ToggleField
+              id={`${idPrefix}-case-sensitive`}
+              checked={question.caseSensitive}
+              onChange={(caseSensitive) => onChange({ caseSensitive })}
+              label="Case-sensitive answers"
+            />
+          </div>
+        </div>
 
-    return [{
-      ...mapping,
-      fromItemNumber: Math.max(1, start),
-      toItemNumber: Math.min(end, nextQuestionCount),
-    }]
-  })
+        <div className="space-y-3">
+          <Label>Ordered accepted answers</Label>
+          <div className="divide-y divide-border rounded-md border border-border">
+            {question.enumerationAnswers.map((answer, answerIndex) => (
+              <div className="space-y-3 p-4" key={`${idPrefix}-order-${answerIndex}`}>
+                <div className="grid gap-3 md:grid-cols-[auto_minmax(0,1fr)_minmax(130px,0.3fr)] md:items-end">
+                  <Badge className="mb-1" variant="secondary">Answer {answerIndex + 1}</Badge>
+                  <div className="space-y-2">
+                    <Label htmlFor={`${idPrefix}-order-${answerIndex}-primary`}>Primary answer</Label>
+                    <Input
+                      id={`${idPrefix}-order-${answerIndex}-primary`}
+                      value={answer.primaryAnswer}
+                      maxLength="500"
+                      onChange={(event) => onChange({
+                        enumerationAnswers: question.enumerationAnswers.map((item, index) => (
+                          index === answerIndex
+                            ? { ...item, primaryAnswer: event.target.value }
+                            : item
+                        )),
+                      })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor={`${idPrefix}-order-${answerIndex}-points`}>Points</Label>
+                    <Input
+                      id={`${idPrefix}-order-${answerIndex}-points`}
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={answer.points}
+                      onChange={(event) => onChange({
+                        enumerationAnswers: question.enumerationAnswers.map((item, index) => (
+                          index === answerIndex
+                            ? { ...item, points: event.target.value }
+                            : item
+                        )),
+                      })}
+                    />
+                  </div>
+                </div>
 
-  return adjusted.length
-    ? adjusted
-    : [{ fromItemNumber: 1, toItemNumber: Math.max(1, nextQuestionCount), skillIds: [] }]
+                {answer.variants.map((variant, variantIndex) => (
+                  <div
+                    className="grid gap-3 pl-0 sm:grid-cols-[minmax(0,1fr)_auto] md:pl-20"
+                    key={`${idPrefix}-order-${answerIndex}-variant-${variantIndex}`}
+                  >
+                    <div className="space-y-2">
+                      <Label htmlFor={`${idPrefix}-order-${answerIndex}-variant-${variantIndex}`}>
+                        Accepted variant {variantIndex + 1}
+                      </Label>
+                      <Input
+                        id={`${idPrefix}-order-${answerIndex}-variant-${variantIndex}`}
+                        value={variant.acceptedText}
+                        maxLength="500"
+                        onChange={(event) => onChange({
+                          enumerationAnswers: question.enumerationAnswers.map((item, index) => (
+                            index === answerIndex
+                              ? {
+                                  ...item,
+                                  variants: item.variants.map((itemVariant, indexOfVariant) => (
+                                    indexOfVariant === variantIndex
+                                      ? { ...itemVariant, acceptedText: event.target.value }
+                                      : itemVariant
+                                  )),
+                                }
+                              : item
+                          )),
+                        })}
+                      />
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      className="self-end"
+                      title="Remove accepted variant"
+                      aria-label={`Remove answer ${answerIndex + 1} variant ${variantIndex + 1}`}
+                      onClick={() => onChange({
+                        enumerationAnswers: question.enumerationAnswers.map((item, index) => (
+                          index === answerIndex
+                            ? {
+                                ...item,
+                                variants: item.variants.filter((_, indexOfVariant) => (
+                                  indexOfVariant !== variantIndex
+                                )),
+                              }
+                            : item
+                        )),
+                      })}
+                    >
+                      <Trash2 className="text-destructive" />
+                    </Button>
+                  </div>
+                ))}
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="md:ml-20"
+                  onClick={() => onChange({
+                    enumerationAnswers: question.enumerationAnswers.map((item, index) => (
+                      index === answerIndex
+                        ? { ...item, variants: [...item.variants, { acceptedText: '' }] }
+                        : item
+                    )),
+                  })}
+                >
+                  <CirclePlus />
+                  Add variant
+                </Button>
+              </div>
+            ))}
+          </div>
+          <p className="m-0 text-xs text-muted-foreground">
+            Points across the primary ordered answers must total {part.pointsPerItem}.
+          </p>
+        </div>
+
+        <WrittenResponseSettings
+          idPrefix={idPrefix}
+          question={question}
+          onChange={onChange}
+          responseRegionSizes={responseRegionSizes}
+        />
+      </div>
+    )
+  }
+
+  if (part.partType === 'essay') {
+    const inlineRubric = question.inlineRubric
+    const updateInlineRubric = (updates) => onChange({
+      inlineRubric: { ...inlineRubric, ...updates },
+    })
+
+    return (
+      <div className="space-y-5">
+        <div className="space-y-2">
+          <Label htmlFor={`${idPrefix}-response-instructions`}>Response instructions</Label>
+          <textarea
+            id={`${idPrefix}-response-instructions`}
+            className={TEXTAREA_CLASS}
+            rows="2"
+            value={question.responseInstructions}
+            placeholder="Tell students how to structure the response"
+            onChange={(event) => onChange({ responseInstructions: event.target.value })}
+          />
+        </div>
+
+        <WrittenResponseSettings
+          idPrefix={idPrefix}
+          question={question}
+          onChange={onChange}
+          responseRegionSizes={responseRegionSizes}
+          required
+        />
+
+        <ToggleField
+          id={`${idPrefix}-page-break`}
+          checked={question.forcePageBreakBefore}
+          onChange={(forcePageBreakBefore) => onChange({ forcePageBreakBefore })}
+          label="Start this essay on a new page"
+        />
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor={`${idPrefix}-scoring-mode`}>Scoring</Label>
+            <Select
+              value={question.scoringMode}
+              onValueChange={(scoringMode) => onChange({
+                scoringMode,
+                rubricSource: scoringMode === 'rubric'
+                  ? rubrics.length ? 'existing' : 'inline'
+                  : question.rubricSource,
+                rubricId: scoringMode === 'rubric' ? question.rubricId : '',
+              })}
+            >
+              <SelectTrigger id={`${idPrefix}-scoring-mode`}>
+                <SelectValue placeholder="Select scoring method" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="manual">Manual scoring</SelectItem>
+                <SelectItem value="rubric">Rubric scoring</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {question.scoringMode === 'rubric' ? (
+            <div className="space-y-2">
+              <Label htmlFor={`${idPrefix}-rubric-source`}>Rubric source</Label>
+              <Select
+                value={question.rubricSource}
+                onValueChange={(rubricSource) => onChange({ rubricSource, rubricId: '' })}
+              >
+                <SelectTrigger id={`${idPrefix}-rubric-source`}>
+                  <SelectValue placeholder="Select rubric source" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="existing">Use existing rubric</SelectItem>
+                  <SelectItem value="inline">Create inline rubric</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
+        </div>
+
+        {question.scoringMode === 'rubric' && question.rubricSource === 'existing' ? (
+          <div className="space-y-2">
+            <Label htmlFor={`${idPrefix}-rubric`}>Rubric</Label>
+            <Select
+              value={question.rubricId || undefined}
+              disabled={!rubrics.length}
+              onValueChange={(rubricId) => onChange({ rubricId })}
+            >
+              <SelectTrigger id={`${idPrefix}-rubric`}>
+                <SelectValue placeholder={rubrics.length ? 'Select rubric' : 'No reusable rubrics available'} />
+              </SelectTrigger>
+              <SelectContent>
+                {rubrics.map((rubric) => (
+                  <SelectItem key={rubric.rubricId} value={String(rubric.rubricId)}>
+                    {rubric.rubricName} ({rubric.totalPoints} points)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
+
+        {question.scoringMode === 'rubric' && question.rubricSource === 'inline' ? (
+          <div className="space-y-4 border-t border-border pt-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor={`${idPrefix}-rubric-name`}>Rubric name</Label>
+                <Input
+                  id={`${idPrefix}-rubric-name`}
+                  value={inlineRubric.rubricName}
+                  maxLength="120"
+                  onChange={(event) => updateInlineRubric({ rubricName: event.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor={`${idPrefix}-rubric-description`}>Rubric description (optional)</Label>
+                <Input
+                  id={`${idPrefix}-rubric-description`}
+                  value={inlineRubric.description}
+                  onChange={(event) => updateInlineRubric({ description: event.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <Label>Rubric criteria</Label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => updateInlineRubric({
+                  criteria: [
+                    ...inlineRubric.criteria,
+                    emptyRubricCriterion(inlineRubric.criteria.length + 1),
+                  ],
+                })}
+              >
+                <CirclePlus />
+                Add criterion
+              </Button>
+            </div>
+
+            <div className="divide-y divide-border rounded-md border border-border">
+              {inlineRubric.criteria.map((criterion, criterionIndex) => (
+                <div className="space-y-3 p-4" key={`${idPrefix}-criterion-${criterionIndex}`}>
+                  <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_140px_auto] md:items-end">
+                    <div className="space-y-2">
+                      <Label htmlFor={`${idPrefix}-criterion-${criterionIndex}-name`}>
+                        Criterion {criterionIndex + 1}
+                      </Label>
+                      <Input
+                        id={`${idPrefix}-criterion-${criterionIndex}-name`}
+                        value={criterion.criterionName}
+                        maxLength="120"
+                        onChange={(event) => updateInlineRubric({
+                          criteria: inlineRubric.criteria.map((item, index) => (
+                            index === criterionIndex
+                              ? { ...item, criterionName: event.target.value }
+                              : item
+                          )),
+                        })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={`${idPrefix}-criterion-${criterionIndex}-points`}>Points</Label>
+                      <Input
+                        id={`${idPrefix}-criterion-${criterionIndex}-points`}
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={criterion.maximumPoints}
+                        onChange={(event) => updateInlineRubric({
+                          criteria: inlineRubric.criteria.map((item, index) => (
+                            index === criterionIndex
+                              ? { ...item, maximumPoints: event.target.value }
+                              : item
+                          )),
+                        })}
+                      />
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      disabled={inlineRubric.criteria.length === 1}
+                      title="Remove rubric criterion"
+                      aria-label={`Remove rubric criterion ${criterionIndex + 1}`}
+                      onClick={() => updateInlineRubric({
+                        criteria: inlineRubric.criteria
+                          .filter((_, index) => index !== criterionIndex)
+                          .map((item, index) => ({ ...item, criterionOrder: index + 1 })),
+                      })}
+                    >
+                      <Trash2 className="text-destructive" />
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor={`${idPrefix}-criterion-${criterionIndex}-description`}>
+                      Criterion description
+                    </Label>
+                    <textarea
+                      id={`${idPrefix}-criterion-${criterionIndex}-description`}
+                      className={TEXTAREA_CLASS}
+                      rows="2"
+                      value={criterion.criterionDescription}
+                      onChange={(event) => updateInlineRubric({
+                        criteria: inlineRubric.criteria.map((item, index) => (
+                          index === criterionIndex
+                            ? { ...item, criterionDescription: event.target.value }
+                            : item
+                        )),
+                      })}
+                    />
+                  </div>
+
+                  <ToggleField
+                    id={`${idPrefix}-criterion-${criterionIndex}-required`}
+                    checked={criterion.required !== false}
+                    onChange={(required) => updateInlineRubric({
+                      criteria: inlineRubric.criteria.map((item, index) => (
+                        index === criterionIndex ? { ...item, required } : item
+                      )),
+                    })}
+                    label="Required criterion"
+                  />
+                </div>
+              ))}
+            </div>
+            <p className="m-0 text-xs text-muted-foreground">
+              Criterion points must total {part.pointsPerItem}.
+            </p>
+          </div>
+        ) : null}
+      </div>
+    )
+  }
+
+  return null
 }
 
-function V2AssessmentEditorPage({ token, testId = null }) {
-  const isEditing = Boolean(testId)
+function V2AssessmentEditorPage({
+  token,
+  testId = null,
+  initialClassAssignmentId = null,
+  onNavigate,
+}) {
+  const [currentTestId, setCurrentTestId] = useState(testId)
+  const isEditing = Boolean(currentTestId)
   const [form, setForm] = useState({
     classAssignmentId: '',
     termPeriodId: '',
     testName: '',
     testType: 'quiz',
-    testDate: '',
+    openAt: '',
+    closeAt: '',
+    allowLateCapture: false,
+    confirmOutsideClassSchedule: false,
+    outsideClassScheduleReason: '',
     instructions: '',
     parts: [emptyPart(1)],
   })
   const [assignments, setAssignments] = useState([])
   const [terms, setTerms] = useState([])
   const [skills, setSkills] = useState([])
+  const [questionTypes, setQuestionTypes] = useState([])
+  const [rubrics, setRubrics] = useState([])
+  const [responseRegionSizes, setResponseRegionSizes] = useState([])
   const [loading, setLoading] = useState(true)
-  const [loadingReference, setLoadingReference] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [activating, setActivating] = useState(false)
+  const [assessmentStatus, setAssessmentStatus] = useState('draft')
+  const [savedPayloadSnapshot, setSavedPayloadSnapshot] = useState(null)
   const [message, setMessage] = useState(null)
 
   useEffect(() => {
@@ -294,15 +1533,16 @@ function V2AssessmentEditorPage({ token, testId = null }) {
       setLoading(true)
 
       try {
-        const baseReference = await getAssessmentReferenceDataV2({}, token)
+        const baseReference = await getAssessmentReferenceDataV3({}, token)
         if (!active) return
+        setCurrentTestId(testId)
         setAssignments(baseReference.classAssignments ?? [])
 
-        if (isEditing) {
-          const assessment = await getAssessmentV2(testId, token)
+        if (testId) {
+          const assessment = await getAssessmentV3(testId, token)
           const [termReference, skillReference] = await Promise.all([
-            getAssessmentReferenceDataV2({ classAssignmentId: assessment.classAssignmentId }, token),
-            getAssessmentReferenceDataV2({
+            getAssessmentReferenceDataV3({ classAssignmentId: assessment.classAssignmentId }, token),
+            getAssessmentReferenceDataV3({
               classAssignmentId: assessment.classAssignmentId,
               termPeriodId: assessment.termPeriodId,
             }, token),
@@ -310,8 +1550,48 @@ function V2AssessmentEditorPage({ token, testId = null }) {
           if (!active) return
           setTerms(termReference.termPeriods ?? [])
           setSkills(skillReference.skills ?? [])
-          setForm(hydrateAssessment(assessment))
+          setQuestionTypes(supportedQuestionTypes(skillReference))
+          setRubrics(skillReference.rubrics ?? [])
+          setResponseRegionSizes(skillReference.responseRegionSizes ?? [])
+          const hydratedForm = hydrateAssessment(assessment, skillReference)
+          setForm(hydratedForm)
+          setAssessmentStatus(String(assessment.status ?? 'draft').toLowerCase())
+          setSavedPayloadSnapshot(JSON.stringify(toPayload(hydratedForm)))
+          return
         }
+
+        const availableAssignments = baseReference.classAssignments ?? []
+        const classAssignmentId = String(
+          initialClassAssignmentId ?? availableAssignments[0]?.classAssignmentId ?? '',
+        )
+
+        if (!classAssignmentId) {
+          throw new Error('No active class assignment is available for assessment creation.')
+        }
+
+        const termReference = await getAssessmentReferenceDataV3({ classAssignmentId }, token)
+        const availableTerms = termReference.termPeriods ?? []
+        const activeTerm =
+          availableTerms.find((term) => String(term.status).toLowerCase() === 'active') ??
+          availableTerms[0]
+
+        if (!activeTerm?.termPeriodId) {
+          throw new Error('No active term period is available for this class assignment.')
+        }
+
+        const termPeriodId = String(activeTerm.termPeriodId)
+        const skillReference = await getAssessmentReferenceDataV3(
+          { classAssignmentId, termPeriodId },
+          token,
+        )
+        if (!active) return
+
+        setTerms(availableTerms)
+        setSkills(skillReference.skills ?? [])
+        setQuestionTypes(supportedQuestionTypes(skillReference))
+        setRubrics(skillReference.rubrics ?? [])
+        setResponseRegionSizes(skillReference.responseRegionSizes ?? [])
+        setForm((current) => ({ ...current, classAssignmentId, termPeriodId }))
       } catch (error) {
         if (active) setMessage({ type: 'error', text: error.message })
       } finally {
@@ -321,14 +1601,70 @@ function V2AssessmentEditorPage({ token, testId = null }) {
 
     initialize()
     return () => { active = false }
-  }, [isEditing, testId, token])
+  }, [initialClassAssignmentId, testId, token])
 
   const selectedAssignment = useMemo(
     () => assignments.find((assignment) => String(assignment.classAssignmentId) === form.classAssignmentId),
     [assignments, form.classAssignmentId],
   )
+  const selectedTerm = useMemo(
+    () => terms.find((term) => String(term.termPeriodId) === form.termPeriodId),
+    [form.termPeriodId, terms],
+  )
 
   const totalItems = form.parts.reduce((total, part) => total + part.questions.length, 0)
+  const maximumScore = form.parts.reduce(
+    (total, part) => total + part.questions.length * Number(part.pointsPerItem || 0),
+    0,
+  )
+  const completedItems = useMemo(
+    () =>
+      form.parts.reduce(
+        (total, part) =>
+          total +
+          part.questions.filter((question, questionIndex) => (
+            !questionValidationError(part, question, questionIndex + 1, rubrics)
+          )).length,
+        0,
+      ),
+    [form.parts, rubrics],
+  )
+  const rootCompetencies = useMemo(() => {
+    const roots = new Map()
+    skills.forEach((skill) => {
+      if (skill.rootTagId && !roots.has(String(skill.rootTagId))) {
+        roots.set(String(skill.rootTagId), {
+          rootTagId: skill.rootTagId,
+          rootTagName: skill.rootTagName || 'Root competency',
+        })
+      }
+    })
+    return Array.from(roots.values())
+  }, [skills])
+  const mappedItems = useMemo(() => {
+    let count = 0
+
+    form.parts.forEach((part) => {
+      const coveredItems = new Set()
+      part.skillMappings.forEach((mapping) => {
+        if (!mapping.skillIds.length) return
+        const start = Number(mapping.fromItemNumber)
+        const end = Number(mapping.toItemNumber)
+        for (let item = start; item <= end && item <= part.questions.length; item += 1) {
+          if (item >= 1) coveredItems.add(item)
+        }
+      })
+      count += coveredItems.size
+    })
+
+    return count
+  }, [form.parts])
+  const currentPayloadSnapshot = JSON.stringify(toPayload(form))
+  const hasUnsavedChanges = Boolean(
+    currentTestId && savedPayloadSnapshot !== currentPayloadSnapshot,
+  )
+  const isDraft = assessmentStatus === 'draft'
+  const reviewError = validateDraft(form, rubrics)
   const updateForm = (field, value) => setForm((current) => ({ ...current, [field]: value }))
   const updatePart = (partIndex, updates) => setForm((current) => ({
     ...current,
@@ -343,106 +1679,140 @@ function V2AssessmentEditorPage({ token, testId = null }) {
       )),
     } : part),
   }))
+  const updateQuestionFields = (partIndex, questionIndex, updates) => setForm((current) => ({
+    ...current,
+    parts: current.parts.map((part, index) => index === partIndex ? {
+      ...part,
+      questions: part.questions.map((question, itemIndex) => (
+        itemIndex === questionIndex ? { ...question, ...updates } : question
+      )),
+    } : part),
+  }))
 
-  const handleAssignmentChange = async (value) => {
-    setForm((current) => ({ ...current, classAssignmentId: value, termPeriodId: '' }))
-    setTerms([])
-    setSkills([])
+  const handleTermChange = async (termPeriodId) => {
+    updateForm('termPeriodId', termPeriodId)
     setMessage(null)
-    if (!value) return
 
-    setLoadingReference(true)
-    try {
-      const reference = await getAssessmentReferenceDataV2({ classAssignmentId: value }, token)
-      setTerms(reference.termPeriods ?? [])
-    } catch (error) {
-      setMessage({ type: 'error', text: error.message })
-    } finally {
-      setLoadingReference(false)
+    if (!termPeriodId || !form.classAssignmentId) {
+      setSkills([])
+      return
     }
-  }
 
-  const handleTermChange = async (value) => {
-    updateForm('termPeriodId', value)
-    setSkills([])
-    setMessage(null)
-    if (!value || !form.classAssignmentId) return
-
-    setLoadingReference(true)
     try {
-      const reference = await getAssessmentReferenceDataV2({
-        classAssignmentId: form.classAssignmentId,
-        termPeriodId: value,
-      }, token)
-      setSkills(reference.skills ?? [])
+      const referenceData = await getAssessmentReferenceDataV3(
+        { classAssignmentId: form.classAssignmentId, termPeriodId },
+        token,
+      )
+      setSkills(referenceData.skills ?? [])
+      setQuestionTypes(supportedQuestionTypes(referenceData))
+      setRubrics(referenceData.rubrics ?? [])
+      setResponseRegionSizes(referenceData.responseRegionSizes ?? [])
+      setForm((current) => ({
+        ...current,
+        termPeriodId,
+        parts: current.parts.map((part) => ({
+          ...part,
+          skillMappings: part.skillMappings.map((mapping) => ({
+            ...mapping,
+            rootTagId: '',
+            skillIds: [],
+          })),
+        })),
+      }))
     } catch (error) {
+      setSkills([])
+      setQuestionTypes([])
+      setRubrics([])
+      setResponseRegionSizes([])
       setMessage({ type: 'error', text: error.message })
-    } finally {
-      setLoadingReference(false)
     }
   }
 
   const handlePartTypeChange = (partIndex, partType) => {
+    const currentPart = form.parts[partIndex]
+    if (!currentPart || currentPart.partType === partType) return
+
+    if (
+      currentPart.partType &&
+      !window.confirm(
+        'Changing the question type will clear existing answers and type-specific settings in this part. Question text and competency mappings will remain. Continue?',
+      )
+    ) {
+      return
+    }
+
     setForm((current) => ({
       ...current,
       parts: current.parts.map((part, index) => index === partIndex ? {
         ...part,
         partType,
-        questions: part.questions.map((question) => ({
-          ...question,
-          optionA: partType === 'true_false' ? 'True' : '',
-          optionB: partType === 'true_false' ? 'False' : '',
-          optionC: '',
-          optionD: '',
-          optionE: '',
-          correctOption: 'A',
-        })),
+        questions: part.questions.map((question, questionIndex) => (
+          emptyQuestion(
+            questionIndex + 1,
+            partType,
+            Number(part.pointsPerItem) || 1,
+            question.questionText,
+          )
+        )),
       } : part),
+    }))
+    setMessage(null)
+  }
+
+  const handleItemCountChange = (partIndex, value) => {
+    const requestedCount = Number(value)
+    if (!Number.isInteger(requestedCount) || requestedCount < 1 || requestedCount > 200) return
+
+    setForm((current) => ({
+      ...current,
+      parts: current.parts.map((part, index) => {
+        if (index !== partIndex) return part
+
+        const previousCount = part.questions.length
+        const questions = Array.from({ length: requestedCount }, (_, questionIndex) => (
+          part.questions[questionIndex] ?? emptyQuestion(
+            questionIndex + 1,
+            part.partType,
+            Number(part.pointsPerItem) || 1,
+          )
+        )).map((question, questionIndex) => ({
+          ...question,
+          itemNumber: questionIndex + 1,
+        }))
+        let skillMappings = part.skillMappings
+          .filter((mapping) => Number(mapping.fromItemNumber) <= requestedCount)
+          .map((mapping) => ({
+            ...mapping,
+            toItemNumber: Math.min(Number(mapping.toItemNumber), requestedCount),
+          }))
+
+        if (
+          skillMappings.length === 1 &&
+          Number(skillMappings[0].fromItemNumber) === 1 &&
+          Number(skillMappings[0].toItemNumber) === previousCount
+        ) {
+          skillMappings = [{ ...skillMappings[0], toItemNumber: requestedCount }]
+        }
+
+        if (!skillMappings.length) {
+          skillMappings = [{
+            fromItemNumber: 1,
+            toItemNumber: requestedCount,
+            rootTagId: '',
+            skillIds: [],
+          }]
+        }
+
+        return { ...part, questions, skillMappings }
+      }),
     }))
   }
 
-  const addQuestion = (partIndex) => setForm((current) => ({
-    ...current,
-    parts: current.parts.map((part, index) => {
-      if (index !== partIndex) return part
-
-      const previousCount = part.questions.length
-      const nextCount = previousCount + 1
-      const skillMappings = part.skillMappings.length === 1
-        && Number(part.skillMappings[0].fromItemNumber) === 1
-        && Number(part.skillMappings[0].toItemNumber) === previousCount
-        ? [{ ...part.skillMappings[0], toItemNumber: nextCount }]
-        : part.skillMappings
-
-      return {
-        ...part,
-        questions: [...part.questions, emptyQuestion(nextCount, part.partType)],
-        skillMappings,
-      }
-    }),
-  }))
-
-  const removeQuestion = (partIndex, questionIndex) => setForm((current) => ({
-    ...current,
-    parts: current.parts.map((part, index) => {
-      if (index !== partIndex || part.questions.length === 1) return part
-
-      const removedItemNumber = questionIndex + 1
-      const questions = part.questions
-        .filter((_, itemIndex) => itemIndex !== questionIndex)
-        .map((question, itemIndex) => ({ ...question, itemNumber: itemIndex + 1 }))
-
-      return {
-        ...part,
-        questions,
-        skillMappings: adjustMappingsAfterQuestionRemoval(
-          part.skillMappings,
-          removedItemNumber,
-          questions.length,
-        ),
-      }
-    }),
-  }))
+  const handlePointsPerItemChange = (partIndex, value) => {
+    const pointsPerItem = Number(value)
+    if (!Number.isInteger(pointsPerItem) || pointsPerItem < 1) return
+    updatePart(partIndex, { pointsPerItem })
+  }
 
   const updateMapping = (partIndex, mappingIndex, field, value) => setForm((current) => ({
     ...current,
@@ -454,7 +1824,7 @@ function V2AssessmentEditorPage({ token, testId = null }) {
     } : part),
   }))
 
-  const toggleMappingSkill = (partIndex, mappingIndex, skillId) => {
+  const handleMappingRootChange = (partIndex, mappingIndex, rootTagId) => {
     setForm((current) => ({
       ...current,
       parts: current.parts.map((part, index) => {
@@ -464,18 +1834,24 @@ function V2AssessmentEditorPage({ token, testId = null }) {
           ...part,
           skillMappings: part.skillMappings.map((mapping, rangeIndex) => {
             if (rangeIndex !== mappingIndex) return mapping
-            const selected = new Set(mapping.skillIds.map(Number))
-            if (selected.has(skillId)) selected.delete(skillId)
-            else selected.add(skillId)
-            return { ...mapping, skillIds: [...selected] }
+            return { ...mapping, rootTagId, skillIds: [] }
           }),
         }
       }),
     }))
   }
 
-  const submit = async (activateAfterSave = false) => {
-    const validationError = validateDraft(form)
+  const handleMappingSkillChange = (partIndex, mappingIndex, skillId) => {
+    updateMapping(
+      partIndex,
+      mappingIndex,
+      'skillIds',
+      skillId ? [Number(skillId)] : [],
+    )
+  }
+
+  const submit = async () => {
+    const validationError = validateDraft(form, rubrics)
     if (validationError) {
       setMessage({ type: 'error', text: validationError })
       window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -488,23 +1864,51 @@ function V2AssessmentEditorPage({ token, testId = null }) {
     try {
       const payload = toPayload(form)
       const saved = isEditing
-        ? await updateAssessmentV2(testId, payload, token)
-        : await createAssessmentV2(payload, token)
-
-      if (activateAfterSave) {
-        await activateAssessmentV2(saved.testId, token)
-        navigateV2(V2_ROUTES.assessments)
-        return
-      }
-
+        ? await updateAssessmentV3(currentTestId, payload, token)
+        : await createAssessmentV3(payload, token)
+      setCurrentTestId(saved.testId)
+      setAssessmentStatus(String(saved.status ?? 'draft').toLowerCase())
+      setSavedPayloadSnapshot(JSON.stringify(payload))
       setMessage({ type: 'success', text: 'Draft assessment saved successfully.' })
-      if (!isEditing) navigateV2(`v2/assessments/${saved.testId}/edit`)
     } catch (error) {
       setMessage({ type: 'error', text: error.message })
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleActivate = async () => {
+    if (!currentTestId || !isDraft || hasUnsavedChanges) return
+
+    const validationError = validateDraft(form, rubrics)
+    if (validationError) {
+      setMessage({ type: 'error', text: validationError })
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
+
+    setActivating(true)
+    setMessage(null)
+
+    try {
+      const activated = await activateAssessmentV3(currentTestId, token)
+      setAssessmentStatus(String(activated.status ?? 'active').toLowerCase())
+      setMessage({ type: 'success', text: 'Assessment activated successfully.' })
+    } catch (error) {
+      setMessage({ type: 'error', text: error.message })
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } finally {
+      setActivating(false)
+    }
+  }
+
+  const handleBack = () => {
+    onNavigate?.('class-records', {
+      classId: selectedAssignment?.classId ?? null,
+      classAssignmentId: form.classAssignmentId || null,
+      initialTab: 'assessment',
+    })
   }
 
   if (loading) {
@@ -517,32 +1921,72 @@ function V2AssessmentEditorPage({ token, testId = null }) {
   }
 
   return (
-    <section className="smart-ui space-y-6 pb-24">
-      <Button variant="link" onClick={() => navigateV2(V2_ROUTES.assessments)}>
+    <section className="smart-ui teacher-assessment-editor-page space-y-6 pb-8">
+      <Button variant="link" onClick={handleBack}>
         <ArrowLeft />
         Back to assessments
       </Button>
 
-      <header className="flex flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-end lg:justify-between">
-        <div className="space-y-1">
+      <header className="assessment-editor-header border-b border-border pb-5">
+        <div className="assessment-editor-header-copy space-y-1">
           <p className="m-0 text-xs font-semibold uppercase text-primary">
-            {isEditing ? 'Edit assessment' : 'New assessment'}
+            {isEditing ? 'Assessment editor' : 'New assessment'}
           </p>
           <h1 className="m-0 text-2xl font-bold text-foreground">
             {isEditing ? form.testName || 'Edit assessment' : 'Create draft assessment'}
           </h1>
-          <p className="m-0 max-w-2xl text-sm text-muted-foreground">
-            Complete every part, answer key, and skill range before activating the assessment.
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant={assessmentStatus === 'active' ? 'default' : 'secondary'}>
+              {assessmentStatus === 'active' ? 'Active' : 'Draft'}
+            </Badge>
+            <p className="m-0 max-w-2xl text-sm text-muted-foreground">
+              Complete every part, answer key, and skill range before activation.
+            </p>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" disabled={saving} onClick={() => submit(false)}>
+        <div className="assessment-editor-header-actions">
+          <Button
+            variant="outline"
+            disabled={saving || activating || !isDraft}
+            onClick={submit}
+          >
             {saving ? <LoaderCircle className="animate-spin" /> : <Save />}
             Save draft
           </Button>
-          <Button disabled={saving} onClick={() => submit(true)}>
-            {saving ? <LoaderCircle className="animate-spin" /> : <CheckCircle2 />}
-            Save and activate
+          <Button
+            disabled={
+              saving ||
+              activating ||
+              !currentTestId ||
+              !isDraft ||
+              hasUnsavedChanges ||
+              Boolean(reviewError)
+            }
+            title={
+              hasUnsavedChanges
+                ? 'Save the latest draft changes before activation.'
+                : reviewError || ''
+            }
+            onClick={handleActivate}
+          >
+            {activating ? <LoaderCircle className="animate-spin" /> : <CheckCircle2 />}
+            Activate
+          </Button>
+          <Button
+            variant="outline"
+            disabled
+            title="Test Questionnaire printing is not available for this assessment yet."
+          >
+            <Printer />
+            Print Test Questionnaire
+          </Button>
+          <Button
+            variant="outline"
+            disabled
+            title="Bubble Answer Sheet printing is not available for this assessment yet."
+          >
+            <Printer />
+            Print Bubble Answer Sheet
           </Button>
         </div>
       </header>
@@ -558,59 +2002,16 @@ function V2AssessmentEditorPage({ token, testId = null }) {
         </div>
       )}
 
+      <div className="assessment-editor-layout">
+        <main className="assessment-editor-configuration">
+      <fieldset className="contents" disabled={!isDraft}>
       <Card>
         <CardHeader>
           <CardTitle>Assessment details</CardTitle>
-          <CardDescription>Select the assigned class and term that own this assessment.</CardDescription>
+          <CardDescription>Enter the main assessment information.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-5 border-t border-border pt-5 md:grid-cols-2 xl:grid-cols-4">
-          <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="assessment-assignment">Class assignment</Label>
-            <select
-              id="assessment-assignment"
-              className={SELECT_CLASS}
-              value={form.classAssignmentId}
-              disabled={isEditing || loadingReference}
-              onChange={(event) => handleAssignmentChange(event.target.value)}
-            >
-              <option value="">Select assigned class</option>
-              {assignments.map((assignment) => (
-                <option key={assignment.classAssignmentId} value={assignment.classAssignmentId}>
-                  {assignmentLabel(assignment)}
-                </option>
-              ))}
-            </select>
-          </div>
-
+        <CardContent className="grid gap-5 border-t border-border pt-5 md:grid-cols-[minmax(0,2fr)_minmax(0,1.25fr)_minmax(0,1fr)]">
           <div className="space-y-2">
-            <Label htmlFor="assessment-term">Term period</Label>
-            <select
-              id="assessment-term"
-              className={SELECT_CLASS}
-              value={form.termPeriodId}
-              disabled={!form.classAssignmentId || loadingReference}
-              onChange={(event) => handleTermChange(event.target.value)}
-            >
-              <option value="">Select term</option>
-              {terms.map((term) => (
-                <option key={term.termPeriodId} value={term.termPeriodId}>{term.termName}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="assessment-type">Assessment type</Label>
-            <select
-              id="assessment-type"
-              className={SELECT_CLASS}
-              value={form.testType}
-              onChange={(event) => updateForm('testType', event.target.value)}
-            >
-              {TEST_TYPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
-          </div>
-
-          <div className="space-y-2 md:col-span-2">
             <Label htmlFor="assessment-name">Assessment name</Label>
             <Input
               id="assessment-name"
@@ -622,16 +2023,107 @@ function V2AssessmentEditorPage({ token, testId = null }) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="assessment-date">Test date</Label>
-            <Input
-              id="assessment-date"
-              type="date"
-              value={form.testDate}
-              onChange={(event) => updateForm('testDate', event.target.value)}
+            <Label htmlFor="assessment-term">Term period</Label>
+            <Select
+              value={form.termPeriodId ? String(form.termPeriodId) : undefined}
+              onValueChange={handleTermChange}
+            >
+              <SelectTrigger id="assessment-term">
+                <SelectValue placeholder="Select term period" />
+              </SelectTrigger>
+              <SelectContent>
+                {terms.map((term) => (
+                  <SelectItem key={term.termPeriodId} value={String(term.termPeriodId)}>
+                    {term.termName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="assessment-type">Assessment type</Label>
+            <Select
+              value={form.testType}
+              onValueChange={(value) => updateForm('testType', value)}
+            >
+              <SelectTrigger id="assessment-type">
+                <SelectValue placeholder="Select assessment type" />
+              </SelectTrigger>
+              <SelectContent>
+                {TEST_TYPES.map(([value, label]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid gap-5 md:col-span-3 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="assessment-open-at">Opens (optional)</Label>
+              <DateTimePicker
+                id="assessment-open-at"
+                value={form.openAt}
+                onChange={(value) => updateForm('openAt', value)}
+                placeholder="Select opening date and time"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="assessment-close-at">Closes (optional)</Label>
+              <DateTimePicker
+                id="assessment-close-at"
+                value={form.closeAt}
+                minDateTime={form.openAt}
+                onChange={(value) => updateForm('closeAt', value)}
+                placeholder="Select closing date and time"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:col-span-3 md:grid-cols-2">
+            <ToggleField
+              id="assessment-allow-late-capture"
+              checked={form.allowLateCapture}
+              onChange={(checked) => updateForm('allowLateCapture', checked)}
+              label="Allow late result capture"
+            />
+            <ToggleField
+              id="assessment-confirm-outside-timetable"
+              checked={form.confirmOutsideClassSchedule}
+              onChange={(checked) => {
+                setForm((current) => ({
+                  ...current,
+                  confirmOutsideClassSchedule: checked,
+                  outsideClassScheduleReason: checked
+                    ? current.outsideClassScheduleReason
+                    : '',
+                }))
+              }}
+              label="Allow schedule outside class timetable"
             />
           </div>
 
-          <div className="space-y-2 md:col-span-2 xl:col-span-1">
+          {form.confirmOutsideClassSchedule ? (
+            <div className="space-y-2 md:col-span-3">
+              <Label htmlFor="assessment-outside-timetable-reason">
+                Outside-timetable reason
+              </Label>
+              <Input
+                id="assessment-outside-timetable-reason"
+                value={form.outsideClassScheduleReason}
+                minLength="5"
+                maxLength="255"
+                placeholder="Enter the reason for this schedule"
+                onChange={(event) => updateForm(
+                  'outsideClassScheduleReason',
+                  event.target.value,
+                )}
+              />
+            </div>
+          ) : null}
+
+          <div className="space-y-2 md:col-span-3">
             <Label htmlFor="assessment-instructions">Instructions (optional)</Label>
             <textarea
               id="assessment-instructions"
@@ -642,21 +2134,14 @@ function V2AssessmentEditorPage({ token, testId = null }) {
               onChange={(event) => updateForm('instructions', event.target.value)}
             />
           </div>
-
-          {selectedAssignment && (
-            <div className="rounded-md border border-border bg-muted px-4 py-3 md:col-span-2 xl:col-span-4">
-              <span className="text-xs font-semibold uppercase text-muted-foreground">Assessment ownership</span>
-              <strong className="mt-1 block text-sm text-foreground">{assignmentLabel(selectedAssignment)}</strong>
-            </div>
-          )}
         </CardContent>
       </Card>
 
       <div className="flex flex-col gap-3 border-b border-border pb-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1">
           <p className="m-0 text-xs font-semibold uppercase text-primary">Assessment content</p>
-          <h2 className="m-0 text-xl font-semibold text-foreground">Test parts and questions</h2>
-          <p className="m-0 text-sm text-muted-foreground">Each item must have an answer key and a skill mapping.</p>
+          <h2 className="m-0 text-xl font-semibold text-foreground">Configure test parts</h2>
+          <p className="m-0 text-sm text-muted-foreground">Set the part name, item count, and score per item.</p>
         </div>
         <Button
           variant="outline"
@@ -666,7 +2151,7 @@ function V2AssessmentEditorPage({ token, testId = null }) {
           }))}
         >
           <CopyPlus />
-          Add another part
+          Add test part
         </Button>
       </div>
 
@@ -675,11 +2160,11 @@ function V2AssessmentEditorPage({ token, testId = null }) {
           <Card key={`part-${partIndex + 1}`}>
             <CardHeader className="flex flex-row items-start justify-between gap-4">
               <div className="flex min-w-0 items-start gap-3">
-                <Badge className="mt-0.5" variant="secondary">Part {partIndex + 1}</Badge>
+                <Badge className="mt-0.5" variant="secondary">Order {partIndex + 1}</Badge>
                 <div className="min-w-0 space-y-1">
-                  <CardTitle className="truncate">{part.partName || `Part ${partIndex + 1}`}</CardTitle>
+                  <CardTitle className="truncate">{part.partName || 'Untitled test part'}</CardTitle>
                   <CardDescription>
-                    {part.questions.length} question{part.questions.length === 1 ? '' : 's'} · {part.pointsPerItem || 0} point(s) each
+                    {part.questions.length} item{part.questions.length === 1 ? '' : 's'} · {part.pointsPerItem || 0} point(s) each
                   </CardDescription>
                 </div>
               </div>
@@ -713,57 +2198,84 @@ function V2AssessmentEditorPage({ token, testId = null }) {
             </CardHeader>
 
             {part.expanded && (
-              <CardContent className="space-y-6 border-t border-border pt-5">
-                <div className="grid gap-4 md:grid-cols-3">
+              <CardContent className="assessment-part-content border-t border-border pt-5">
+                <div className="assessment-part-settings-grid">
                   <div className="space-y-2">
                     <Label htmlFor={`part-${partIndex}-name`}>Part name</Label>
                     <Input
                       id={`part-${partIndex}-name`}
                       value={part.partName}
                       maxLength="80"
+                      placeholder="Enter part name"
                       onChange={(event) => updatePart(partIndex, { partName: event.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor={`part-${partIndex}-type`}>Question type</Label>
-                    <select
-                      id={`part-${partIndex}-type`}
-                      className={SELECT_CLASS}
-                      value={part.partType}
-                      onChange={(event) => handlePartTypeChange(partIndex, event.target.value)}
+                    <Label htmlFor={`part-${partIndex}-type`}>Part type</Label>
+                    <Select
+                      value={part.partType || undefined}
+                      disabled={!questionTypes.length}
+                      onValueChange={(value) => handlePartTypeChange(partIndex, value)}
                     >
-                      <option value="multiple_choice">Multiple choice</option>
-                      <option value="true_false">True or false</option>
-                    </select>
+                      <SelectTrigger id={`part-${partIndex}-type`}>
+                        <SelectValue
+                          placeholder={questionTypes.length
+                            ? 'Select question type'
+                            : 'No question types available'}
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {questionTypes.map((questionType) => (
+                          <SelectItem key={questionType.code} value={questionType.code}>
+                            {questionType.name || formatCodeLabel(questionType.code)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor={`part-${partIndex}-items`}>Number of items</Label>
+                    <Input
+                      id={`part-${partIndex}-items`}
+                      type="number"
+                      min="1"
+                      max="200"
+                      step="1"
+                      value={part.questions.length}
+                      onChange={(event) => handleItemCountChange(partIndex, event.target.value)}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor={`part-${partIndex}-points`}>Points per item</Label>
                     <Input
                       id={`part-${partIndex}-points`}
                       type="number"
-                      min="0.01"
-                      step="0.01"
+                      min="1"
+                      step="1"
                       value={part.pointsPerItem}
-                      onChange={(event) => updatePart(partIndex, { pointsPerItem: event.target.value })}
+                      onChange={(event) => handlePointsPerItemChange(partIndex, event.target.value)}
                     />
                   </div>
                 </div>
 
-                <section className="space-y-3">
+                <section className="assessment-questions-section space-y-3">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <h3 className="m-0 text-base font-semibold text-foreground">Questions and answer keys</h3>
-                      <p className="m-0 mt-1 text-sm text-muted-foreground">Item numbers restart inside each part.</p>
+                      <h3 className="m-0 text-base font-semibold text-foreground">Encode questions</h3>
+                      <p className="m-0 mt-1 text-sm text-muted-foreground">
+                        Question fields are generated from the configured number of items.
+                      </p>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => addQuestion(partIndex)}>
-                      <CirclePlus />
-                      Add question
-                    </Button>
                   </div>
 
-                  <div className="divide-y divide-border rounded-md border border-border">
+                  {!part.partType ? (
+                    <div className="rounded-md border border-dashed border-border bg-muted/40 px-4 py-6 text-sm text-muted-foreground">
+                      Select a question type to configure this part's question fields.
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-border rounded-md border border-border">
                     {part.questions.map((question, questionIndex) => (
-                      <div className="grid gap-4 p-4 lg:grid-cols-[auto_1fr_auto]" key={`part-${partIndex}-question-${questionIndex}`}>
+                      <div className="grid gap-4 p-4 lg:grid-cols-[auto_1fr]" key={`part-${partIndex}-question-${questionIndex}`}>
                         <span className="flex size-8 items-center justify-center rounded-md bg-secondary text-sm font-semibold text-secondary-foreground">
                           {questionIndex + 1}
                         </span>
@@ -780,71 +2292,34 @@ function V2AssessmentEditorPage({ token, testId = null }) {
                             />
                           </div>
 
-                          {part.partType === 'multiple_choice' ? (
-                            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                              {['A', 'B', 'C', 'D', 'E'].map((option) => (
-                                <div className="space-y-2" key={option}>
-                                  <Label htmlFor={`part-${partIndex}-question-${questionIndex}-option-${option}`}>
-                                    Option {option}{option === 'E' ? ' (optional)' : ''}
-                                  </Label>
-                                  <Input
-                                    id={`part-${partIndex}-question-${questionIndex}-option-${option}`}
-                                    value={question[`option${option}`]}
-                                    maxLength="255"
-                                    onChange={(event) => updateQuestion(
-                                      partIndex,
-                                      questionIndex,
-                                      `option${option}`,
-                                      event.target.value,
-                                    )}
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
-                              Printed choices are True and False. The API stores <strong>A = True</strong> and <strong>B = False</strong>.
-                            </div>
-                          )}
-
-                          <div className="max-w-xs space-y-2">
-                            <Label htmlFor={`part-${partIndex}-question-${questionIndex}-answer`}>Correct answer</Label>
-                            <select
-                              id={`part-${partIndex}-question-${questionIndex}-answer`}
-                              className={SELECT_CLASS}
-                              value={question.correctOption}
-                              onChange={(event) => updateQuestion(partIndex, questionIndex, 'correctOption', event.target.value)}
-                            >
-                              {(part.partType === 'true_false' ? ['A', 'B'] : ['A', 'B', 'C', 'D', 'E']).map((option) => (
-                                <option key={option} value={option} disabled={option === 'E' && !question.optionE.trim()}>
-                                  {option}{part.partType === 'true_false' ? option === 'A' ? ' - True' : ' - False' : ''}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
+                          <QuestionTypeEditor
+                            part={part}
+                            partIndex={partIndex}
+                            question={question}
+                            questionIndex={questionIndex}
+                            rubrics={rubrics}
+                            responseRegionSizes={responseRegionSizes}
+                            onChange={(updates) => updateQuestionFields(
+                              partIndex,
+                              questionIndex,
+                              updates,
+                            )}
+                          />
                         </div>
 
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="self-start"
-                          title="Remove question"
-                          aria-label={`Remove question ${questionIndex + 1}`}
-                          disabled={part.questions.length === 1}
-                          onClick={() => removeQuestion(partIndex, questionIndex)}
-                        >
-                          <Trash2 className="text-destructive" />
-                        </Button>
                       </div>
                     ))}
-                  </div>
+                    </div>
+                  )}
                 </section>
 
-                <section className="space-y-3 border-t border-border pt-5">
+                <section className="assessment-mapping-section space-y-3 border-t border-border pt-5">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <h3 className="m-0 text-base font-semibold text-foreground">Range-based skill mapping</h3>
-                      <p className="m-0 mt-1 text-sm text-muted-foreground">Cover every item with at least one competency or skill.</p>
+                      <h3 className="m-0 text-base font-semibold text-foreground">Configure competency mapping</h3>
+                      <p className="m-0 mt-1 text-sm text-muted-foreground">
+                        Select one competency skill for each item range and cover every item.
+                      </p>
                     </div>
                     <Button
                       variant="outline"
@@ -852,18 +2327,43 @@ function V2AssessmentEditorPage({ token, testId = null }) {
                       onClick={() => updatePart(partIndex, {
                         skillMappings: [
                           ...part.skillMappings,
-                          { fromItemNumber: 1, toItemNumber: part.questions.length, skillIds: [] },
+                          {
+                            fromItemNumber: 1,
+                            toItemNumber: part.questions.length,
+                            rootTagId: '',
+                            skillIds: [],
+                          },
                         ],
                       })}
                     >
                       <CirclePlus />
-                      Add skill range
+                      Add range
                     </Button>
                   </div>
 
+                  {form.termPeriodId && !skills.length ? (
+                    <div
+                      className="rounded-md border border-dashed border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground"
+                      role="status"
+                    >
+                      No competencies are available for this class assignment and term period.
+                    </div>
+                  ) : null}
+
                   <div className="divide-y divide-border rounded-md border border-border">
-                    {part.skillMappings.map((mapping, mappingIndex) => (
-                      <div className="grid gap-4 p-4 lg:grid-cols-[9rem_9rem_1fr_auto]" key={`mapping-${partIndex}-${mappingIndex}`}>
+                    {part.skillMappings.map((mapping, mappingIndex) => {
+                      const mappedSkill = skills.find((skill) => (
+                        mapping.skillIds.map(Number).includes(Number(skill.skillId))
+                      ))
+                      const selectedRootTagId = String(
+                        mapping.rootTagId || mappedSkill?.rootTagId || '',
+                      )
+                      const availableSkills = skills.filter((skill) => (
+                        String(skill.rootTagId) === selectedRootTagId
+                      ))
+
+                      return (
+                      <div className="assessment-mapping-row" key={`mapping-${partIndex}-${mappingIndex}`}>
                         <div className="space-y-2">
                           <Label htmlFor={`part-${partIndex}-mapping-${mappingIndex}-from`}>From item</Label>
                           <Input
@@ -887,29 +2387,61 @@ function V2AssessmentEditorPage({ token, testId = null }) {
                           />
                         </div>
 
-                        <fieldset className="min-w-0 space-y-2" disabled={!form.termPeriodId || loadingReference}>
-                          <legend className="text-sm font-medium text-foreground">Competency / skills</legend>
-                          <div className="grid max-h-44 gap-2 overflow-y-auto rounded-md border border-input bg-background p-3 sm:grid-cols-2">
-                            {skills.map((skill) => (
-                              <label className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent" key={skill.skillId}>
-                                <input
-                                  type="checkbox"
-                                  className="mt-0.5 size-4 accent-primary"
-                                  checked={mapping.skillIds.map(Number).includes(Number(skill.skillId))}
-                                  onChange={() => toggleMappingSkill(partIndex, mappingIndex, Number(skill.skillId))}
-                                />
-                                <span>{skillLabel(skill)}</span>
-                              </label>
-                            ))}
-                            {!skills.length && (
-                              <span className="col-span-full text-sm text-muted-foreground">
-                                {form.termPeriodId
-                                  ? 'No skills are available for this class and term.'
-                                  : 'Select a class assignment and term period first.'}
-                              </span>
+                        <div className="min-w-0 space-y-2">
+                          <Label htmlFor={`part-${partIndex}-mapping-${mappingIndex}-root`}>
+                            Root competency
+                          </Label>
+                          <Select
+                            value={selectedRootTagId || undefined}
+                            disabled={!rootCompetencies.length}
+                            onValueChange={(value) => handleMappingRootChange(
+                              partIndex,
+                              mappingIndex,
+                              value,
                             )}
-                          </div>
-                        </fieldset>
+                          >
+                            <SelectTrigger id={`part-${partIndex}-mapping-${mappingIndex}-root`}>
+                              <SelectValue placeholder="Select root competency" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {rootCompetencies.map((root) => (
+                                <SelectItem key={root.rootTagId} value={String(root.rootTagId)}>
+                                  {root.rootTagName}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="min-w-0 space-y-2">
+                          <Label htmlFor={`part-${partIndex}-mapping-${mappingIndex}-skill`}>
+                            Specific competency / skill
+                          </Label>
+                          <Select
+                            value={mapping.skillIds[0] ? String(mapping.skillIds[0]) : undefined}
+                            disabled={!selectedRootTagId || !availableSkills.length}
+                            onValueChange={(value) => handleMappingSkillChange(
+                              partIndex,
+                              mappingIndex,
+                              value,
+                            )}
+                          >
+                            <SelectTrigger id={`part-${partIndex}-mapping-${mappingIndex}-skill`}>
+                              <SelectValue
+                                placeholder={availableSkills.length
+                                  ? 'Select competency or skill'
+                                  : 'No skills available'}
+                              />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableSkills.map((skill) => (
+                                <SelectItem key={skill.skillId} value={String(skill.skillId)}>
+                                  {skill.competencyName || 'Unnamed skill'}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
 
                         <Button
                           variant="ghost"
@@ -925,7 +2457,8 @@ function V2AssessmentEditorPage({ token, testId = null }) {
                           <Trash2 className="text-destructive" />
                         </Button>
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </section>
               </CardContent>
@@ -933,22 +2466,62 @@ function V2AssessmentEditorPage({ token, testId = null }) {
           </Card>
         ))}
       </div>
+      </fieldset>
+        </main>
 
-      <div className="sticky bottom-4 z-20 flex flex-col gap-3 rounded-lg border border-border bg-background/95 p-3 shadow-md backdrop-blur sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Badge variant="outline">{form.parts.length} part{form.parts.length === 1 ? '' : 's'}</Badge>
-          <span>{totalItems} item{totalItems === 1 ? '' : 's'}</span>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" disabled={saving} onClick={() => submit(false)}>
-            {saving ? <LoaderCircle className="animate-spin" /> : <Save />}
-            Save draft
-          </Button>
-          <Button disabled={saving} onClick={() => submit(true)}>
-            {saving ? <LoaderCircle className="animate-spin" /> : <CheckCircle2 />}
-            Save and activate
-          </Button>
-        </div>
+        <aside className="assessment-editor-summary" aria-label="Assessment configuration summary">
+          <Card className="assessment-editor-summary-card">
+            <CardHeader>
+              <CardTitle>Configuration summary</CardTitle>
+              <CardDescription>Current assessment setup.</CardDescription>
+            </CardHeader>
+            <CardContent className="assessment-editor-summary-content">
+              <dl className="assessment-editor-summary-list">
+                <div>
+                  <dt>Status</dt>
+                  <dd>
+                    <Badge variant={assessmentStatus === 'active' ? 'default' : 'secondary'}>
+                      {assessmentStatus === 'active' ? 'Active' : 'Draft'}
+                    </Badge>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Class</dt>
+                  <dd>{selectedAssignment ? assignmentLabel(selectedAssignment) : 'Not selected'}</dd>
+                </div>
+                <div>
+                  <dt>Term</dt>
+                  <dd>{selectedTerm?.termName || 'Not selected'}</dd>
+                </div>
+                <div>
+                  <dt>Content</dt>
+                  <dd>
+                    {form.parts.length} part{form.parts.length === 1 ? '' : 's'} · {totalItems}{' '}
+                    item{totalItems === 1 ? '' : 's'}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Questions</dt>
+                  <dd>{completedItems} of {totalItems} complete</dd>
+                </div>
+                <div>
+                  <dt>Maximum score</dt>
+                  <dd>{maximumScore} point{maximumScore === 1 ? '' : 's'}</dd>
+                </div>
+                <div>
+                  <dt>Skill coverage</dt>
+                  <dd>{mappedItems} of {totalItems} items mapped</dd>
+                </div>
+              </dl>
+
+              {reviewError ? (
+                <p className="assessment-editor-summary-error" role="status">
+                  {reviewError}
+                </p>
+              ) : null}
+            </CardContent>
+          </Card>
+        </aside>
       </div>
     </section>
   )

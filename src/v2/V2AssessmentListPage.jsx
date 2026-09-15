@@ -281,7 +281,7 @@ function V2AssessmentListPage({ token }) {
                             onClick={() => navigateV2(`v2/assessments/${assessment.testId}/print-omr`)}
                           >
                             <Printer />
-                            Print OMR
+                            Print Bubble Answer Sheet
                           </Button>
                         )}
                         {status !== 'archived' && (

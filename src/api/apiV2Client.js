@@ -6,7 +6,13 @@ const API_BASE_URL = (
 ).replace(/\/$/, '')
 
 export const AUTH_EXPIRED_EVENT = 'smart:auth-expired'
-const PUBLIC_AUTH_PATHS = new Set(['/api/v2/auth/login'])
+const PUBLIC_AUTH_PATHS = new Set([
+  '/api/v2/auth/login',
+  '/api/v2/auth/teacher-registration/reference-data',
+  '/api/v2/auth/register-teacher',
+  '/api/v2/auth/verify-teacher-email',
+  '/api/v2/auth/resend-teacher-verification',
+])
 const AUTH_STORAGE_KEY = 'assessment-auth-session'
 const LEGACY_TOKEN_STORAGE_KEY = 'assessment-token'
 
@@ -181,14 +187,22 @@ function buildQuery(params = {}) {
   return query ? `?${query}` : ''
 }
 
-async function requestV2(path, { token = '', headers = {}, ...options } = {}) {
+async function requestV2(
+  path,
+  {
+    token = '',
+    headers = {},
+    expectedStatus = null,
+    responseType = 'auto',
+    ...options
+  } = {},
+) {
   const requestHeaders = new Headers(headers)
   const explicitToken = normalizeAccessToken(token)
   const storedToken = readStoredAccessToken()
-  const requestToken =
-    path === '/api/v2/auth/me' && explicitToken
-      ? explicitToken
-      : storedToken || explicitToken
+  const requestToken = PUBLIC_AUTH_PATHS.has(path)
+    ? explicitToken
+    : explicitToken || storedToken
 
   if (!PUBLIC_AUTH_PATHS.has(path) && !requestToken) {
     const requestError = new Error('Your session is unavailable. Please sign in again.')
@@ -212,9 +226,14 @@ async function requestV2(path, { token = '', headers = {}, ...options } = {}) {
     headers: requestHeaders,
   })
   const contentType = response.headers.get('content-type') ?? ''
-  const payload = contentType.includes('application/json')
-    ? await response.json().catch(() => null)
-    : await response.text().catch(() => '')
+  const payload =
+    !response.ok && contentType.includes('application/json')
+      ? await response.json().catch(() => null)
+      : responseType === 'blob'
+        ? await response.blob()
+        : contentType.includes('application/json')
+          ? await response.json().catch(() => null)
+          : await response.text().catch(() => '')
 
   if (!response.ok) {
     const errorMessage = extractMessage(payload)
@@ -227,12 +246,24 @@ async function requestV2(path, { token = '', headers = {}, ...options } = {}) {
     const requestError = new Error(errorMessage)
     requestError.status = response.status
     requestError.code = errorCode
+    requestError.errors = payload?.errors ?? null
+    requestError.data = payload?.data ?? null
     requestError.isAuthenticationFailure = authenticationFailure
 
     if (authenticationFailure && !PUBLIC_AUTH_PATHS.has(path)) {
       dispatchAuthenticationFailure(requestToken)
     }
 
+    throw requestError
+  }
+
+  if (expectedStatus !== null && response.status !== expectedStatus) {
+    const requestError = new Error(`Expected HTTP ${expectedStatus} but received ${response.status}.`)
+    requestError.status = response.status
+    requestError.code = 'UNEXPECTED_RESPONSE_STATUS'
+    requestError.errors = null
+    requestError.data = payload?.data ?? null
+    requestError.isAuthenticationFailure = false
     throw requestError
   }
 
@@ -306,6 +337,80 @@ function normalizeV2Assessment(assessment = {}) {
     classAssignmentId: assessment.classAssignmentId ?? null,
     classId: assessment.classId ?? null,
     testStatus: assessment.status ?? '',
+    parts: Array.isArray(assessment.parts)
+      ? assessment.parts.map((part) => ({
+          ...part,
+          id: part.testPartId ?? null,
+          label: part.partName ?? '',
+          type: part.partType ?? '',
+        }))
+      : [],
+  }
+}
+
+function normalizeV2LmsRecord(record = {}) {
+  return {
+    ...record,
+    id: record.skillId ?? record.competencyId ?? null,
+    averageScore: record.masteryRate ?? null,
+    masteryLevel: record.status ?? '',
+  }
+}
+
+function normalizeV2TestPartResult(record = {}) {
+  return {
+    ...record,
+    id: record.studentId ?? null,
+    name: record.studentName ?? '',
+    score: record.partScore ?? 0,
+    performanceStatus: record.performance ?? '',
+  }
+}
+
+function normalizeV2SyncActivity(record = {}) {
+  const successfulResults = Number(record.successfulResults ?? 0)
+  const failedResults = Number(record.failedResults ?? 0)
+  const skippedResults = Number(record.skippedResults ?? 0)
+  const status = String(record.syncStatus ?? '').replaceAll('_', ' ')
+  const className = [record.gradeLevelName, record.sectionName].filter(Boolean).join(' - ')
+  const details = [record.testName, className, record.subjectName, status]
+    .filter(Boolean)
+    .join(' | ')
+
+  return {
+    ...record,
+    id: record.syncId ?? null,
+    timestamp: record.lastSyncedAt ?? record.completedAt ?? record.startedAt ?? '',
+    activity: `${successfulResults} result${successfulResults === 1 ? '' : 's'} synced`,
+    details:
+      details ||
+      `${failedResults} failed${skippedResults ? ` | ${skippedResults} skipped` : ''}`,
+  }
+}
+
+function normalizeV2Student(student = {}) {
+  const firstName = student.firstName ?? ''
+  const middleName = student.middleName ?? ''
+  const lastName = student.lastName ?? ''
+
+  return {
+    id: student.studentId ?? null,
+    studentId: student.studentId ?? null,
+    classListId: student.classListId ?? null,
+    classId: student.classId ?? null,
+    studentLrn: student.studentLrn ?? '',
+    firstName,
+    middleName,
+    lastName,
+    name: [firstName, middleName, lastName].filter(Boolean).join(' ') || 'Student',
+    gender: student.gender ?? '',
+    sectionId: student.sectionId ?? null,
+    section: student.sectionName ?? '',
+    sectionName: student.sectionName ?? '',
+    gradeLevel: student.gradeLevelName ?? '',
+    gradeLevelName: student.gradeLevelName ?? '',
+    academicYearId: student.academicYearId ?? null,
+    academicYear: student.academicYear ?? '',
   }
 }
 
@@ -334,6 +439,49 @@ export async function getCurrentUserV2(token) {
 
 export async function logoutV2(token) {
   return requestV2('/api/v2/auth/logout', { method: 'POST', token })
+}
+
+export async function getTeacherRegistrationReferenceDataV2() {
+  const payload = await requestV2('/api/v2/auth/teacher-registration/reference-data')
+  const data = extractData(payload) ?? {}
+
+  return {
+    genders: Array.isArray(data.genders) ? data.genders : [],
+    suffixes: Array.isArray(data.suffixes) ? data.suffixes : [],
+    majors: Array.isArray(data.majors) ? data.majors : [],
+    educationalAttainments: Array.isArray(data.educationalAttainments)
+      ? data.educationalAttainments
+      : [],
+    schools: Array.isArray(data.schools) ? data.schools : [],
+    verificationMethods: Array.isArray(data.verificationMethods)
+      ? data.verificationMethods
+      : [],
+  }
+}
+
+export async function registerTeacherV2(teacherPayload) {
+  const payload = await requestV2('/api/v2/auth/register-teacher', {
+    method: 'POST',
+    body: JSON.stringify(teacherPayload),
+    expectedStatus: 201,
+  })
+  return extractData(payload)
+}
+
+export async function verifyTeacherEmailV2(verificationPayload) {
+  const payload = await requestV2('/api/v2/auth/verify-teacher-email', {
+    method: 'POST',
+    body: JSON.stringify(verificationPayload),
+  })
+  return extractData(payload)
+}
+
+export async function resendTeacherVerificationV2(resendPayload) {
+  const payload = await requestV2('/api/v2/auth/resend-teacher-verification', {
+    method: 'POST',
+    body: JSON.stringify(resendPayload),
+  })
+  return extractData(payload)
 }
 
 export async function getTeacherAccountsV2(token, status = '') {
@@ -412,6 +560,41 @@ export async function createClassAssignmentV2(assignmentPayload, token) {
   return normalizeV2ClassAssignment(extractData(payload) ?? {})
 }
 
+export async function updateClassAssignmentV2(classAssignmentId, assignmentPayload, token) {
+  const payload = await requestV2(
+    `/api/v2/school-setup/class-assignments/${classAssignmentId}`,
+    {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify(assignmentPayload),
+    },
+  )
+  return normalizeV2ClassAssignment(extractData(payload) ?? {})
+}
+
+export async function deactivateClassAssignmentV2(classAssignmentId, token) {
+  const payload = await requestV2(
+    `/api/v2/school-setup/class-assignments/${classAssignmentId}/deactivate`,
+    {
+      method: 'PATCH',
+      token,
+    },
+  )
+  return extractData(payload)
+}
+
+export async function reactivateClassAssignmentV2(classAssignmentId, reason, token) {
+  const payload = await requestV2(
+    `/api/v2/school-setup/class-assignments/${classAssignmentId}/reactivate`,
+    {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify({ reason }),
+    },
+  )
+  return normalizeV2ClassAssignment(extractData(payload) ?? {})
+}
+
 export async function getAssessmentReferenceDataV2(filters, token) {
   const payload = await requestV2(
     `/api/v2/assessments/reference-data${buildQuery(filters)}`,
@@ -432,6 +615,71 @@ export async function getAssessmentsV2(token, classAssignmentId = '') {
 export async function getAssessmentV2(testId, token) {
   const payload = await requestV2(`/api/v2/assessments/${testId}`, { token })
   return normalizeV2Assessment(extractData(payload) ?? {})
+}
+
+export async function getLmsV2(testId, token) {
+  const payload = await requestV2(
+    `/api/v2/analytics/lms${buildQuery({ testId })}`,
+    { token },
+  )
+  const records = extractData(payload)
+  return Array.isArray(records) ? records.map(normalizeV2LmsRecord) : []
+}
+
+export async function getItemAnalysisV2(testId, token) {
+  const payload = await requestV2(
+    `/api/v2/analytics/item-analysis${buildQuery({ testId })}`,
+    { token },
+  )
+  const records = extractData(payload)
+  return Array.isArray(records) ? records : []
+}
+
+export async function getTestPartResultsV2(testId, testPartId, token) {
+  const payload = await requestV2(
+    `/api/v2/analytics/test-part-results${buildQuery({ testId, testPartId })}`,
+    { token },
+  )
+  const records = extractData(payload)
+  return Array.isArray(records) ? records.map(normalizeV2TestPartResult) : []
+}
+
+export async function getSyncActivityV2(filters = {}, token) {
+  const payload = await requestV2(
+    `/api/v2/analytics/sync-activity${buildQuery(filters)}`,
+    { token },
+  )
+  const records = extractData(payload)
+  return Array.isArray(records) ? records.map(normalizeV2SyncActivity) : []
+}
+
+export async function getSchoolAnalyticsV2(filters = {}, token) {
+  const payload = await requestV2(
+    `/api/v2/analytics/school-overview${buildQuery(filters)}`,
+    { token },
+  )
+  const data = extractData(payload) ?? {}
+
+  return {
+    totalAssessments: Number(data.totalAssessments ?? 0),
+    lms: Array.isArray(data.lms) ? data.lms.map(normalizeV2LmsRecord) : [],
+    gradeLevels: Array.isArray(data.gradeLevels)
+      ? data.gradeLevels.map((record) => ({
+          ...record,
+          id: record.gradeLevelId ?? null,
+          label: record.gradeLevelName ?? 'Grade level',
+          value: record.masteryRate ?? null,
+        }))
+      : [],
+    trends: Array.isArray(data.trends)
+      ? data.trends.map((record) => ({
+          ...record,
+          id: record.testId ?? null,
+          label: record.testName ?? 'Assessment',
+          value: record.masteryRate ?? null,
+        }))
+      : [],
+  }
 }
 
 export async function createAssessmentV2(assessmentPayload, token) {
@@ -468,11 +716,64 @@ export async function archiveAssessmentV2(testId, token) {
   return normalizeV2Assessment(extractData(payload) ?? {})
 }
 
-export async function getOmrSheetHtmlV2(testId, token, classListId = '') {
-  return requestV2(
-    `/api/v2/assessments/${testId}/omr-sheet${buildQuery({ classListId })}`,
+export function getBubbleAnswerSheetPdfV2(testId, token) {
+  return requestV2(`/api/v2/assessments/${testId}/omr-sheet`, {
+    token,
+    responseType: 'blob',
+    headers: {
+      Accept: 'application/pdf',
+    },
+  })
+}
+
+export function getTestQuestionnairePdfV2(testId, token) {
+  return requestV2(`/api/v2/assessments/${testId}/questionnaire`, {
+    token,
+    responseType: 'blob',
+    headers: {
+      Accept: 'application/pdf',
+    },
+  })
+}
+
+export async function getStudentsV2(token, academicYearId = '') {
+  const payload = await requestV2(
+    `/api/v2/import/students${buildQuery({ academicYearId })}`,
     { token },
   )
+  const records = extractData(payload)
+  return Array.isArray(records) ? records.map(normalizeV2Student) : []
+}
+
+export async function getTeacherClassStudentsV2(classId, token) {
+  const payload = await requestV2(`/api/v2/teacher/classes/${classId}/students`, { token })
+  const records = extractData(payload)
+  return Array.isArray(records) ? records.map(normalizeV2Student) : []
+}
+
+export async function previewSf1V2(file, token) {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const payload = await requestV2('/api/v2/import/sf1/preview', {
+    method: 'POST',
+    token,
+    body: formData,
+  })
+  return extractData(payload) ?? {}
+}
+
+export async function confirmSf1V2(file, { gradeLevelId }, token) {
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('gradeLevelId', String(gradeLevelId))
+
+  const payload = await requestV2('/api/v2/import/sf1/confirm', {
+    method: 'POST',
+    token,
+    body: formData,
+  })
+  return extractData(payload) ?? {}
 }
 
 export { API_BASE_URL as API_V2_BASE_URL }
