@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   BarChart3,
   CalendarDays,
@@ -5,7 +6,6 @@ import {
   GraduationCap,
   LayoutDashboard,
   LogOut,
-  Settings,
   UserRoundCheck,
   UsersRound,
 } from 'lucide-react'
@@ -17,7 +17,6 @@ const principalNavIcons = {
   students: UsersRound,
   'teacher-approval': UserRoundCheck,
   reports: BarChart3,
-  'principal-settings': Settings,
 }
 function AppLayout({
   user,
@@ -30,6 +29,7 @@ function AppLayout({
   isTeacherWorkspaceLayout = false,
   children,
 }) {
+  const [confirmingLogout, setConfirmingLogout] = useState(false)
   const displayName =
     user.name || [user.firstName, user.middleName, user.lastName].filter(Boolean).join(' ')
   const teacherInitials =
@@ -48,7 +48,6 @@ function AppLayout({
       .map((namePart) => namePart[0])
       .join('')
       .toUpperCase() || 'P'
-
   return (
     <div
       className={`dashboard-shell ${isTeacherWorkspaceLayout ? 'is-teacher-workspace' : ''} ${
@@ -90,7 +89,15 @@ function AppLayout({
           </nav>
 
           <div className="principal-sidebar-footer">
-            <div className="principal-sidebar-profile">
+            <button
+              type="button"
+              className={`principal-sidebar-profile ${
+                activePage === 'principal-settings' ? 'is-active' : ''
+              }`}
+              onClick={() => onNavigate('principal-settings')}
+              aria-label="Open account settings"
+              title="Settings"
+            >
               <span className="principal-avatar" aria-hidden="true">
                 {principalInitials}
               </span>
@@ -98,8 +105,12 @@ function AppLayout({
                 <strong>{displayName || user.email || 'Principal'}</strong>
                 <span>Principal</span>
               </div>
-            </div>
-            <button type="button" className="principal-logout-button" onClick={onLogout}>
+            </button>
+            <button
+              type="button"
+              className="principal-logout-button"
+              onClick={() => setConfirmingLogout(true)}
+            >
               <LogOut size={16} strokeWidth={2.2} aria-hidden="true" />
               <span>Log out</span>
             </button>
@@ -141,6 +152,12 @@ function AppLayout({
           </nav>
 
           <div className="teacher-workspace-profile">
+            {schoolYearLabel ? (
+              <div className="principal-school-year teacher-workspace-school-year">
+                <CalendarDays size={17} strokeWidth={2.2} aria-hidden="true" />
+                SY {schoolYearLabel}
+              </div>
+            ) : null}
             <NotificationCenter token={token} variant="teacher" />
             <button
               type="button"
@@ -162,15 +179,53 @@ function AppLayout({
           <header className="principal-topbar">
             <NotificationCenter token={token} variant="principal" />
             {schoolYearLabel ? (
-              <span className="principal-school-year">
+              <button
+                type="button"
+                className="principal-school-year"
+                onClick={() => onNavigate('principal-settings', { scrollTo: 'academic-calendar' })}
+                title="Open academic calendar settings"
+              >
                 <CalendarDays size={17} strokeWidth={2.2} aria-hidden="true" />
                 SY {schoolYearLabel}
-              </span>
+              </button>
             ) : null}
           </header>
         ) : null}
         {children}
       </main>
+      {isTeacherWorkspaceLayout ? (
+        <footer className="teacher-app-footer">© 2026 SMART Assessment System</footer>
+      ) : null}
+
+      {confirmingLogout ? (
+        <div className="principal-teacher-modal-backdrop" role="presentation">
+          <section
+            className="principal-teacher-confirmation"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="principalLogoutTitle"
+          >
+            <span className="principal-teacher-confirmation-icon is-reject" aria-hidden="true">
+              <LogOut size={23} strokeWidth={2.4} />
+            </span>
+            <div>
+              <h3 id="principalLogoutTitle">Are you sure you want to log out?</h3>
+            </div>
+            <div className="principal-teacher-confirmation-actions">
+              <button
+                type="button"
+                className="principal-teacher-cancel-button"
+                onClick={() => setConfirmingLogout(false)}
+              >
+                No
+              </button>
+              <button type="button" className="principal-reject-button" onClick={onLogout}>
+                Yes
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   )
 }

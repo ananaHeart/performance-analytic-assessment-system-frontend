@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ArrowLeft,
   CheckCircle2,
@@ -15,6 +15,9 @@ import {
 import {
   activateAssessmentV3,
   createAssessmentV3,
+  downloadAnswerSheetPdfV3,
+  generateAnswerSheetVersionV3,
+  getAnswerSheetEligibilityV3,
   getAssessmentReferenceDataV3,
   getAssessmentV3,
   updateAssessmentV3,
@@ -602,6 +605,10 @@ function validateDraft(form, rubrics = []) {
 
   if (!form.testName.trim()) {
     return 'Enter the assessment name.'
+  }
+
+  if (!form.openAt) {
+    return 'Set the opening date (when the assessment is conducted).'
   }
 
   if (form.openAt && form.closeAt && new Date(form.closeAt) <= new Date(form.openAt)) {
@@ -1500,6 +1507,12 @@ function V2AssessmentEditorPage({
 }) {
   const [currentTestId, setCurrentTestId] = useState(testId)
   const isEditing = Boolean(currentTestId)
+  const [currentTestAssignmentId, setCurrentTestAssignmentId] = useState(null)
+  const [answerSheetEligibility, setAnswerSheetEligibility] = useState(null)
+  const [answerSheetChecking, setAnswerSheetChecking] = useState(false)
+  const [answerSheetVersion, setAnswerSheetVersion] = useState(null)
+  const [answerSheetPreparing, setAnswerSheetPreparing] = useState(false)
+  const [answerSheetError, setAnswerSheetError] = useState('')
   const [form, setForm] = useState({
     classAssignmentId: '',
     termPeriodId: '',
@@ -1525,6 +1538,27 @@ function V2AssessmentEditorPage({
   const [assessmentStatus, setAssessmentStatus] = useState('draft')
   const [savedPayloadSnapshot, setSavedPayloadSnapshot] = useState(null)
   const [message, setMessage] = useState(null)
+  const [openAtError, setOpenAtError] = useState('')
+
+  const refreshAnswerSheetEligibility = useCallback(async (testAssignmentId) => {
+    if (!testAssignmentId) {
+      setAnswerSheetEligibility(null)
+      return
+    }
+
+    setAnswerSheetChecking(true)
+    try {
+      const result = await getAnswerSheetEligibilityV3(testAssignmentId, token)
+      setAnswerSheetEligibility(result)
+    } catch (eligibilityError) {
+      setAnswerSheetEligibility({
+        eligible: false,
+        blockers: [{ code: 'ELIGIBILITY_CHECK_FAILED', message: eligibilityError.message }],
+      })
+    } finally {
+      setAnswerSheetChecking(false)
+    }
+  }, [token])
 
   useEffect(() => {
     let active = true
@@ -1557,6 +1591,8 @@ function V2AssessmentEditorPage({
           setForm(hydratedForm)
           setAssessmentStatus(String(assessment.status ?? 'draft').toLowerCase())
           setSavedPayloadSnapshot(JSON.stringify(toPayload(hydratedForm)))
+          setCurrentTestAssignmentId(assessment.testAssignmentId ?? null)
+          refreshAnswerSheetEligibility(assessment.testAssignmentId ?? null)
           return
         }
 
@@ -1601,7 +1637,7 @@ function V2AssessmentEditorPage({
 
     initialize()
     return () => { active = false }
-  }, [initialClassAssignmentId, testId, token])
+  }, [initialClassAssignmentId, testId, token, refreshAnswerSheetEligibility])
 
   const selectedAssignment = useMemo(
     () => assignments.find((assignment) => String(assignment.classAssignmentId) === form.classAssignmentId),
@@ -1665,7 +1701,23 @@ function V2AssessmentEditorPage({
   )
   const isDraft = assessmentStatus === 'draft'
   const reviewError = validateDraft(form, rubrics)
-  const updateForm = (field, value) => setForm((current) => ({ ...current, [field]: value }))
+  const answerSheetBlockerMessage = answerSheetEligibility?.blockers
+    ?.map((blocker) => blocker.message)
+    .filter(Boolean)
+    .join(' ')
+  const bubbleAnswerSheetTitle = !currentTestAssignmentId
+    ? 'Save the assessment before printing the Bubble Answer Sheet.'
+    : answerSheetChecking
+      ? 'Checking Bubble Answer Sheet eligibility...'
+      : answerSheetEligibility && !answerSheetEligibility.eligible
+        ? answerSheetBlockerMessage || 'This assessment is not eligible for Bubble Answer Sheet generation yet.'
+        : answerSheetPreparing
+          ? 'Preparing the Bubble Answer Sheet PDF...'
+          : 'Generate and open the Bubble Answer Sheet PDF'
+  const updateForm = (field, value) => {
+    if (field === 'openAt') setOpenAtError('')
+    setForm((current) => ({ ...current, [field]: value }))
+  }
   const updatePart = (partIndex, updates) => setForm((current) => ({
     ...current,
     parts: current.parts.map((part, index) => index === partIndex ? { ...part, ...updates } : part),
@@ -1870,11 +1922,47 @@ function V2AssessmentEditorPage({
       setAssessmentStatus(String(saved.status ?? 'draft').toLowerCase())
       setSavedPayloadSnapshot(JSON.stringify(payload))
       setMessage({ type: 'success', text: 'Draft assessment saved successfully.' })
+      setCurrentTestAssignmentId(saved.testAssignmentId ?? null)
+      setAnswerSheetVersion(null)
+      refreshAnswerSheetEligibility(saved.testAssignmentId ?? null)
     } catch (error) {
       setMessage({ type: 'error', text: error.message })
+      setOpenAtError(error.errors?.openAt ?? '')
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handlePrintBubbleAnswerSheet = async () => {
+    if (!currentTestAssignmentId || !answerSheetEligibility?.eligible) return
+
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) {
+      setAnswerSheetError('Allow pop-ups to open the Bubble Answer Sheet.')
+      return
+    }
+
+    setAnswerSheetPreparing(true)
+    setAnswerSheetError('')
+
+    try {
+      let version = answerSheetVersion
+      if (!version) {
+        version = await generateAnswerSheetVersionV3(currentTestAssignmentId, 'A4', token)
+        setAnswerSheetVersion(version)
+      }
+
+      const pdfBlob = await downloadAnswerSheetPdfV3(version.answerSheetVersionId, token)
+      const pdfUrl = URL.createObjectURL(pdfBlob)
+      printWindow.opener = null
+      printWindow.location.replace(pdfUrl)
+      window.setTimeout(() => URL.revokeObjectURL(pdfUrl), 60_000)
+    } catch (printError) {
+      printWindow.close()
+      setAnswerSheetError(printError.message)
+    } finally {
+      setAnswerSheetPreparing(false)
     }
   }
 
@@ -1897,6 +1985,7 @@ function V2AssessmentEditorPage({
       setMessage({ type: 'success', text: 'Assessment activated successfully.' })
     } catch (error) {
       setMessage({ type: 'error', text: error.message })
+      setOpenAtError(error.errors?.openAt ?? '')
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } finally {
       setActivating(false)
@@ -1975,20 +2064,39 @@ function V2AssessmentEditorPage({
           <Button
             variant="outline"
             disabled
-            title="Test Questionnaire printing is not available for this assessment yet."
+            title="Test Questionnaire printing has no backend endpoint yet."
           >
             <Printer />
             Print Test Questionnaire
           </Button>
           <Button
             variant="outline"
-            disabled
-            title="Bubble Answer Sheet printing is not available for this assessment yet."
+            disabled={
+              !currentTestAssignmentId ||
+              answerSheetChecking ||
+              answerSheetPreparing ||
+              !answerSheetEligibility?.eligible
+            }
+            title={bubbleAnswerSheetTitle}
+            onClick={handlePrintBubbleAnswerSheet}
           >
-            <Printer />
+            {answerSheetChecking || answerSheetPreparing ? (
+              <LoaderCircle className="animate-spin" />
+            ) : (
+              <Printer />
+            )}
             Print Bubble Answer Sheet
           </Button>
         </div>
+        {answerSheetEligibility && !answerSheetEligibility.eligible ? (
+          <p className="col-span-full m-0 text-sm text-muted-foreground">
+            Bubble Answer Sheet not available yet:{' '}
+            {answerSheetBlockerMessage || 'this assessment does not meet the current template requirements.'}
+          </p>
+        ) : null}
+        {answerSheetError ? (
+          <p className="col-span-full m-0 text-sm text-destructive">{answerSheetError}</p>
+        ) : null}
       </header>
 
       {message && (
@@ -2060,13 +2168,14 @@ function V2AssessmentEditorPage({
 
           <div className="grid gap-5 md:col-span-3 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="assessment-open-at">Opens (optional)</Label>
+              <Label htmlFor="assessment-open-at">Opens</Label>
               <DateTimePicker
                 id="assessment-open-at"
                 value={form.openAt}
                 onChange={(value) => updateForm('openAt', value)}
                 placeholder="Select opening date and time"
               />
+              {openAtError ? <p className="m-0 text-sm text-destructive">{openAtError}</p> : null}
             </div>
 
             <div className="space-y-2">

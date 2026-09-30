@@ -16,7 +16,7 @@ import TeacherApprovalPage from './pages/TeacherApprovalPage'
 import {
   V3_AUTH_EXPIRED_EVENT,
   getCurrentUserV3,
-  getSchoolSetupReferenceDataV3,
+  getReportReferenceDataV3,
   logoutV3,
   normalizeAccessToken,
 } from './api/apiV3Client'
@@ -39,7 +39,6 @@ const NAV_ITEMS_BY_ROLE = {
     { key: 'students', label: 'Students' },
     { key: 'teacher-approval', label: 'Teachers' },
     { key: 'reports', label: 'Reports' },
-    { key: 'principal-settings', label: 'Settings' },
   ],
   teacher: [
     { key: 'teacher-dashboard', label: 'Dashboard' },
@@ -49,9 +48,12 @@ const NAV_ITEMS_BY_ROLE = {
 }
 
 const ALLOWED_PAGES_BY_ROLE = {
-  principal: NAV_ITEMS_BY_ROLE.principal
-    .filter((item) => !item.disabled)
-    .map((item) => item.key),
+  principal: [
+    ...NAV_ITEMS_BY_ROLE.principal
+      .filter((item) => !item.disabled)
+      .map((item) => item.key),
+    'principal-settings',
+  ],
   teacher: [
     ...NAV_ITEMS_BY_ROLE.teacher
       .filter((item) => !item.disabled)
@@ -248,6 +250,8 @@ function renderProtectedPage(
   teacherActiveClassAssignmentId,
   teacherActiveAssessmentId,
   teacherActiveClassTab,
+  reportsInitialFilters,
+  settingsScrollTarget,
 ) {
   const sharedProps = { user: auth.user, role: auth.user.role, token: auth.token, onNavigate, onLogout }
 
@@ -281,11 +285,11 @@ function renderProtectedPage(
         />
       )
     case 'reports':
-      return <ReportsPage {...sharedProps} />
+      return <ReportsPage {...sharedProps} initialFilters={reportsInitialFilters} />
     case 'teacher-settings':
       return <TeacherSettingsPage {...sharedProps} />
     case 'principal-settings':
-      return <PrincipalSettingsPage {...sharedProps} />
+      return <PrincipalSettingsPage {...sharedProps} scrollTarget={settingsScrollTarget} />
     default:
       return null
   }
@@ -328,6 +332,8 @@ function App() {
   )
   const [currentPage, setCurrentPage] = useState(initialAppState.currentPage)
   const [schoolYearLabel, setSchoolYearLabel] = useState('')
+  const [reportsInitialFilters, setReportsInitialFilters] = useState(null)
+  const [settingsScrollTarget, setSettingsScrollTarget] = useState(null)
 
   useEffect(() => {
     let isMounted = true
@@ -451,13 +457,13 @@ function App() {
   useEffect(() => {
     let isMounted = true
 
-    if (auth?.user?.role !== 'principal' || !auth?.token) {
+    if (!auth?.token || !['principal', 'teacher'].includes(auth?.user?.role)) {
       return () => {
         isMounted = false
       }
     }
 
-    getSchoolSetupReferenceDataV3(auth.token)
+    getReportReferenceDataV3(auth.token)
       .then((referenceData) => {
         if (!isMounted) return
 
@@ -551,6 +557,16 @@ function App() {
       })
     }
 
+    if (page === 'reports') {
+      setReportsInitialFilters(
+        Object.prototype.hasOwnProperty.call(options, 'testId') ? options : null,
+      )
+    }
+
+    if (page === 'principal-settings') {
+      setSettingsScrollTarget(options.scrollTo ?? null)
+    }
+
     const nextPage = normalizePage(auth, page)
     setCurrentPage(nextPage)
     setHashPage(nextPage)
@@ -599,6 +615,8 @@ function App() {
     teacherActiveClassAssignmentId,
     teacherActiveAssessmentId,
     teacherActiveClassTab,
+    reportsInitialFilters,
+    settingsScrollTarget,
   )
   const isTeacherWorkspaceLayout = auth.user.role === 'teacher'
 
@@ -633,7 +651,7 @@ function App() {
         token={auth.token}
         onNavigate={handleNavigate}
         onLogout={handleLogout}
-        schoolYearLabel={auth?.user?.role === 'principal' ? schoolYearLabel : ''}
+        schoolYearLabel={schoolYearLabel}
         isTeacherWorkspaceLayout={isTeacherWorkspaceLayout}
       >
         {protectedPage}

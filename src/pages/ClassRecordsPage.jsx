@@ -4,10 +4,8 @@ import {
   Archive,
   AlertTriangle,
   BookOpen,
-  CalendarClock,
   ClipboardCheck,
   ClipboardList,
-  Clock3,
   FileText,
   Pencil,
   Plus,
@@ -17,13 +15,11 @@ import {
   X,
 } from 'lucide-react'
 import {
+  archiveAssessmentV3,
   archiveClassAssignmentV3,
-  archiveClassAssignmentScheduleV3,
   createClassAssignmentV3,
-  createClassAssignmentScheduleV3,
   createClassV3,
   getClassAssignmentsV3,
-  getClassAssignmentSchedulesV3,
   getClassesV3,
   getAssessmentReferenceDataV3,
   getAssessmentsV3,
@@ -33,16 +29,16 @@ import {
   getTeacherClassStudentsV3,
   updateStudentEnrollmentStatusV3,
   updateStudentProfileV3,
-  updateClassAssignmentScheduleV3,
 } from '../api/apiV3Client'
 import V3Sf1ImportPanel from '../components/V3Sf1ImportPanel'
 
 const initialAssignmentForm = {
-  teacherId: '',
-  subjectId: '',
-  gradeLevelId: '',
   classId: '',
+  subjectId: '',
+  teacherId: '',
 }
+
+const MAX_BIRTH_DATE = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
 
 const initialManualStudentForm = {
   classId: '',
@@ -70,32 +66,6 @@ const ENROLLMENT_STATUSES = ['enrolled', 'transferred', 'dropped', 'completed']
 const initialClassForm = {
   gradeLevelId: '',
   sectionName: '',
-}
-
-const initialScheduleForm = {
-  dayOfWeek: '',
-  startTime: '',
-  endTime: '',
-  effectiveFrom: '',
-  effectiveTo: '',
-}
-
-const WEEK_DAYS = [
-  [1, 'Monday'],
-  [2, 'Tuesday'],
-  [3, 'Wednesday'],
-  [4, 'Thursday'],
-  [5, 'Friday'],
-  [6, 'Saturday'],
-  [7, 'Sunday'],
-]
-
-function toTimeInput(value) {
-  return String(value ?? '').slice(0, 5)
-}
-
-function toApiTime(value) {
-  return value && value.length === 5 ? `${value}:00` : value
 }
 
 function formatStatus(status) {
@@ -398,6 +368,34 @@ function getClassSubjectSummary(assignments) {
   return subjectNames.join(', ')
 }
 
+function toTitleCase(value) {
+  // \b is ASCII-only in JS regex, so it misreads accented letters (e.g. "ñ") as
+  // word boundaries and capitalizes the letters next to them too. Matching an
+  // explicit non-letter/non-number boundary (or start of string) instead keeps
+  // this correct for names like "Añana".
+  return String(value ?? '')
+    .toLowerCase()
+    .replace(/(^|[^\p{L}\p{N}'])(\p{L})/gu, (_match, boundary, letter) => boundary + letter.toUpperCase())
+}
+
+function getDisplayName(student) {
+  const lastName = toTitleCase(student?.lastName)
+
+  if (!lastName) {
+    return toTitleCase(student?.name)
+  }
+
+  const givenNames = [toTitleCase(student?.firstName), toTitleCase(student?.middleName)]
+    .filter(Boolean)
+    .join(' ')
+
+  return givenNames ? `${lastName}, ${givenNames}` : lastName
+}
+
+function getStudentLastNameSortKey(student) {
+  return normalizeMatchText(student?.lastName || student?.name || '')
+}
+
 function getStudentInitials(student) {
   const nameParts = String(student?.name ?? '')
     .trim()
@@ -449,6 +447,10 @@ function formatDate(dateValue) {
 function getAssessmentStatusClass(status) {
   const normalizedStatus = String(status ?? '').toLowerCase()
 
+  if (normalizedStatus.includes('archived')) {
+    return 'status-archived'
+  }
+
   if (normalizedStatus.includes('active') || normalizedStatus.includes('complete')) {
     return 'status-active'
   }
@@ -458,6 +460,10 @@ function getAssessmentStatusClass(status) {
   }
 
   return 'status-pending'
+}
+
+function isArchivedAssessment(assessment) {
+  return String(assessment?.testStatus ?? assessment?.status ?? '').toLowerCase() === 'archived'
 }
 
 function studentBelongsToClass(student, assignment) {
@@ -509,18 +515,7 @@ function ClassRecordsPage({
   const [academicYears, setAcademicYears] = useState([])
   const [selectedAcademicYearId, setSelectedAcademicYearId] = useState('')
   const [sections, setSections] = useState([])
-  const [assignmentSections, setAssignmentSections] = useState([])
   const [assessments, setAssessments] = useState([])
-  const [classSchedules, setClassSchedules] = useState([])
-  const [scheduleForm, setScheduleForm] = useState(initialScheduleForm)
-  const [editingScheduleId, setEditingScheduleId] = useState(null)
-  const [isScheduleFormOpen, setIsScheduleFormOpen] = useState(false)
-  const [isSchedulesLoading, setIsSchedulesLoading] = useState(false)
-  const [isScheduleSaving, setIsScheduleSaving] = useState(false)
-  const [scheduleMessage, setScheduleMessage] = useState({ error: '', success: '' })
-  const [schedulePendingArchive, setSchedulePendingArchive] = useState(null)
-  const [scheduleArchiveReason, setScheduleArchiveReason] = useState('')
-  const [isScheduleArchiving, setIsScheduleArchiving] = useState(false)
   const [selectedClassAssignment, setSelectedClassAssignment] = useState(null)
   const [assignmentForm, setAssignmentForm] = useState(initialAssignmentForm)
   const [manualStudentForm, setManualStudentForm] = useState(initialManualStudentForm)
@@ -564,6 +559,7 @@ function ClassRecordsPage({
   const [manualMessage, setManualMessage] = useState({ error: '', success: '' })
   const [isStudentsLoading, setIsStudentsLoading] = useState(true)
   const [isAssessmentsLoading, setIsAssessmentsLoading] = useState(true)
+  const [archivingAssessmentId, setArchivingAssessmentId] = useState(null)
   const [isSectionsLoading, setIsSectionsLoading] = useState(true)
   const [isAssignmentSubmitting, setIsAssignmentSubmitting] = useState(false)
   const isAssignmentUpdating = false
@@ -614,12 +610,29 @@ function ClassRecordsPage({
 
     return Array.from(optionMap.values())
   }, [schoolGradeLevels, sectionOptions])
-  const selectedAssignmentGradeLevel = useMemo(
+  const assignmentClassOptions = useMemo(
     () =>
-      assignmentGradeOptions.find(
-        (gradeLevel) => String(gradeLevel.id) === String(assignmentForm.gradeLevelId),
+      sections
+        .filter(
+          (section) =>
+            !selectedAcademicYearId ||
+            String(section.academicYearId) === String(selectedAcademicYearId),
+        )
+        .map((section) => ({
+          classId: section.classId,
+          gradeLevelName: section.gradeLevelName,
+          sectionName: section.sectionName,
+          label: getClassDisplayLabel(section),
+        }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [sections, selectedAcademicYearId],
+  )
+  const selectedAssignmentClass = useMemo(
+    () =>
+      assignmentClassOptions.find(
+        (option) => String(option.classId) === String(assignmentForm.classId),
       ) ?? null,
-    [assignmentForm.gradeLevelId, assignmentGradeOptions],
+    [assignmentClassOptions, assignmentForm.classId],
   )
   const selectedAcademicYear = useMemo(
     () =>
@@ -659,21 +672,6 @@ function ClassRecordsPage({
       selectedAcademicYear,
       'No academic year selected',
     )
-  const assignmentSectionOptions = useMemo(() => {
-    const sourceSections = assignmentForm.gradeLevelId ? assignmentSections : []
-
-    if (!selectedAssignmentGradeLevel) {
-      return []
-    }
-
-    return sourceSections.filter((section) => {
-      const hasGradeMetadata =
-        (section.gradeLevelId !== null && section.gradeLevelId !== undefined) ||
-        Boolean(section.gradeLevelName)
-
-      return hasGradeMetadata ? sectionMatchesGrade(section, selectedAssignmentGradeLevel) : true
-    })
-  }, [assignmentForm.gradeLevelId, assignmentSections, selectedAssignmentGradeLevel])
   const selectedAssignmentEditGradeLevel = useMemo(
     () =>
       assignmentGradeOptions.find(
@@ -752,7 +750,7 @@ function ClassRecordsPage({
   const teacherClassOptions = useMemo(() => {
     const optionMap = new Map()
 
-    classAssignments.forEach((assignment) => {
+    activeClassAssignments.forEach((assignment) => {
       const key = getClassSectionKey(assignment)
 
       if (!optionMap.has(key)) {
@@ -770,7 +768,7 @@ function ClassRecordsPage({
     })
 
     return Array.from(optionMap.values())
-  }, [classAssignments])
+  }, [activeClassAssignments])
   const selectedClassFilterKey = selectedClassAssignment
     ? getClassSectionKey(selectedClassAssignment)
     : (teacherClassOptions[0]?.key ?? '')
@@ -796,14 +794,23 @@ function ClassRecordsPage({
 
     const searchText = normalizeMatchText(studentNameSearch)
 
-    if (!searchText) {
-      return classFilteredStudents
-    }
+    const searchFilteredStudents = searchText
+      ? classFilteredStudents.filter((student) =>
+          normalizeMatchText(student.name).includes(searchText),
+        )
+      : classFilteredStudents
 
-    return classFilteredStudents.filter((student) =>
-      normalizeMatchText(student.name).includes(searchText),
+    return [...searchFilteredStudents].sort((left, right) =>
+      getStudentLastNameSortKey(left).localeCompare(getStudentLastNameSortKey(right)),
     )
   }, [selectedStudentClassAssignment, studentNameSearch, teacherAssignedStudents])
+  const sortedPrincipalRosterStudents = useMemo(
+    () =>
+      [...students].sort((left, right) =>
+        getStudentLastNameSortKey(left).localeCompare(getStudentLastNameSortKey(right)),
+      ),
+    [students],
+  )
   const selectedClassGroupAssignments = useMemo(() => {
     if (!selectedClassAssignment) {
       return []
@@ -811,16 +818,17 @@ function ClassRecordsPage({
 
     const selectedGroupKey = getClassSectionKey(selectedClassAssignment)
 
-    return classAssignments.filter(
+    return activeClassAssignments.filter(
       (assignment) => getClassSectionKey(assignment) === selectedGroupKey,
     )
-  }, [classAssignments, selectedClassAssignment])
+  }, [activeClassAssignments, selectedClassAssignment])
   const selectedClassAssessments = useMemo(
     () =>
       assessments.filter(
         (assessment) =>
           Number(assessment.classAssignmentId) ===
-          Number(selectedClassAssignment?.classAssignmentId),
+            Number(selectedClassAssignment?.classAssignmentId) &&
+          !isArchivedAssessment(assessment),
       ),
     [assessments, selectedClassAssignment?.classAssignmentId],
   )
@@ -899,8 +907,8 @@ function ClassRecordsPage({
     if (role === 'teacher') {
       try {
         const referenceData = await getAssessmentReferenceDataV3({}, token)
-        const nextTeacherAssignments = (referenceData.classAssignments ?? []).map(
-          (assignment) => ({
+        const nextTeacherAssignments = (referenceData.classAssignments ?? [])
+          .map((assignment) => ({
             id: assignment.classAssignmentId,
             classAssignmentId: assignment.classAssignmentId,
             classId: assignment.classId,
@@ -915,9 +923,9 @@ function ClassRecordsPage({
             subjectId: assignment.subjectId,
             subjectName: assignment.subjectName ?? '',
             assignmentRole: assignment.assignmentRole ?? '',
-            status: 'active',
-          }),
-        )
+            status: assignment.status ?? 'active',
+          }))
+          .filter(isActiveClassAssignment)
 
         const academicYearMap = new Map()
         nextTeacherAssignments.forEach((assignment) => {
@@ -1155,6 +1163,30 @@ function ClassRecordsPage({
     }
   }
 
+  const handleArchiveAssessment = async (event, assessment) => {
+    event.stopPropagation()
+
+    if (!assessment?.id || archivingAssessmentId) return
+
+    const confirmed = window.confirm(
+      `Archive "${assessment.testName || 'this assessment'}"? It will be hidden from this class's ` +
+        'assessment list and moved to Archived Assessments in your profile, where you can restore it.',
+    )
+    if (!confirmed) return
+
+    setArchivingAssessmentId(assessment.id)
+    setAssessmentsError('')
+
+    try {
+      await archiveAssessmentV3(assessment.id, token)
+      await loadTeacherAssessments()
+    } catch (archiveError) {
+      setAssessmentsError(archiveError.message || 'Unable to archive this assessment.')
+    } finally {
+      setArchivingAssessmentId(null)
+    }
+  }
+
   /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
   useEffect(() => {
     loadSections()
@@ -1229,12 +1261,6 @@ function ClassRecordsPage({
   }, [role, selectedClassAssignment?.classAssignmentId])
 
   useEffect(() => {
-    if (role === 'teacher') {
-      loadClassSchedules()
-    }
-  }, [role, selectedClassAssignment?.classAssignmentId])
-
-  useEffect(() => {
     if (role === 'principal' && selectedAcademicYearId) {
       loadTeacherClasses()
     }
@@ -1245,44 +1271,6 @@ function ClassRecordsPage({
       loadStudents()
     }
   }, [role, selectedClassAssignment?.classId])
-
-  useEffect(() => {
-    const { gradeLevelId, subjectId } = assignmentForm
-
-    setAssignmentSections([])
-
-    if (!selectedAcademicYearId || !gradeLevelId || !subjectId) {
-      return
-    }
-
-    let shouldApplyResults = true
-
-    getClassesV3(
-      {
-        academicYearId: selectedAcademicYearId,
-        gradeLevelId,
-      },
-      token,
-    )
-      .then((classRecords) => {
-        if (shouldApplyResults) {
-          setAssignmentSections(
-            classRecords
-              .map(normalizeAvailableClassOption)
-              .filter((classRecord) => classRecord.classId !== null && classRecord.classId !== undefined),
-          )
-        }
-      })
-      .catch(() => {
-        if (shouldApplyResults) {
-          setAssignmentSections([])
-        }
-      })
-
-    return () => {
-      shouldApplyResults = false
-    }
-  }, [assignmentForm.gradeLevelId, assignmentForm.subjectId, selectedAcademicYearId, token])
 
   /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
@@ -1300,9 +1288,8 @@ function ClassRecordsPage({
     setAssignmentForm((currentForm) => ({
       ...currentForm,
       [name]: value,
-      ...(name === 'teacherId' ? { subjectId: '', gradeLevelId: '', classId: '' } : {}),
-      ...(name === 'subjectId' ? { gradeLevelId: '', classId: '' } : {}),
-      ...(name === 'gradeLevelId' ? { classId: '' } : {}),
+      ...(name === 'classId' ? { subjectId: '', teacherId: '' } : {}),
+      ...(name === 'subjectId' ? { teacherId: '' } : {}),
     }))
   }
 
@@ -1311,14 +1298,13 @@ function ClassRecordsPage({
     setAssignmentMessage({ error: '', success: '' })
 
     if (
-      !assignmentForm.teacherId ||
-      !assignmentForm.subjectId ||
-      !assignmentForm.gradeLevelId ||
       !assignmentForm.classId ||
+      !assignmentForm.subjectId ||
+      !assignmentForm.teacherId ||
       !selectedAcademicYearId
     ) {
       setAssignmentMessage({
-        error: 'Select teacher, subject, grade level, section, and academic year before assigning.',
+        error: 'Select class, subject, teacher, and academic year before assigning.',
         success: '',
       })
       return
@@ -1338,9 +1324,6 @@ function ClassRecordsPage({
     const selectedSubject = subjects.find(
       (subject) => String(subject.id) === String(assignmentForm.subjectId),
     )
-    const selectedSection = assignmentSectionOptions.find(
-      (section) => String(section.id) === String(assignmentForm.classId),
-    )
 
     setAssignmentCreateError('')
     setAssignmentPendingCreation({
@@ -1352,8 +1335,8 @@ function ClassRecordsPage({
       },
       teacherName: selectedTeacher?.name || 'Selected teacher',
       subjectName: selectedSubject?.name || 'Selected subject',
-      gradeLevelName: selectedAssignmentGradeLevel?.name || 'Selected grade level',
-      sectionName: selectedSection?.name || 'Selected section',
+      gradeLevelName: selectedAssignmentClass?.gradeLevelName || 'Selected grade level',
+      sectionName: selectedAssignmentClass?.sectionName || 'Selected section',
       academicYear: selectedAcademicYearLabel,
     })
   }
@@ -1385,32 +1368,6 @@ function ClassRecordsPage({
       )
     } finally {
       setIsAssignmentSubmitting(false)
-    }
-  }
-
-  async function loadClassSchedules({ preserveMessage = false } = {}) {
-    const classAssignmentId = selectedClassAssignment?.classAssignmentId
-
-    if (role !== 'teacher' || !classAssignmentId) {
-      setClassSchedules([])
-      setIsSchedulesLoading(false)
-      return
-    }
-
-    setIsSchedulesLoading(true)
-    if (!preserveMessage) setScheduleMessage({ error: '', success: '' })
-
-    try {
-      const records = await getClassAssignmentSchedulesV3(classAssignmentId, token)
-      setClassSchedules(records)
-    } catch (loadError) {
-      setClassSchedules([])
-      setScheduleMessage({
-        error: loadError.message || 'Unable to load the class timetable.',
-        success: '',
-      })
-    } finally {
-      setIsSchedulesLoading(false)
     }
   }
 
@@ -1711,12 +1668,6 @@ function ClassRecordsPage({
   const handleTeacherSubjectChange = (event) => {
     const nextClassAssignmentId = Number(event.target.value)
 
-    setIsScheduleFormOpen(false)
-    setEditingScheduleId(null)
-    setScheduleForm(initialScheduleForm)
-    setSchedulePendingArchive(null)
-    setScheduleArchiveReason('')
-    setScheduleMessage({ error: '', success: '' })
     setSelectedClassAssignment(
       classAssignments.find(
         (assignment) => Number(assignment.classAssignmentId) === nextClassAssignmentId,
@@ -1727,12 +1678,6 @@ function ClassRecordsPage({
   const handleTeacherClassSelect = (assignment) => {
     if (!assignment) return
 
-    setIsScheduleFormOpen(false)
-    setEditingScheduleId(null)
-    setScheduleForm(initialScheduleForm)
-    setSchedulePendingArchive(null)
-    setScheduleArchiveReason('')
-    setScheduleMessage({ error: '', success: '' })
     setSelectedClassAssignment(assignment)
     onNavigate('class-records', {
       classId: assignment.classId,
@@ -1741,141 +1686,6 @@ function ClassRecordsPage({
     })
   }
 
-  const openScheduleForm = (schedule = null) => {
-    setEditingScheduleId(schedule?.classAssignmentScheduleId ?? null)
-    setScheduleForm(
-      schedule
-        ? {
-            dayOfWeek: String(schedule.dayOfWeek ?? ''),
-            startTime: toTimeInput(schedule.startTime),
-            endTime: toTimeInput(schedule.endTime),
-            effectiveFrom: schedule.effectiveFrom ?? '',
-            effectiveTo: schedule.effectiveTo ?? '',
-          }
-        : initialScheduleForm,
-    )
-    setScheduleMessage({ error: '', success: '' })
-    setIsScheduleFormOpen(true)
-  }
-
-  const closeScheduleForm = () => {
-    if (isScheduleSaving) return
-    setIsScheduleFormOpen(false)
-    setEditingScheduleId(null)
-    setScheduleForm(initialScheduleForm)
-  }
-
-  const handleScheduleFormChange = (event) => {
-    const { name, value } = event.target
-    setScheduleForm((current) => ({ ...current, [name]: value }))
-    setScheduleMessage({ error: '', success: '' })
-  }
-
-  const handleScheduleSubmit = async (event) => {
-    event.preventDefault()
-    const classAssignmentId = selectedClassAssignment?.classAssignmentId
-
-    if (!classAssignmentId) {
-      setScheduleMessage({ error: 'Select a class assignment first.', success: '' })
-      return
-    }
-
-    if (
-      !scheduleForm.dayOfWeek ||
-      !scheduleForm.startTime ||
-      !scheduleForm.endTime ||
-      !scheduleForm.effectiveFrom ||
-      !scheduleForm.effectiveTo
-    ) {
-      setScheduleMessage({ error: 'Complete every timetable field.', success: '' })
-      return
-    }
-
-    if (scheduleForm.endTime <= scheduleForm.startTime) {
-      setScheduleMessage({ error: 'End time must be later than start time.', success: '' })
-      return
-    }
-
-    if (scheduleForm.effectiveTo < scheduleForm.effectiveFrom) {
-      setScheduleMessage({ error: 'Effective end date must not be before the start date.', success: '' })
-      return
-    }
-
-    const payload = {
-      dayOfWeek: Number(scheduleForm.dayOfWeek),
-      startTime: toApiTime(scheduleForm.startTime),
-      endTime: toApiTime(scheduleForm.endTime),
-      timezoneName: 'Asia/Manila',
-      effectiveFrom: scheduleForm.effectiveFrom,
-      effectiveTo: scheduleForm.effectiveTo,
-    }
-
-    setIsScheduleSaving(true)
-    setScheduleMessage({ error: '', success: '' })
-
-    try {
-      if (editingScheduleId) {
-        await updateClassAssignmentScheduleV3(
-          classAssignmentId,
-          editingScheduleId,
-          payload,
-          token,
-        )
-      } else {
-        await createClassAssignmentScheduleV3(classAssignmentId, payload, token)
-      }
-
-      setIsScheduleFormOpen(false)
-      setEditingScheduleId(null)
-      setScheduleForm(initialScheduleForm)
-      setScheduleMessage({
-        error: '',
-        success: editingScheduleId
-          ? 'Class timetable updated successfully.'
-          : 'Class timetable added successfully.',
-      })
-      await loadClassSchedules({ preserveMessage: true })
-    } catch (saveError) {
-      setScheduleMessage({
-        error: saveError.message || 'Unable to save the class timetable.',
-        success: '',
-      })
-    } finally {
-      setIsScheduleSaving(false)
-    }
-  }
-
-  const handleArchiveSchedule = async (event) => {
-    event.preventDefault()
-    const classAssignmentId = selectedClassAssignment?.classAssignmentId
-    const scheduleId = schedulePendingArchive?.classAssignmentScheduleId
-    const reason = scheduleArchiveReason.trim()
-
-    if (!classAssignmentId || !scheduleId) return
-
-    if (reason.length < 5 || reason.length > 255) {
-      setScheduleMessage({ error: 'Enter an archive reason between 5 and 255 characters.', success: '' })
-      return
-    }
-
-    setIsScheduleArchiving(true)
-    setScheduleMessage({ error: '', success: '' })
-
-    try {
-      await archiveClassAssignmentScheduleV3(classAssignmentId, scheduleId, reason, token)
-      setSchedulePendingArchive(null)
-      setScheduleArchiveReason('')
-      setScheduleMessage({ error: '', success: 'Timetable entry archived successfully.' })
-      await loadClassSchedules({ preserveMessage: true })
-    } catch (archiveError) {
-      setScheduleMessage({
-        error: archiveError.message || 'Unable to archive this timetable entry.',
-        success: '',
-      })
-    } finally {
-      setIsScheduleArchiving(false)
-    }
-  }
 
   const handleManualSubmit = async (event) => {
     event.preventDefault()
@@ -2161,8 +1971,9 @@ function ClassRecordsPage({
 
                     {selectedClassAssignment && !isAssessmentsLoading
                       ? selectedClassAssessments.map((assessment, index) => (
-                          <button
-                            type="button"
+                          <div
+                            role="button"
+                            tabIndex={0}
                             className="teacher-assessment-row"
                             key={assessment.id ?? index}
                             onClick={() =>
@@ -2172,6 +1983,15 @@ function ClassRecordsPage({
                                 assessmentId: assessment.id,
                               })
                             }
+                            onKeyDown={(event) => {
+                              if (event.key !== 'Enter' && event.key !== ' ') return
+                              event.preventDefault()
+                              onNavigate('assessment-setup', {
+                                classId: selectedClassAssignment.classId,
+                                classAssignmentId: selectedClassAssignment.classAssignmentId,
+                                assessmentId: assessment.id,
+                              })
+                            }}
                           >
                             <span className="teacher-assessment-icon" aria-hidden="true">
                               {index % 2 === 0 ? (
@@ -2184,14 +2004,26 @@ function ClassRecordsPage({
                               <strong>{assessment.testName || 'Untitled assessment'}</strong>
                               <small>Assigned date: {formatDate(assessment.testDate)}</small>
                             </div>
-                            <span
-                              className={`status-pill ${getAssessmentStatusClass(
-                                assessment.testStatus,
-                              )}`}
-                            >
-                              {assessment.testStatus || 'Status not set'}
-                            </span>
-                          </button>
+                            <div className="teacher-assessment-row-actions">
+                              <span
+                                className={`status-pill ${getAssessmentStatusClass(
+                                  assessment.testStatus,
+                                )}`}
+                              >
+                                {assessment.testStatus || 'Status not set'}
+                              </span>
+                              <button
+                                type="button"
+                                className="teacher-assessment-archive-button"
+                                title="Archive this assessment"
+                                aria-label={`Archive ${assessment.testName || 'assessment'}`}
+                                disabled={archivingAssessmentId === assessment.id}
+                                onClick={(event) => handleArchiveAssessment(event, assessment)}
+                              >
+                                <Archive size={15} strokeWidth={2.2} aria-hidden="true" />
+                              </button>
+                            </div>
+                          </div>
                         ))
                       : null}
                   </div>
@@ -2235,235 +2067,6 @@ function ClassRecordsPage({
                   </button>
                 </div>
 
-                <article className="teacher-timetable-panel" aria-labelledby="classTimetableTitle">
-                  <header className="teacher-timetable-header">
-                    <div>
-                      <span className="teacher-timetable-icon" aria-hidden="true">
-                        <CalendarClock size={19} strokeWidth={2.2} />
-                      </span>
-                      <div>
-                        <p>Class timetable</p>
-                        <strong id="classTimetableTitle">Teaching schedule</strong>
-                      </div>
-                    </div>
-                    <div className="teacher-timetable-actions">
-                      <button
-                        type="button"
-                        className="icon-action-button"
-                        title="Refresh timetable"
-                        aria-label="Refresh timetable"
-                        disabled={isSchedulesLoading || !selectedClassAssignment}
-                        onClick={() => loadClassSchedules()}
-                      >
-                        <RefreshCw size={16} aria-hidden="true" />
-                      </button>
-                      <button
-                        type="button"
-                        className="secondary-button"
-                        disabled={!selectedClassAssignment || isSchedulesLoading}
-                        onClick={() => openScheduleForm()}
-                      >
-                        <Plus size={16} aria-hidden="true" />
-                        Add schedule
-                      </button>
-                    </div>
-                  </header>
-
-                {scheduleMessage.error ? (
-                  <p className="form-message form-message-error" role="alert">
-                    {scheduleMessage.error}
-                  </p>
-                ) : null}
-                {scheduleMessage.success ? (
-                  <p className="form-message form-message-success" role="status">
-                    {scheduleMessage.success}
-                  </p>
-                ) : null}
-
-                {isScheduleFormOpen ? (
-                  <form className="teacher-timetable-form" onSubmit={handleScheduleSubmit}>
-                    <label>
-                      <span>Day</span>
-                      <select
-                        name="dayOfWeek"
-                        value={scheduleForm.dayOfWeek}
-                        onChange={handleScheduleFormChange}
-                      >
-                        <option value="">Select day</option>
-                        {WEEK_DAYS.map(([value, label]) => (
-                          <option key={value} value={value}>{label}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      <span>Starts</span>
-                      <input
-                        type="time"
-                        name="startTime"
-                        value={scheduleForm.startTime}
-                        onChange={handleScheduleFormChange}
-                      />
-                    </label>
-                    <label>
-                      <span>Ends</span>
-                      <input
-                        type="time"
-                        name="endTime"
-                        value={scheduleForm.endTime}
-                        onChange={handleScheduleFormChange}
-                      />
-                    </label>
-                    <label>
-                      <span>Effective from</span>
-                      <input
-                        type="date"
-                        name="effectiveFrom"
-                        value={scheduleForm.effectiveFrom}
-                        onChange={handleScheduleFormChange}
-                      />
-                    </label>
-                    <label>
-                      <span>Effective to</span>
-                      <input
-                        type="date"
-                        name="effectiveTo"
-                        min={scheduleForm.effectiveFrom || undefined}
-                        value={scheduleForm.effectiveTo}
-                        onChange={handleScheduleFormChange}
-                      />
-                    </label>
-                    <div className="teacher-timetable-form-actions">
-                      <button
-                        type="button"
-                        className="secondary-button"
-                        disabled={isScheduleSaving}
-                        onClick={closeScheduleForm}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        className="primary-button"
-                        disabled={isScheduleSaving}
-                      >
-                        <Save size={16} aria-hidden="true" />
-                        {isScheduleSaving
-                          ? 'Saving...'
-                          : editingScheduleId
-                            ? 'Save changes'
-                            : 'Add schedule'}
-                      </button>
-                    </div>
-                  </form>
-                ) : null}
-
-                {schedulePendingArchive ? (
-                  <form className="teacher-timetable-archive" onSubmit={handleArchiveSchedule}>
-                    <div>
-                      <strong>Archive this timetable entry?</strong>
-                      <span>
-                        {schedulePendingArchive.dayName} at{' '}
-                        {toTimeInput(schedulePendingArchive.startTime)} -{' '}
-                        {toTimeInput(schedulePendingArchive.endTime)}
-                      </span>
-                    </div>
-                    <label>
-                      <span>Reason</span>
-                      <input
-                        value={scheduleArchiveReason}
-                        minLength="5"
-                        maxLength="255"
-                        placeholder="Enter a reason for archiving"
-                        onChange={(event) => {
-                          setScheduleArchiveReason(event.target.value)
-                          setScheduleMessage({ error: '', success: '' })
-                        }}
-                      />
-                    </label>
-                    <div className="teacher-timetable-form-actions">
-                      <button
-                        type="button"
-                        className="secondary-button"
-                        disabled={isScheduleArchiving}
-                        onClick={() => {
-                          setSchedulePendingArchive(null)
-                          setScheduleArchiveReason('')
-                        }}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        className="danger-button"
-                        disabled={isScheduleArchiving || scheduleArchiveReason.trim().length < 5}
-                      >
-                        <Archive size={16} aria-hidden="true" />
-                        {isScheduleArchiving ? 'Archiving...' : 'Archive'}
-                      </button>
-                    </div>
-                  </form>
-                ) : null}
-
-                {isSchedulesLoading ? (
-                  <p className="teacher-timetable-empty">Loading timetable...</p>
-                ) : classSchedules.length ? (
-                  <div className="teacher-timetable-list">
-                    {classSchedules.map((schedule) => {
-                      const scheduleStatus = String(schedule.scheduleStatus || 'active').toLowerCase()
-                      const isActiveSchedule = scheduleStatus === 'active'
-
-                      return (
-                        <div
-                          className={`teacher-timetable-row${isActiveSchedule ? '' : ' is-archived'}`}
-                          key={schedule.classAssignmentScheduleId ?? schedule.scheduleUuid}
-                        >
-                          <Clock3 size={17} aria-hidden="true" />
-                          <div>
-                            <strong>{schedule.dayName || 'Scheduled day'}</strong>
-                            <span>
-                              {toTimeInput(schedule.startTime)} - {toTimeInput(schedule.endTime)}
-                            </span>
-                          </div>
-                          <small>
-                            {formatDate(schedule.effectiveFrom)} - {formatDate(schedule.effectiveTo)}
-                          </small>
-                          <span className={`status-pill status-${scheduleStatus}`}>
-                            {formatStatus(scheduleStatus)}
-                          </span>
-                          <div className="teacher-timetable-row-actions">
-                            <button
-                              type="button"
-                              className="icon-action-button"
-                              title="Edit timetable entry"
-                              aria-label={`Edit ${schedule.dayName || 'timetable'} entry`}
-                              disabled={!isActiveSchedule}
-                              onClick={() => openScheduleForm(schedule)}
-                            >
-                              <Pencil size={15} aria-hidden="true" />
-                            </button>
-                            <button
-                              type="button"
-                              className="icon-action-button is-danger"
-                              title="Archive timetable entry"
-                              aria-label={`Archive ${schedule.dayName || 'timetable'} entry`}
-                              disabled={!isActiveSchedule}
-                              onClick={() => {
-                                setSchedulePendingArchive(schedule)
-                                setScheduleArchiveReason('')
-                                setScheduleMessage({ error: '', success: '' })
-                              }}
-                            >
-                              <Archive size={15} aria-hidden="true" />
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <p className="teacher-timetable-empty">No timetable entries for this class.</p>
-                )}
-                </article>
               </aside>
             </div>
           ) : null}
@@ -2525,7 +2128,7 @@ function ClassRecordsPage({
                       ? filteredTeacherStudents.map((student, index) => (
                           <tr key={student.id ?? `${student.studentLrn}-${index}`}>
                             <td>{String(index + 1).padStart(2, '0')}</td>
-                            <td>{student.name}</td>
+                            <td>{getDisplayName(student)}</td>
                             <td>{student.studentLrn || '-'}</td>
                             <td>{student.section || '-'}</td>
                             <td>
@@ -2578,7 +2181,7 @@ function ClassRecordsPage({
                     </div>
                     <div className="student-profile-card">
                       <p>LRN: {selectedStudentInfo.studentLrn || 'Not provided'}</p>
-                      <p>NAME: {selectedStudentInfo.name}</p>
+                      <p>NAME: {getDisplayName(selectedStudentInfo)}</p>
                       <p>
                         {selectedStudentInfo.gradeLevel || 'Grade level not assigned'} -{' '}
                         {selectedStudentInfo.section || 'Section not assigned'}
@@ -2656,18 +2259,24 @@ function ClassRecordsPage({
           </p>
         ) : null}
         <form className="principal-assignment-form" onSubmit={handleAssignmentSubmit}>
-          <label htmlFor="classAssignmentTeacherId">
-            <span>Teacher</span>
+          <label htmlFor="classAssignmentClassId">
+            <span>Class</span>
             <select
-              id="classAssignmentTeacherId"
-              name="teacherId"
-              value={assignmentForm.teacherId}
+              id="classAssignmentClassId"
+              name="classId"
+              value={assignmentForm.classId}
               onChange={handleAssignmentFormChange}
+              disabled={!assignmentClassOptions.length}
             >
-              <option value="">Select teacher</option>
-              {schoolTeachers.map((teacher) => (
-                <option key={teacher.userId ?? teacher.id} value={teacher.userId ?? teacher.id}>
-                  {teacher.name}
+              <option value="">Select class</option>
+              {!assignmentClassOptions.length ? (
+                <option value="" disabled>
+                  No available classes for this academic year.
+                </option>
+              ) : null}
+              {assignmentClassOptions.map((option) => (
+                <option key={option.classId} value={option.classId}>
+                  {option.label}
                 </option>
               ))}
             </select>
@@ -2680,7 +2289,7 @@ function ClassRecordsPage({
               name="subjectId"
               value={assignmentForm.subjectId}
               onChange={handleAssignmentFormChange}
-              disabled={!assignmentForm.teacherId}
+              disabled={!assignmentForm.classId}
             >
               <option value="">Select subject</option>
               {subjects.map((subject) => (
@@ -2691,46 +2300,19 @@ function ClassRecordsPage({
             </select>
           </label>
 
-          <label htmlFor="classAssignmentGradeLevelId">
-            <span>Grade Level</span>
+          <label htmlFor="classAssignmentTeacherId">
+            <span>Teacher</span>
             <select
-              id="classAssignmentGradeLevelId"
-              name="gradeLevelId"
-              value={assignmentForm.gradeLevelId}
+              id="classAssignmentTeacherId"
+              name="teacherId"
+              value={assignmentForm.teacherId}
               onChange={handleAssignmentFormChange}
               disabled={!assignmentForm.subjectId}
             >
-              <option value="">Select grade level</option>
-              {assignmentGradeOptions.map((gradeLevel) => (
-                <option key={gradeLevel.id} value={gradeLevel.id}>
-                  {gradeLevel.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label htmlFor="classAssignmentSectionId">
-            <span>Section</span>
-            <select
-              id="classAssignmentSectionId"
-              name="classId"
-              value={assignmentForm.classId}
-              onChange={handleAssignmentFormChange}
-              disabled={!assignmentForm.gradeLevelId || !assignmentSectionOptions.length}
-            >
-              <option value="">
-                {assignmentForm.gradeLevelId
-                  ? 'Select section'
-                  : 'Select section'}
-              </option>
-              {assignmentForm.gradeLevelId && !assignmentSectionOptions.length ? (
-                <option value="" disabled>
-                  No available sections for this grade level.
-                </option>
-              ) : null}
-              {assignmentSectionOptions.map((section) => (
-                <option key={section.classId ?? section.id} value={section.classId}>
-                  {section.sectionName || section.name}
+              <option value="">Select teacher</option>
+              {schoolTeachers.map((teacher) => (
+                <option key={teacher.userId ?? teacher.id} value={teacher.userId ?? teacher.id}>
+                  {teacher.name}
                 </option>
               ))}
             </select>
@@ -3442,10 +3024,10 @@ function ClassRecordsPage({
               ) : null}
 
               {!isStudentsLoading
-                ? students.map((student) => (
+                ? sortedPrincipalRosterStudents.map((student) => (
                     <tr key={student.classListId ?? `${student.studentLrn}-${student.name}`}>
                       <td>{student.studentLrn || 'Not provided'}</td>
-                      <td>{student.name}</td>
+                      <td>{getDisplayName(student)}</td>
                       <td>{student.gender}</td>
                       <td>{student.section || 'Not assigned'}</td>
                       <td>{student.gradeLevel || 'Not assigned'}</td>
@@ -3461,7 +3043,7 @@ function ClassRecordsPage({
                             type="button"
                             className="principal-assignment-edit-button"
                             onClick={() => openStudentProfileDialog(student)}
-                            aria-label={`Edit ${student.name} profile`}
+                            aria-label={`Edit ${getDisplayName(student)} profile`}
                             title="Edit Student Profile"
                           >
                             <Pencil size={16} aria-hidden="true" />
@@ -3470,7 +3052,7 @@ function ClassRecordsPage({
                             type="button"
                             className="principal-student-status-button"
                             onClick={() => openStudentStatusDialog(student)}
-                            aria-label={`Change ${student.name} enrollment status`}
+                            aria-label={`Change ${getDisplayName(student)} enrollment status`}
                             title="Change enrollment status"
                           >
                             <RefreshCw size={16} aria-hidden="true" />
@@ -3680,7 +3262,7 @@ function ClassRecordsPage({
                   type="date"
                   value={manualStudentForm.birthDate}
                   onChange={handleManualStudentChange}
-                  max={new Date(Date.now() - 86400000).toISOString().slice(0, 10)}
+                  max={MAX_BIRTH_DATE}
                   disabled={isManualSubmitting}
                 />
               </label>
@@ -3841,7 +3423,7 @@ function ClassRecordsPage({
                     type="date"
                     value={studentProfileForm.birthDate}
                     onChange={handleStudentProfileChange}
-                    max={new Date(Date.now() - 86400000).toISOString().slice(0, 10)}
+                    max={MAX_BIRTH_DATE}
                     disabled={isStudentProfileSaving}
                   />
                 </label>
@@ -3933,7 +3515,7 @@ function ClassRecordsPage({
               <dl className="assignment-delete-summary">
                 <div>
                   <dt>Student</dt>
-                  <dd>{studentPendingStatus.name}</dd>
+                  <dd>{getDisplayName(studentPendingStatus)}</dd>
                 </div>
                 <div>
                   <dt>Current status</dt>

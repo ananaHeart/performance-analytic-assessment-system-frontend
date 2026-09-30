@@ -299,6 +299,15 @@
   color: #b91c1c;
 }
 
+.sf1-preview-table-wrap tr.sf1-row-conflict td {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.sf1-preview-table-wrap tr.sf1-row-conflict:hover td {
+  background: #fee2e2;
+}
+
 .sf1-empty-preview {
   min-height: 210px;
   margin-top: 18px;

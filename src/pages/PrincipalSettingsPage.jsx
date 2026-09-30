@@ -11,6 +11,7 @@ import {
   X,
 } from 'lucide-react'
 import MfaSecurityPanel from '../components/MfaSecurityPanel'
+import { formatAcademicYearDate, formatTermDate, isThreeTermCalendar } from '../utils/academicCalendar'
 import {
   getClassAssignmentsV3,
   getAcademicYearsV3,
@@ -63,21 +64,7 @@ function createSchoolProfileDraft(profile = {}) {
   }
 }
 
-function formatCalendarDate(value) {
-  if (!value) return 'Not set'
-
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return String(value)
-
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: 'UTC',
-  }).format(date)
-}
-
-function PrincipalSettingsPage({ user, token }) {
+function PrincipalSettingsPage({ user, token, scrollTarget = null }) {
   const displayName =
     user.name || [user.firstName, user.middleName, user.lastName].filter(Boolean).join(' ')
   const [archivedAssignments, setArchivedAssignments] = useState([])
@@ -257,6 +244,14 @@ function PrincipalSettingsPage({ user, token }) {
     loadAcademicCalendar()
   }, [loadAcademicCalendar, loadArchivedAssignments, loadSchoolProfile])
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  useEffect(() => {
+    if (scrollTarget !== 'academic-calendar') return
+
+    document
+      .getElementById('academicCalendarSection')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [scrollTarget])
 
   const openRestoreDialog = (assignment) => {
     setRestorePending(assignment)
@@ -466,6 +461,7 @@ function PrincipalSettingsPage({ user, token }) {
       </section>
 
       <section
+        id="academicCalendarSection"
         className="content-card principal-academic-calendar-card"
         aria-labelledby="academicCalendarTitle"
       >
@@ -502,6 +498,7 @@ function PrincipalSettingsPage({ user, token }) {
               const termPeriods = [...(academicYear.termPeriods ?? [])].sort(
                 (left, right) => Number(left.termOrder ?? 0) - Number(right.termOrder ?? 0),
               )
+              const threeTermCalendar = isThreeTermCalendar(termPeriods)
 
               return (
                 <article
@@ -516,8 +513,8 @@ function PrincipalSettingsPage({ user, token }) {
                     <div>
                       <span>School year dates</span>
                       <strong>
-                        {formatCalendarDate(academicYear.startDate)} -{' '}
-                        {formatCalendarDate(academicYear.endDate)}
+                        {formatAcademicYearDate(academicYear.startDate)} -{' '}
+                        {formatAcademicYearDate(academicYear.endDate)}
                       </strong>
                     </div>
                     <span className={`status-pill status-${academicYear.status || 'inactive'}`}>
@@ -525,14 +522,18 @@ function PrincipalSettingsPage({ user, token }) {
                     </span>
                   </div>
 
-                  <div className="principal-term-grid">
+                  <div
+                    className="principal-term-grid"
+                    style={{ '--term-count': Math.max(1, termPeriods.length) }}
+                  >
                     {termPeriods.map((term) => (
                       <div className="principal-term-row" key={term.termPeriodId}>
                         <span>{term.termOrder}</span>
                         <div>
                           <strong>{term.termName}</strong>
                           <small>
-                            {formatCalendarDate(term.startAt)} - {formatCalendarDate(term.endAt)}
+                            {formatTermDate(term.startAt, { threeTermCalendar })} -{' '}
+                            {formatTermDate(term.endAt, { threeTermCalendar, exclusiveEnd: true })}
                           </small>
                         </div>
                         <span className={`status-pill status-${term.status || 'inactive'}`}>

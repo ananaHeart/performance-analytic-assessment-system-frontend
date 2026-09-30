@@ -1,7 +1,9 @@
 .public-auth-page {
   --public-header-height: 72px;
   min-height: 100svh;
-  overflow-x: hidden;
+  /* clip (not hidden) so the page does not become a scroll container,
+     which would stop the sticky visual panel from sticking. */
+  overflow-x: clip;
   padding-top: var(--public-header-height);
   background: #ffffff;
   color: var(--text);
@@ -105,9 +107,11 @@
 }
 
 .public-auth-visual {
-  position: relative;
+  position: sticky;
+  top: var(--public-header-height);
+  align-self: start;
   isolation: isolate;
-  min-height: 100%;
+  height: calc(100svh - var(--public-header-height));
   display: flex;
   align-items: flex-end;
   overflow: hidden;
@@ -120,6 +124,17 @@
 
 .public-auth-page.is-signup .public-auth-visual {
   background-position: 60% center;
+}
+
+/* On very short windows the panel copy would not fit in one screen height,
+   so let the panel scroll with the page instead of clipping its text. */
+@media (min-width: 821px) and (max-height: 560px) {
+  .public-auth-visual {
+    position: relative;
+    top: auto;
+    align-self: stretch;
+    height: auto;
+  }
 }
 
 .public-auth-visual-overlay {
@@ -1110,6 +1125,9 @@
 
   .public-auth-visual,
   .public-auth-page.is-signup .public-auth-visual {
+    position: relative;
+    top: auto;
+    height: auto;
     min-height: 230px;
     background-position: center 38%;
   }

@@ -23,12 +23,6 @@ function getClassId(record) {
   return record?.classId ?? record?.id ?? null
 }
 
-function formatOutcome(value) {
-  return String(value || 'unknown')
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (character) => character.toUpperCase())
-}
-
 function V3Sf1ImportPanel({
   token,
   gradeLevels = [],
@@ -440,11 +434,9 @@ function V3Sf1ImportPanel({
                   <table className="approval-table">
                     <thead>
                       <tr>
-                        <th>Row</th>
                         <th>LRN</th>
                         <th>Name</th>
                         <th>Parser</th>
-                        <th>Planned result</th>
                         <th>Message</th>
                       </tr>
                     </thead>
@@ -452,9 +444,12 @@ function V3Sf1ImportPanel({
                       {(preview.rows ?? []).map((row, index) => {
                         const parserIsValid =
                           String(row.parserStatus ?? '').toLowerCase() === 'valid'
+                        const isConflict = row.plannedOutcome === 'enrollment_conflict'
                         return (
-                          <tr key={`${row.studentLrn || 'row'}-${row.rowNumber || index}`}>
-                            <td>{row.rowNumber ?? index + 1}</td>
+                          <tr
+                            key={`${row.studentLrn || 'row'}-${row.rowNumber || index}`}
+                            className={isConflict ? 'sf1-row-conflict' : ''}
+                          >
                             <td>{row.studentLrn || '-'}</td>
                             <td>
                               {[row.lastName, row.firstName].filter(Boolean).join(', ') || 'Incomplete'}
@@ -468,7 +463,6 @@ function V3Sf1ImportPanel({
                                 {row.parserStatus || '-'}
                               </span>
                             </td>
-                            <td>{formatOutcome(row.plannedOutcome)}</td>
                             <td>{row.message || row.warningCode || '-'}</td>
                           </tr>
                         )

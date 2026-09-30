@@ -121,7 +121,10 @@ function buildQuery(params = {}) {
   return query ? `?${query}` : ''
 }
 
-async function requestV3(path, { token = '', headers = {}, expectedStatus = null, ...options } = {}) {
+async function requestV3(
+  path,
+  { token = '', headers = {}, expectedStatus = null, responseType = 'auto', ...options } = {},
+) {
   if (!API_BASE_URL) {
     const configurationError = new Error(
       'The SMART backend URL is not configured. Configure it and restart the frontend.',
@@ -170,17 +173,17 @@ async function requestV3(path, { token = '', headers = {}, expectedStatus = null
   }
 
   const contentType = response.headers.get('content-type') ?? ''
-  const payload = contentType.includes('application/json')
-    ? await response.json().catch(() => null)
-    : await response.text().catch(() => '')
 
   if (!response.ok) {
-    const code = extractErrorCode(payload)
-    const requestError = new Error(extractMessage(payload))
+    const errorPayload = contentType.includes('application/json')
+      ? await response.json().catch(() => null)
+      : await response.text().catch(() => '')
+    const code = extractErrorCode(errorPayload)
+    const requestError = new Error(extractMessage(errorPayload))
     requestError.status = response.status
     requestError.code = code
-    requestError.errors = payload?.errors ?? null
-    requestError.data = payload?.data ?? null
+    requestError.errors = errorPayload?.errors ?? null
+    requestError.data = errorPayload?.data ?? null
     requestError.isAuthenticationFailure = isAuthenticationFailure(response.status, code)
 
     if (requestError.isAuthenticationFailure && !PUBLIC_AUTH_PATHS.has(path)) {
@@ -189,6 +192,13 @@ async function requestV3(path, { token = '', headers = {}, expectedStatus = null
 
     throw requestError
   }
+
+  const payload =
+    responseType === 'blob'
+      ? await response.blob()
+      : contentType.includes('application/json')
+        ? await response.json().catch(() => null)
+        : await response.text().catch(() => '')
 
   if (expectedStatus !== null && response.status !== expectedStatus) {
     const statusError = new Error(
@@ -444,6 +454,206 @@ export async function getAssessmentResultsReportV3(testId, classAssignmentId, to
   )
 
   return extractData(payload) ?? null
+}
+
+export function downloadAssessmentResultsPdfV3(testId, classAssignmentId, token) {
+  return requestV3(
+    `/api/v3/reports/assessment-results/pdf${buildQuery({ testId, classAssignmentId })}`,
+    { token, responseType: 'blob', headers: { Accept: 'application/pdf' } },
+  )
+}
+
+export function downloadAssessmentResultsExcelV3(testId, classAssignmentId, token) {
+  return requestV3(
+    `/api/v3/reports/assessment-results/excel${buildQuery({ testId, classAssignmentId })}`,
+    {
+      token,
+      responseType: 'blob',
+      headers: {
+        Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      },
+    },
+  )
+}
+
+export async function getItemAnalysisReportV3(testId, classAssignmentId, token) {
+  const payload = await requestV3(
+    `/api/v3/reports/item-analysis${buildQuery({ testId, classAssignmentId })}`,
+    { token },
+  )
+
+  return extractData(payload) ?? null
+}
+
+export function downloadItemAnalysisPdfV3(testId, classAssignmentId, token) {
+  return requestV3(
+    `/api/v3/reports/item-analysis/pdf${buildQuery({ testId, classAssignmentId })}`,
+    { token, responseType: 'blob', headers: { Accept: 'application/pdf' } },
+  )
+}
+
+export function downloadItemAnalysisExcelV3(testId, classAssignmentId, token) {
+  return requestV3(
+    `/api/v3/reports/item-analysis/excel${buildQuery({ testId, classAssignmentId })}`,
+    {
+      token,
+      responseType: 'blob',
+      headers: {
+        Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      },
+    },
+  )
+}
+
+export async function getStudentPerformanceProfileV3(studentId, token) {
+  const payload = await requestV3(
+    `/api/v3/reports/student-performance-profile${buildQuery({ studentId })}`,
+    { token },
+  )
+
+  return extractData(payload) ?? null
+}
+
+export function downloadStudentPerformanceProfilePdfV3(studentId, token) {
+  return requestV3(
+    `/api/v3/reports/student-performance-profile/pdf${buildQuery({ studentId })}`,
+    { token, responseType: 'blob', headers: { Accept: 'application/pdf' } },
+  )
+}
+
+export function downloadStudentPerformanceProfileExcelV3(studentId, token) {
+  return requestV3(
+    `/api/v3/reports/student-performance-profile/excel${buildQuery({ studentId })}`,
+    {
+      token,
+      responseType: 'blob',
+      headers: {
+        Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      },
+    },
+  )
+}
+
+function buildConsolidatedQuery(groupBy, filters) {
+  const {
+    academicYearId,
+    termPeriodId,
+    gradeLevelId,
+    classId,
+    teacherUserId,
+    subjectId,
+    testId,
+  } = filters ?? {}
+
+  return buildQuery({
+    groupBy,
+    academicYearId,
+    termPeriodId,
+    gradeLevelId,
+    classId,
+    teacherUserId,
+    subjectId,
+    testId,
+  })
+}
+
+export async function getConsolidatedReportV3(groupBy, filters, token) {
+  const payload = await requestV3(
+    `/api/v3/reports/consolidated${buildConsolidatedQuery(groupBy, filters)}`,
+    { token },
+  )
+
+  return extractData(payload) ?? null
+}
+
+export function downloadConsolidatedReportPdfV3(groupBy, filters, token) {
+  return requestV3(
+    `/api/v3/reports/consolidated/pdf${buildConsolidatedQuery(groupBy, filters)}`,
+    { token, responseType: 'blob', headers: { Accept: 'application/pdf' } },
+  )
+}
+
+export function downloadConsolidatedReportExcelV3(groupBy, filters, token) {
+  return requestV3(
+    `/api/v3/reports/consolidated/excel${buildConsolidatedQuery(groupBy, filters)}`,
+    {
+      token,
+      responseType: 'blob',
+      headers: {
+        Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      },
+    },
+  )
+}
+
+function buildSyncActivityQuery(filters) {
+  const { academicYearId, termPeriodId, teacherUserId, from, to } = filters ?? {}
+
+  return buildQuery({ academicYearId, termPeriodId, teacherUserId, from, to })
+}
+
+export async function getSyncActivityReportV3(filters, token) {
+  const payload = await requestV3(
+    `/api/v3/reports/sync-activity${buildSyncActivityQuery(filters)}`,
+    { token },
+  )
+
+  return extractData(payload) ?? null
+}
+
+export function downloadSyncActivityPdfV3(filters, token) {
+  return requestV3(
+    `/api/v3/reports/sync-activity/pdf${buildSyncActivityQuery(filters)}`,
+    { token, responseType: 'blob', headers: { Accept: 'application/pdf' } },
+  )
+}
+
+export function downloadSyncActivityExcelV3(filters, token) {
+  return requestV3(
+    `/api/v3/reports/sync-activity/excel${buildSyncActivityQuery(filters)}`,
+    {
+      token,
+      responseType: 'blob',
+      headers: {
+        Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      },
+    },
+  )
+}
+
+function buildLearningCompetencyQuery(filters) {
+  const { termPeriodId, gradeLevelId, subjectId, rootTagId, skillId } = filters ?? {}
+
+  return buildQuery({ termPeriodId, gradeLevelId, subjectId, rootTagId, skillId })
+}
+
+export async function getLearningCompetencyReportV3(filters, token) {
+  const payload = await requestV3(
+    `/api/v3/reports/learning-competency${buildLearningCompetencyQuery(filters)}`,
+    { token },
+  )
+
+  return extractData(payload) ?? null
+}
+
+export function downloadLearningCompetencyPdfV3(filters, token) {
+  return requestV3(
+    `/api/v3/reports/learning-competency/pdf${buildLearningCompetencyQuery(filters)}`,
+    { token, responseType: 'blob', headers: { Accept: 'application/pdf' } },
+  )
+}
+
+export function downloadLearningCompetencyExcelV3(filters, token) {
+  return requestV3(
+    `/api/v3/reports/learning-competency/excel${buildLearningCompetencyQuery(filters)}`,
+    {
+      token,
+      responseType: 'blob',
+      headers: {
+        Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      },
+    },
+  )
 }
 
 function normalizeNotificationUnreadCount(data) {
@@ -820,6 +1030,43 @@ export async function archiveAssessmentV3(testId, token) {
     token,
   })
   return extractData(payload) ?? null
+}
+
+export async function restoreAssessmentV3(testId, token) {
+  const payload = await requestV3(`/api/v3/assessments/${testId}/restore`, {
+    method: 'POST',
+    token,
+  })
+  return extractData(payload) ?? null
+}
+
+export async function getAnswerSheetEligibilityV3(testAssignmentId, token, paperSizeCode = 'A4') {
+  const payload = await requestV3(
+    `/api/v3/test-assignments/${testAssignmentId}/answer-sheet-eligibility${buildQuery({ paperSizeCode })}`,
+    { token },
+  )
+  return extractData(payload) ?? null
+}
+
+export async function generateAnswerSheetVersionV3(testAssignmentId, paperSizeCode, token) {
+  const payload = await requestV3(
+    `/api/v3/test-assignments/${testAssignmentId}/answer-sheet-versions`,
+    {
+      method: 'POST',
+      token,
+      expectedStatus: 201,
+      body: JSON.stringify({ paperSizeCode }),
+    },
+  )
+  return extractData(payload) ?? null
+}
+
+export function downloadAnswerSheetPdfV3(answerSheetVersionId, token) {
+  return requestV3(`/api/v3/answer-sheet-versions/${answerSheetVersionId}/pdf`, {
+    token,
+    responseType: 'blob',
+    headers: { Accept: 'application/pdf' },
+  })
 }
 
 export async function previewSf1V3(

@@ -93,6 +93,15 @@ function getAssessmentTimestamp(assessment) {
   return Number.isNaN(timestamp) ? 0 : timestamp
 }
 
+function isArchivedAssessment(assessment) {
+  return String(assessment?.status ?? assessment?.testStatus ?? '').toLowerCase() === 'archived'
+}
+
+function isActiveClassAssignment(assignment) {
+  const status = String(assignment?.status ?? '').trim().toLowerCase()
+  return !status || status === 'active'
+}
+
 function TeacherDashboard({ token, onNavigate }) {
   const [classAssignments, setClassAssignments] = useState([])
   const [classStudentCounts, setClassStudentCounts] = useState({})
@@ -169,7 +178,7 @@ function TeacherDashboard({ token, onNavigate }) {
     try {
       const referenceResult = await getAssessmentReferenceDataV3({}, token)
 
-      const assignments = referenceResult.classAssignments ?? []
+      const assignments = (referenceResult.classAssignments ?? []).filter(isActiveClassAssignment)
       setClassAssignments(assignments)
 
       const classIds = [
@@ -193,9 +202,9 @@ function TeacherDashboard({ token, onNavigate }) {
       })
       setClassStudentCounts(nextCounts)
       setAssessments(
-        assessmentResults.flatMap((result) =>
-          result.status === 'fulfilled' ? result.value : [],
-        ),
+        assessmentResults
+          .flatMap((result) => (result.status === 'fulfilled' ? result.value : []))
+          .filter((assessment) => !isArchivedAssessment(assessment)),
       )
       setAssessmentsAvailable(
         assessmentResults.every((result) => result.status === 'fulfilled'),
@@ -402,11 +411,6 @@ function TeacherDashboard({ token, onNavigate }) {
           </section>
         </div>
       </div>
-
-      <footer className="teacher-dashboard-footer">
-        <span>SMART Assessment System</span>
-        <span>Teacher workspace</span>
-      </footer>
     </div>
   )
 }

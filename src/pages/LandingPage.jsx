@@ -1,10 +1,9 @@
 import {
-  ArrowRight,
   BarChart3,
   ClipboardCheck,
   GraduationCap,
-  LogIn,
   RefreshCw,
+  Sparkles,
   UserPlus,
 } from 'lucide-react'
 import landingHero from '../assets/landing-hero.png'
@@ -53,13 +52,6 @@ function LandingPage({ onNavigate }) {
           <button type="button" className="landing-login-link" onClick={() => onNavigate('login')}>
             Log in
           </button>
-          <button
-            type="button"
-            className="landing-header-register"
-            onClick={() => onNavigate('register')}
-          >
-            Register now
-          </button>
         </nav>
       </header>
 
@@ -77,24 +69,28 @@ function LandingPage({ onNavigate }) {
               Thank you for choosing a clearer way to turn classroom assessment results into
               practical teaching decisions.
             </p>
+            <p className="landing-hero-pitch">
+              <Sparkles size={19} strokeWidth={2.2} aria-hidden="true" />
+              <span>
+                Try our powerful analysis system: see which competencies your class has mastered
+                and which learners need help next.
+              </span>
+            </p>
 
             <div className="landing-hero-actions">
-              <button type="button" className="landing-primary-action" onClick={() => onNavigate('login')}>
-                <LogIn size={18} strokeWidth={2.2} aria-hidden="true" />
-                Log in
-                <ArrowRight size={17} strokeWidth={2.2} aria-hidden="true" />
-              </button>
               <button
                 type="button"
                 className="landing-secondary-action"
                 onClick={() => onNavigate('register')}
               >
                 <UserPlus size={18} strokeWidth={2.2} aria-hidden="true" />
-                Register now
+                Get started
               </button>
             </div>
 
-            <p className="landing-access-note">For school principals and teachers.</p>
+            <p className="landing-access-note">
+              For teachers. Your school principal approves new accounts.
+            </p>
           </div>
         </div>
       </section>

@@ -460,11 +460,23 @@ h3 {
 }
 
 .principal-sidebar-profile {
+  width: 100%;
   min-height: 64px;
   display: flex;
   align-items: center;
   gap: 7px;
   padding: 11px 20px 8px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.principal-sidebar-profile.is-active {
+  background: #f3fee8;
+}
+
+.principal-sidebar-profile.is-active strong {
+  color: var(--primary);
 }
 
 .principal-avatar {
@@ -550,13 +562,22 @@ h3 {
   display: inline-flex;
   align-items: center;
   gap: 9px;
+  border: 0;
+  padding: 0;
+  background: transparent;
   color: #111827;
   font-size: 0.95rem;
   font-weight: 900;
+  cursor: pointer;
 }
 
 .principal-school-year svg {
   color: var(--primary);
+}
+
+.teacher-workspace-school-year {
+  cursor: default;
+  white-space: nowrap;
 }
 
 .principal-dashboard-page {
@@ -715,6 +736,21 @@ h3 {
 
 .principal-recent-table tbody tr:last-child td {
   border-bottom: 0;
+}
+
+.principal-recent-row {
+  cursor: pointer;
+  transition: background 0.16s ease;
+}
+
+.principal-recent-row:hover,
+.principal-recent-row:focus-visible {
+  background: #f7fff9;
+}
+
+.principal-recent-row:focus-visible {
+  outline: 2px solid rgba(131, 232, 65, 0.45);
+  outline-offset: -2px;
 }
 
 .principal-recent-table td {
@@ -973,7 +1009,7 @@ h3 {
 
 .principal-term-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(var(--term-count, 4), minmax(0, 1fr));
   border: 1px solid #e3e9ef;
   border-radius: 8px;
   overflow: hidden;
@@ -1042,6 +1078,10 @@ h3 {
 
   .principal-term-row:nth-child(2n) {
     border-right: 0;
+  }
+
+  .principal-term-row:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
   }
 
   .principal-term-row:nth-child(-n + 2) {
@@ -3884,6 +3924,101 @@ h3 {
 
 .teacher-account-security {
   min-width: 0;
+  display: grid;
+  gap: 18px;
+  align-content: start;
+}
+
+.archived-assessments-header {
+  margin-bottom: 14px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.archived-assessments-header h2 {
+  margin: 0;
+  color: var(--ui-foreground);
+  font-size: 1.16rem;
+  line-height: 1.25;
+}
+
+.archived-assessments-empty {
+  margin: 0;
+  padding: 22px;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.86rem;
+  text-align: center;
+}
+
+.archived-assessments-group + .archived-assessments-group {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.archived-assessments-group h3 {
+  margin: 0 0 10px;
+  color: var(--ui-muted-foreground);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.archived-assessments-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.archived-assessments-row {
+  min-height: 56px;
+  padding: 10px 14px;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+}
+
+.archived-assessments-icon {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 7px;
+  background: var(--status-neutral-bg);
+  color: var(--status-neutral-text);
+}
+
+.archived-assessments-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.archived-assessments-copy strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.94rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.archived-assessments-copy small {
+  color: var(--muted);
+  font-size: 0.76rem;
 }
 
 @media (max-width: 900px) {
@@ -4793,7 +4928,7 @@ h3 {
   min-height: 72px;
   padding: 13px 22px;
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr) 130px;
+  grid-template-columns: 38px minmax(0, 1fr) 170px;
   align-items: center;
   gap: 14px;
   border: none;
@@ -4806,6 +4941,39 @@ h3 {
   transition:
     background 0.16s ease,
     box-shadow 0.16s ease;
+}
+
+.teacher-assessment-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.teacher-assessment-archive-button {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #ffffff;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+
+.teacher-assessment-archive-button:hover:not(:disabled) {
+  border-color: var(--status-danger-text);
+  background: var(--status-danger-bg);
+  color: var(--status-danger-text);
+}
+
+.teacher-assessment-archive-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .teacher-assessment-row:hover,
@@ -8347,4 +8515,22 @@ h3 {
   .assessment-editor-summary-list {
     grid-template-columns: 1fr;
   }
+}
+
+/* Teacher workspace footer: a simple copyright line under every teacher page. */
+.teacher-app-footer {
+  flex-shrink: 0;
+  padding: 18px 24px;
+  border-top: 1px solid #e6e9ee;
+  background: #ffffff;
+  color: #516075;
+  font-size: 0.86rem;
+  font-weight: 650;
+  text-align: center;
+}
+
+/* Teacher page roots used one-screen min-heights to fill the view; with the
+   footer at the bottom now, those min-heights would push it below the fold. */
+.dashboard-shell.is-teacher-workspace .dashboard-main > * {
+  min-height: 0;
 }
