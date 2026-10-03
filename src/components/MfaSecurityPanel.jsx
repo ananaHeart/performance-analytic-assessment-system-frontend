@@ -46,7 +46,7 @@ function formatMfaError(error, fallback) {
 
 function createRecoveryCodeDownload(codes) {
   const contents = [
-    'SMART Assessment System - Authenticator Recovery Codes',
+    'Marka - Authenticator Recovery Codes',
     '',
     'Store these codes securely. Each code can be used only once.',
     '',
@@ -492,7 +492,7 @@ function MfaSecurityPanel({ token }) {
             <span className="mfa-flow-icon" aria-hidden="true"><KeyRound size={20} /></span>
             <div>
               <h4>Confirm your account</h4>
-              <p>Enter your current password before SMART creates the authenticator secret.</p>
+              <p>Enter your current password before Marka creates the authenticator secret.</p>
             </div>
           </div>
           <div className="mfa-enrollment-fields">

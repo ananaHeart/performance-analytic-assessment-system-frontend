@@ -37,14 +37,14 @@ function LandingPage({ onNavigate }) {
           type="button"
           className="landing-brand"
           onClick={() => onNavigate('home')}
-          aria-label="SMART Assessment System home"
+          aria-label="Marka home"
         >
           <span className="landing-brand-mark" aria-hidden="true">
             <GraduationCap size={22} strokeWidth={2.2} />
           </span>
           <span className="landing-brand-copy">
-            <strong>SMART</strong>
-            <span>Assessment System</span>
+            <strong>Marka</strong>
+            <span>Dashboard</span>
           </span>
         </button>
 
@@ -63,11 +63,10 @@ function LandingPage({ onNavigate }) {
         <div className="landing-hero-overlay" aria-hidden="true" />
         <div className="landing-hero-inner">
           <div className="landing-hero-copy">
-            <p className="landing-eyebrow">Welcome to SMART</p>
-            <h1 id="landing-title">SMART Assessment System</h1>
+            <p className="landing-eyebrow">Welcome to Marka</p>
+            <h1 id="landing-title">Marka</h1>
             <p className="landing-hero-lead">
-              Thank you for choosing a clearer way to turn classroom assessment results into
-              practical teaching decisions.
+              Scan, score, and see how every learner is doing.
             </p>
             <p className="landing-hero-pitch">
               <Sparkles size={19} strokeWidth={2.2} aria-hidden="true" />
@@ -120,7 +119,7 @@ function LandingPage({ onNavigate }) {
       </section>
 
       <footer className="landing-footer">
-        <span>© 2026 SMART Assessment System</span>
+        <span>© 2026 Marka</span>
         <span>Built for evidence-informed teaching.</span>
       </footer>
     </main>

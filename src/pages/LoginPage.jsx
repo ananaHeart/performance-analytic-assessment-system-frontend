@@ -291,13 +291,13 @@ function LoginPage({ onLoginSuccess, onAuthenticationFailure, onNavigate }) {
               </button>
             </form>
 
-            <p className="public-auth-footer">© 2026 SMART Assessment System</p>
+            <p className="public-auth-footer">© 2026 Marka</p>
           </>
         ) : (
           <>
         <div className="public-auth-form-heading">
           <p>Account access</p>
-          <h1>Log in to SMART</h1>
+          <h1>Log in to Marka Dashboard</h1>
           <span>Use your active school account to continue.</span>
         </div>
 
@@ -362,7 +362,7 @@ function LoginPage({ onLoginSuccess, onAuthenticationFailure, onNavigate }) {
         <p className="public-auth-account-note">
           Access is limited to active principal and teacher accounts.
         </p>
-        <p className="public-auth-footer">© 2026 SMART Assessment System</p>
+        <p className="public-auth-footer">© 2026 Marka</p>
           </>
         )}
       </div>

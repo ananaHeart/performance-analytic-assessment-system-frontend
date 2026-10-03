@@ -17,14 +17,14 @@ function PublicAuthShell({
           type="button"
           className="public-auth-brand"
           onClick={() => onNavigate('home')}
-          aria-label="SMART Assessment System home"
+          aria-label="Marka home"
         >
           <span className="public-auth-brand-mark" aria-hidden="true">
             <GraduationCap size={22} strokeWidth={2.2} />
           </span>
           <span className="public-auth-brand-copy">
-            <strong>SMART</strong>
-            <span>Assessment System</span>
+            <strong>Marka</strong>
+            <span>Dashboard</span>
           </span>
         </button>
 
@@ -38,7 +38,7 @@ function PublicAuthShell({
         <aside
           className="public-auth-visual"
           style={{ '--public-auth-image': `url(${landingHero})` }}
-          aria-label="SMART Assessment System"
+          aria-label="Marka Dashboard"
         >
           <div className="public-auth-visual-overlay" aria-hidden="true" />
           <div className="public-auth-visual-copy">

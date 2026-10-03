@@ -51,7 +51,7 @@ function V2LoginPage({ onLogin }) {
           <span className="mx-auto mb-4 flex size-12 items-center justify-center rounded-lg bg-brand-soft text-primary">
             <GraduationCap size={25} strokeWidth={2.1} aria-hidden="true" />
           </span>
-          <p className="mb-1 text-sm font-semibold text-primary">SMART Assessment System</p>
+          <p className="mb-1 text-sm font-semibold text-primary">Marka</p>
           <h1 id="login-title" className="text-2xl font-bold text-foreground">
             Sign in to your account
           </h1>

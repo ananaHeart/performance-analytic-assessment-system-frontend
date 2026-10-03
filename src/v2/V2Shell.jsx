@@ -21,7 +21,7 @@ function V2Shell({ user, route, onLogout, children }) {
               <ClipboardCheck size={20} />
             </span>
             <span>
-              <strong>SMART Assessment</strong>
+              <strong>Marka</strong>
               <small>{role === 'principal' ? 'School administration' : 'Assessment workspace'}</small>
             </span>
           </button>

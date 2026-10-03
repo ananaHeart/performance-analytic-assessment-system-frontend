@@ -61,8 +61,8 @@ function AppLayout({
               <GraduationCap size={20} strokeWidth={2.3} />
             </span>
             <div>
-              <strong>SMART</strong>
-              <span>Assessment System</span>
+              <strong>Marka</strong>
+              <span>Dashboard</span>
             </div>
           </div>
 
@@ -130,8 +130,8 @@ function AppLayout({
               onClick={() => onNavigate('teacher-dashboard')}
               aria-label="Go to home dashboard"
             >
-              <strong>SMART</strong>
-              <span>Assessment System</span>
+              <strong>Marka</strong>
+              <span>Dashboard</span>
             </button>
           </div>
 
@@ -194,7 +194,7 @@ function AppLayout({
         {children}
       </main>
       {isTeacherWorkspaceLayout ? (
-        <footer className="teacher-app-footer">© 2026 SMART Assessment System</footer>
+        <footer className="teacher-app-footer">© 2026 Marka</footer>
       ) : null}
 
       {confirmingLogout ? (

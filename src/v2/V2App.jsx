@@ -123,7 +123,7 @@ function V2App({ route }) {
     content = (
       <RouteMessage
         title="Page not found"
-        description="This page is not available in the SMART Assessment workspace."
+        description="This page is not available in the Marka workspace."
         actionLabel="Return to workspace"
         actionRoute={homeRoute}
       />

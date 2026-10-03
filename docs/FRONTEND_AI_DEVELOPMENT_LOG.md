@@ -255,4 +255,18 @@ At the user's request, the left photo/copy panel on the public auth pages (`Publ
 
 ---
 
+## 2026-10-03 — Product renamed "SMART Assessment System" → "Marka" (UI text only)
+
+The user's thesis panel pushed back on the working name during a workshop, rejecting "SMART Assessment System," "Mobile Analysis System," and "Performance Analytic Assessment System" as not commercial-sounding, and asked for a real product-style name. This session and the mobile session (`mobileassessmentapp-8c`) jointly brainstormed a shortlist, ran a quick web-search name-collision check (ruling out "Rubrix" and "Masterly" as already-taken, flagging "Gradewise"/"Talino"/"Learnlytics" as close to existing products), and the user picked **Marka** (Filipino for "grade/mark").
+
+Agreed strings, shared with mobile: brand "Marka"; web dashboard "Marka" (brand block) or "Marka Dashboard" (browser title, Login heading); mobile app "Marka Teacher"; shared tagline "Scan, score, and see how every learner is doing."
+
+Agreed scope with mobile (now the standing rule for any future rename): change visible text only — titles, headers, login/landing copy, brand blocks, footers, alert/error strings, downloaded-file content — and never touch file/component names, routes, API paths, `apiV3Client.js` function names, the repo name, `package.json` name, or the mobile package ID. A generic use of the word "system" in body copy (e.g. "our powerful analysis system") is not the brand name and was left alone.
+
+Changed: `index.html` `<title>` ("web-dashboard" → "Marka Dashboard" — this had never actually said the old brand name), `AppLayout.jsx` (both brand blocks, teacher footer), `PublicAuthShell.jsx` (brand block, aria-labels), `LandingPage.jsx` (brand block, hero eyebrow/h1/lead now use the brand name and shared tagline, footer), `LoginPage.jsx` (both footers; h1 is literally "Log in to Marka Dashboard" so it matches the mobile app's principal-redirect pop-up text word for word), `TeacherSignUpPage.jsx` (3 strings), `MfaSecurityPanel.jsx` (downloaded recovery-codes file header, one sentence), `apiV3Client.js` (2 network/config error messages), and the already-dead/unmounted `V2App.jsx`/`V2Shell.jsx`/`V2LoginPage.jsx` (cheap consistency cleanup, not a live-surface fix — confirmed via the codebase-map memory that `App.jsx` never imports these). Grep-confirmed zero remaining "SMART"/"Assessment System" strings in `src/` except one `global.css` comment, correctly left alone since code comments aren't user-visible.
+
+**Status: Verified** live against the real app entry point (not a mock harness) via headless Chrome: landing and login pages both render "Marka"/"Marka Dashboard" correctly, browser tab title confirmed, zero console errors. ESLint clean on every touched file. **Not yet committed** — holding for the user's review, same as the mobile side.
+
+---
+
 *This log is maintained going forward as new frontend work is completed. Entries are added, not rewritten — if a status changes (e.g., an "unverified" item gets a real live test), a new dated entry records the change rather than editing history.*

@@ -127,7 +127,7 @@ async function requestV3(
 ) {
   if (!API_BASE_URL) {
     const configurationError = new Error(
-      'The SMART backend URL is not configured. Configure it and restart the frontend.',
+      'The Marka backend URL is not configured. Configure it and restart the frontend.',
     )
     configurationError.code = 'V3_API_URL_MISSING'
     throw configurationError
@@ -165,7 +165,7 @@ async function requestV3(
     })
   } catch (cause) {
     const networkError = new Error(
-      `Unable to connect to the SMART backend at ${API_BASE_URL}. Confirm it is running and retry.`,
+      `Unable to connect to the Marka backend at ${API_BASE_URL}. Confirm it is running and retry.`,
       { cause },
     )
     networkError.code = 'V3_NETWORK_ERROR'

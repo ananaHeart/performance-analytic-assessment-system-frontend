@@ -885,7 +885,7 @@ function TeacherSignUpPage({ onNavigate }) {
     <PublicAuthShell
       variant="signup"
       eyebrow="Teacher registration"
-      title="Request access to SMART."
+      title="Request access to Marka."
       description="Submit verified profile, address, and account details for principal approval."
       trustMessage="New teacher accounts remain pending until reviewed by the school."
       onNavigate={onNavigate}
@@ -955,7 +955,7 @@ function TeacherSignUpPage({ onNavigate }) {
                       ? 'Address location comes from dropdowns; only address line is free text.'
                       : step === 3
                         ? 'Set a password that matches backend strength rules.'
-                        : 'Select where SMART should send your registration verification code.'}
+                        : 'Select where Marka should send your registration verification code.'}
               </span>
             </div>
             <strong>
@@ -1412,7 +1412,7 @@ function TeacherSignUpPage({ onNavigate }) {
                   </span>
                   <div>
                     <h3>Review teacher registration</h3>
-                    <p>Review the details, then choose where SMART should send the verification code.</p>
+                    <p>Review the details, then choose where Marka should send the verification code.</p>
                   </div>
                 </div>
 
