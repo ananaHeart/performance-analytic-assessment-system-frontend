@@ -16,6 +16,7 @@ import {
   activateAssessmentV3,
   createAssessmentV3,
   downloadAnswerSheetPdfV3,
+  downloadTestQuestionnairePdfV3,
   generateAnswerSheetVersionV3,
   getAnswerSheetEligibilityV3,
   getAssessmentReferenceDataV3,
@@ -1513,6 +1514,8 @@ function V2AssessmentEditorPage({
   const [answerSheetVersion, setAnswerSheetVersion] = useState(null)
   const [answerSheetPreparing, setAnswerSheetPreparing] = useState(false)
   const [answerSheetError, setAnswerSheetError] = useState('')
+  const [questionnairePreparing, setQuestionnairePreparing] = useState(false)
+  const [questionnaireError, setQuestionnaireError] = useState('')
   const [form, setForm] = useState({
     classAssignmentId: '',
     termPeriodId: '',
@@ -1714,6 +1717,13 @@ function V2AssessmentEditorPage({
         : answerSheetPreparing
           ? 'Preparing the Bubble Answer Sheet PDF...'
           : 'Generate and open the Bubble Answer Sheet PDF'
+  const questionnaireTitle = !currentTestId
+    ? 'Save the assessment before printing the Test Questionnaire.'
+    : hasUnsavedChanges
+      ? 'Save the latest draft changes before printing.'
+      : questionnairePreparing
+        ? 'Preparing the Test Questionnaire PDF...'
+        : 'Open the Test Questionnaire PDF'
   const updateForm = (field, value) => {
     if (field === 'openAt') setOpenAtError('')
     setForm((current) => ({ ...current, [field]: value }))
@@ -1966,6 +1976,32 @@ function V2AssessmentEditorPage({
     }
   }
 
+  const handlePrintTestQuestionnaire = async () => {
+    if (!currentTestId || hasUnsavedChanges) return
+
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) {
+      setQuestionnaireError('Allow pop-ups to open the Test Questionnaire.')
+      return
+    }
+
+    setQuestionnairePreparing(true)
+    setQuestionnaireError('')
+
+    try {
+      const pdfBlob = await downloadTestQuestionnairePdfV3(currentTestId, token)
+      const pdfUrl = URL.createObjectURL(pdfBlob)
+      printWindow.opener = null
+      printWindow.location.replace(pdfUrl)
+      window.setTimeout(() => URL.revokeObjectURL(pdfUrl), 60_000)
+    } catch (printError) {
+      printWindow.close()
+      setQuestionnaireError(printError.message)
+    } finally {
+      setQuestionnairePreparing(false)
+    }
+  }
+
   const handleActivate = async () => {
     if (!currentTestId || !isDraft || hasUnsavedChanges) return
 
@@ -1982,6 +2018,8 @@ function V2AssessmentEditorPage({
     try {
       const activated = await activateAssessmentV3(currentTestId, token)
       setAssessmentStatus(String(activated.status ?? 'active').toLowerCase())
+      setAnswerSheetVersion(null)
+      refreshAnswerSheetEligibility(activated.testAssignmentId ?? currentTestAssignmentId)
       setMessage({ type: 'success', text: 'Assessment activated successfully.' })
     } catch (error) {
       setMessage({ type: 'error', text: error.message })
@@ -2063,10 +2101,11 @@ function V2AssessmentEditorPage({
           </Button>
           <Button
             variant="outline"
-            disabled
-            title="Test Questionnaire printing has no backend endpoint yet."
+            disabled={!currentTestId || questionnairePreparing || hasUnsavedChanges}
+            title={questionnaireTitle}
+            onClick={handlePrintTestQuestionnaire}
           >
-            <Printer />
+            {questionnairePreparing ? <LoaderCircle className="animate-spin" /> : <Printer />}
             Print Test Questionnaire
           </Button>
           <Button
@@ -2096,6 +2135,9 @@ function V2AssessmentEditorPage({
         ) : null}
         {answerSheetError ? (
           <p className="col-span-full m-0 text-sm text-destructive">{answerSheetError}</p>
+        ) : null}
+        {questionnaireError ? (
+          <p className="col-span-full m-0 text-sm text-destructive">{questionnaireError}</p>
         ) : null}
       </header>
 

@@ -1069,6 +1069,14 @@ export function downloadAnswerSheetPdfV3(answerSheetVersionId, token) {
   })
 }
 
+export function downloadTestQuestionnairePdfV3(testId, token) {
+  return requestV3(`/api/v3/assessments/${testId}/questionnaire/pdf`, {
+    token,
+    responseType: 'blob',
+    headers: { Accept: 'application/pdf' },
+  })
+}
+
 export async function previewSf1V3(
   file,
   { academicYearId, gradeLevelId, sectionName = '' },

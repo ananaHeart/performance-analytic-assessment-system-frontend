@@ -76,14 +76,6 @@ const REPORT_TYPES = [
     enabled: true,
   },
   {
-    code: 'lms_intervention_plan',
-    label: 'LMS Intervention Plan',
-    description: 'Teacher intervention plan based on backend report evidence.',
-    roles: ['teacher'],
-    icon: FileText,
-    enabled: false,
-  },
-  {
     code: 'principal_consolidated',
     label: 'Principal Consolidated Report',
     description: 'School reporting view consolidated by the backend.',
@@ -1151,6 +1143,9 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
   const competencyMasteryRows = Array.isArray(itemAnalysisData?.competencyMastery)
     ? itemAnalysisData.competencyMastery
     : []
+  const skillNameById = new Map(
+    competencyMasteryRows.map((row) => [String(row.skillId), row.skillName || `Skill #${row.skillId}`]),
+  )
 
   const consolidatedGroups = Array.isArray(consolidatedData?.groups) ? consolidatedData.groups : []
 
@@ -1981,6 +1976,7 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
                   <tr>
                     <th>Item</th>
                     <th>Type</th>
+                    <th>Competency</th>
                     <th>Correct</th>
                     <th>Incorrect</th>
                     <th>Unanswered</th>
@@ -1994,6 +1990,13 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
                           <strong>Item {index + 1}</strong>
                         </td>
                         <td>{formatStatus(row.questionTypeCode)}</td>
+                        <td>
+                          {Array.isArray(row.skillIds) && row.skillIds.length
+                            ? row.skillIds
+                                .map((skillId) => skillNameById.get(String(skillId)) || `Skill #${skillId}`)
+                                .join(', ')
+                            : 'Not mapped'}
+                        </td>
                         <td>{formatBackendCount(row.correctCount)}</td>
                         <td>{formatBackendCount(row.incorrectCount)}</td>
                         <td>{formatBackendCount(row.unansweredCount)}</td>
@@ -2001,7 +2004,7 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="5" className="reports-results-empty">
+                      <td colSpan="6" className="reports-results-empty">
                         No item rows are available.
                       </td>
                     </tr>
