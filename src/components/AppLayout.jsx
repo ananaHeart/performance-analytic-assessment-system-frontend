@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   BarChart3,
   CalendarDays,
@@ -30,6 +30,32 @@ function AppLayout({
   children,
 }) {
   const [confirmingLogout, setConfirmingLogout] = useState(false)
+  const navigationRef = useRef(null)
+
+  useEffect(() => {
+    const navigation = navigationRef.current
+    if (!navigation) return
+
+    const revealActiveItem = () => {
+      const activeItem = navigation.querySelector('[aria-current="page"]')
+      if (!activeItem || navigation.scrollWidth <= navigation.clientWidth) return
+
+      const navigationBounds = navigation.getBoundingClientRect()
+      const activeBounds = activeItem.getBoundingClientRect()
+      // Reveal the active tab without scrolling the page or interrupting manual swipes.
+      if (activeBounds.left < navigationBounds.left) {
+        navigation.scrollLeft += activeBounds.left - navigationBounds.left - 2
+      } else if (activeBounds.right > navigationBounds.right) {
+        navigation.scrollLeft += activeBounds.right - navigationBounds.right + 2
+      }
+    }
+
+    revealActiveItem()
+    const observer = new ResizeObserver(revealActiveItem)
+    observer.observe(navigation)
+    return () => observer.disconnect()
+  }, [activePage, isTeacherWorkspaceLayout])
+
   const displayName =
     user.name || [user.firstName, user.middleName, user.lastName].filter(Boolean).join(' ')
   const teacherInitials =
@@ -62,11 +88,10 @@ function AppLayout({
             </span>
             <div>
               <strong>Marka</strong>
-              <span>Dashboard</span>
             </div>
           </div>
 
-          <nav className="sidebar-nav principal-sidebar-nav" aria-label="Main navigation">
+          <nav ref={navigationRef} className="sidebar-nav principal-sidebar-nav" aria-label="Main navigation">
             {navItems.map((item) => {
               const NavIcon = principalNavIcons[item.key] ?? LayoutDashboard
 
@@ -80,6 +105,7 @@ function AppLayout({
                   onClick={() => onNavigate(item.key)}
                   disabled={item.disabled}
                   title={item.title}
+                  aria-current={activePage === item.key ? 'page' : undefined}
                 >
                   <NavIcon size={16} strokeWidth={2.2} aria-hidden="true" />
                   <span>{item.label}</span>
@@ -131,11 +157,10 @@ function AppLayout({
               aria-label="Go to home dashboard"
             >
               <strong>Marka</strong>
-              <span>Dashboard</span>
             </button>
           </div>
 
-          <nav className="teacher-workspace-nav" aria-label="Teacher navigation">
+          <nav ref={navigationRef} className="teacher-workspace-nav" aria-label="Teacher navigation">
             {navItems.map((item) => (
               <button
                 key={item.key}

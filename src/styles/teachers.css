@@ -1,0 +1,293 @@
+.teachers-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.principal-teachers-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.principal-teachers-page .principal-teachers-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.principal-teachers-page .principal-teacher-tabs {
+  margin: 0;
+  min-width: 0;
+  gap: 4px;
+}
+
+.principal-teachers-page .principal-teacher-tabs button {
+  min-height: 38px;
+  padding: 0 10px;
+  gap: 6px;
+  font-size: 0.84rem;
+  white-space: nowrap;
+}
+
+.principal-teachers-page .principal-teacher-tab-count {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+}
+
+.principal-teachers-page .principal-teachers-toolbar {
+  flex: 1 1 330px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 128px;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+}
+
+.principal-teachers-page .principal-teachers-search {
+  justify-self: end;
+  width: min(100%, 440px);
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 10px;
+  gap: 6px;
+}
+
+.principal-teachers-page .principal-teachers-search svg {
+  flex-shrink: 0;
+}
+
+.principal-teachers-page .principal-teachers-search input {
+  height: 36px;
+  font-size: 0.84rem;
+}
+
+.principal-teachers-page .principal-teachers-refresh {
+  width: 128px;
+  min-height: 38px;
+  padding: 0 10px;
+}
+
+.principal-teachers-page > .form-message {
+  margin: 0;
+}
+
+.principal-teachers-page .principal-teachers-table-panel {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.principal-teachers-page .principal-teachers-table-wrap {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.principal-teachers-page .principal-teachers-table {
+  min-width: 1040px;
+}
+
+.principal-teachers-page .principal-teachers-table :is(th, td) {
+  height: 56px;
+  padding: 8px 12px;
+  letter-spacing: 0;
+}
+
+.principal-teachers-page .principal-teachers-table th {
+  height: 36px;
+  white-space: nowrap;
+}
+
+.principal-teachers-page .principal-teachers-table td {
+  max-width: 300px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.principal-teachers-page .principal-teachers-table :is(th, td):first-child {
+  min-width: 190px;
+}
+
+.principal-teachers-page .principal-teachers-table :is(th, td):nth-child(2) {
+  min-width: 200px;
+}
+
+.principal-teachers-page .principal-teachers-table :is(th, td):nth-child(3) {
+  min-width: 170px;
+}
+
+.principal-teachers-page .principal-teachers-table :is(th, td):nth-child(4) {
+  min-width: 114px;
+}
+
+.principal-teachers-page .principal-teachers-table .principal-teachers-empty {
+  height: 100px;
+  text-align: center;
+}
+
+.principal-teachers-page .principal-teacher-name-cell {
+  display: flex;
+  width: 100%;
+  gap: 8px;
+}
+
+.principal-teachers-page .principal-teacher-name-cell strong {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.principal-teachers-page .principal-teacher-name-cell > span {
+  width: 30px;
+  height: 30px;
+}
+
+.principal-teachers-page .principal-teacher-contact span {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  align-items: start;
+}
+
+.principal-teachers-page .principal-teacher-contact svg {
+  margin-top: 1px;
+}
+
+.principal-teachers-page .principal-teacher-actions {
+  gap: 6px;
+}
+
+.principal-teachers-page .principal-teacher-view-button {
+  padding: 0 8px;
+}
+
+.principal-teachers-page .principal-teacher-modal-backdrop {
+  padding: 16px;
+}
+
+.principal-teachers-page :is(.principal-teacher-modal, .principal-teacher-confirmation) {
+  max-height: calc(100dvh - 32px);
+}
+
+.principal-teachers-page :is(.principal-teacher-modal-header, .principal-teacher-modal-footer) {
+  min-height: 0;
+  flex-shrink: 0;
+  flex-direction: row;
+  padding: 10px 16px;
+  gap: 8px 12px;
+}
+
+.principal-teachers-page .principal-teacher-modal-header > div {
+  min-width: 0;
+}
+
+.principal-teachers-page :is(.principal-teacher-modal-header, .principal-teacher-confirmation) h3 {
+  font-size: 1rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.principal-teachers-page .principal-teacher-modal-close {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+}
+
+.principal-teachers-page .principal-teacher-detail-sections {
+  padding: 0 16px;
+}
+
+.principal-teachers-page .principal-teacher-detail-section {
+  padding: 12px 0;
+}
+
+.principal-teachers-page .principal-teacher-detail-section > header {
+  margin-bottom: 8px;
+}
+
+.principal-teachers-page .principal-teacher-detail-grid {
+  gap: 10px 16px;
+}
+
+.principal-teachers-page .principal-teacher-detail {
+  gap: 2px;
+}
+
+.principal-teachers-page .principal-teacher-modal-footer {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.principal-teachers-page .principal-teacher-modal-actions {
+  width: auto;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.principal-teachers-page :is(.principal-teacher-modal-actions, .principal-teacher-confirmation-actions) > button {
+  min-height: 36px;
+  padding: 0 10px;
+}
+
+.principal-teachers-page .principal-teacher-confirmation {
+  gap: 10px 12px;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.principal-teachers-page .principal-teacher-confirmation-icon {
+  width: 32px;
+  height: 32px;
+}
+
+.principal-teachers-page .principal-teacher-confirmation p {
+  margin-top: 6px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.principal-teachers-page .principal-teacher-confirmation > :is(label, .form-message) {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin: 0;
+}
+
+.principal-teachers-page .principal-teacher-confirmation textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 8px 10px;
+  font-size: 0.84rem;
+}
+
+.principal-teachers-page .principal-teacher-confirmation-actions {
+  padding-top: 2px;
+  gap: 8px;
+}
+
+@media (max-width: 560px) {
+  .principal-teachers-page .principal-teacher-tabs {
+    width: 100%;
+  }
+
+  .principal-teachers-page .principal-teacher-tabs button {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0 6px;
+    gap: 4px;
+    font-size: 0.8rem;
+  }
+
+  .principal-teachers-page .principal-teachers-search {
+    width: 100%;
+  }
+}

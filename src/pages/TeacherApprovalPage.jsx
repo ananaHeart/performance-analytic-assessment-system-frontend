@@ -344,47 +344,47 @@ function TeacherApprovalPage({ token, user }) {
 
   return (
     <div className="principal-teachers-page">
-      <section className="principal-teachers-header">
-        <h2>Teacher Accounts</h2>
-        <p>Review registration requests and manage teacher account access for your school.</p>
-      </section>
+      <h1 className="teachers-visually-hidden">Teacher accounts</h1>
 
-      <div className="principal-teacher-tabs" role="tablist" aria-label="Teacher account status">
-        {teacherTabs.map((tab) => (
+      <div className="principal-teachers-controls">
+        <div className="principal-teacher-tabs" role="tablist" aria-label="Teacher account status">
+          {teacherTabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab.key}
+              className={activeTab === tab.key ? 'is-active' : ''}
+              onClick={() => setActiveTab(tab.key)}
+            >
+              <span>{tab.label}</span>
+              <span className="principal-teacher-tab-count">{tabCounts[tab.key] ?? 0}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="principal-teachers-toolbar">
+          <label className="principal-teachers-search" htmlFor="teacherSearch">
+            <Search size={17} strokeWidth={2.1} aria-hidden="true" />
+            <input
+              id="teacherSearch"
+              type="search"
+              aria-label="Search teachers by name, email, phone, or specialization"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search teachers"
+            />
+          </label>
           <button
-            key={tab.key}
             type="button"
-            role="tab"
-            aria-selected={activeTab === tab.key}
-            className={activeTab === tab.key ? 'is-active' : ''}
-            onClick={() => setActiveTab(tab.key)}
+            className="principal-teachers-refresh"
+            onClick={() => loadTeachers()}
+            disabled={isLoading}
           >
-            <span>{tab.label}</span>
-            <span className="principal-teacher-tab-count">{tabCounts[tab.key] ?? 0}</span>
+            <RefreshCw size={16} strokeWidth={2.2} aria-hidden="true" />
+            <span>{isLoading ? 'Refreshing...' : 'Refresh'}</span>
           </button>
-        ))}
-      </div>
-
-      <div className="principal-teachers-toolbar">
-        <label className="principal-teachers-search" htmlFor="teacherSearch">
-          <Search size={17} strokeWidth={2.1} aria-hidden="true" />
-          <input
-            id="teacherSearch"
-            type="search"
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="Search name, email, or specialization"
-          />
-        </label>
-        <button
-          type="button"
-          className="principal-teachers-refresh"
-          onClick={() => loadTeachers()}
-          disabled={isLoading}
-        >
-          <RefreshCw size={16} strokeWidth={2.2} aria-hidden="true" />
-          <span>{isLoading ? 'Refreshing...' : 'Refresh'}</span>
-        </button>
+        </div>
       </div>
 
       {error ? (
@@ -531,7 +531,6 @@ function TeacherApprovalPage({ token, user }) {
           >
             <header className="principal-teacher-modal-header">
               <div>
-                <p>Teacher account</p>
                 <h3 id="teacherDetailsTitle">{selectedTeacher.name || 'Teacher details'}</h3>
               </div>
               <button
@@ -677,7 +676,7 @@ function TeacherApprovalPage({ token, user }) {
                 />
               </label>
             ) : null}
-            {pendingAction.action === 'reject' && error ? (
+            {error ? (
               <p className="form-message form-message-error" role="alert">
                 {error}
               </p>

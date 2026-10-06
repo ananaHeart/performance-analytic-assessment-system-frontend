@@ -735,14 +735,6 @@ function ClassRecordsPage({
         }),
     [sectionOptions, selectedAcademicYearId],
   )
-  const selectedPrincipalRosterClass =
-    principalRosterClassOptions.find(
-      (classRecord) => String(classRecord.classId) === String(principalRosterClassId),
-    ) ?? null
-  const selectedManualClass =
-    principalRosterClassOptions.find(
-      (classRecord) => String(classRecord.classId) === String(manualStudentForm.classId),
-    ) ?? null
   const selectedClassStudents = useMemo(
     () => students.filter((student) => studentBelongsToClass(student, selectedClassAssignment)),
     [students, selectedClassAssignment],
@@ -1868,38 +1860,73 @@ function ClassRecordsPage({
 
     return (
       <div className="content-stack teacher-records-page smart-ui">
+        <h1 className="classes-visually-hidden">Classes</h1>
         {studentsError ? <p className="form-message form-message-error">{studentsError}</p> : null}
 
         <section className="teacher-assessment-workspace-panel">
-          <div className="teacher-assessment-title-row">
-            <div>
-              <p>Class workspace</p>
-              <h2>{teacherHeaderLabel}</h2>
-              <span>
-                {shouldShowClassSelection
-                  ? isSectionsLoading
-                    ? 'Loading assigned classes'
-                    : `${teacherClassOptions.length} assigned classes`
-                  : isStudentsLoading
-                    ? 'Loading students'
-                    : `${teacherHeaderStudentCount} students`}
-              </span>
+          {shouldShowClassSelection ? (
+            !isSectionsLoading && teacherClassOptions.length > 0 ? (
+              <p className="teacher-class-count">{teacherClassOptions.length} assigned classes</p>
+            ) : null
+          ) : (
+            <div className="teacher-assessment-title-row">
+              <div className="teacher-class-context">
+                <h2>{teacherHeaderLabel}</h2>
+                <span>
+                  {isStudentsLoading ? 'Loading students' : `${teacherHeaderStudentCount} students`}
+                </span>
+              </div>
+              {activeTeacherTab === 'assessment' ? (
+                <div className="teacher-assessment-toolbar" role="group" aria-label="Class controls">
+                  <label className="teacher-subject-select" htmlFor="teacherClassSubject">
+                    <span id="teacherClassSubjectLabel">Subject</span>
+                    <select
+                      id="teacherClassSubject"
+                      aria-labelledby="teacherClassSubjectLabel"
+                      value={selectedClassAssignment?.classAssignmentId ?? ''}
+                      onChange={handleTeacherSubjectChange}
+                      disabled={!selectedClassGroupAssignments.length}
+                    >
+                      {selectedClassGroupAssignments.map((assignment) => (
+                        <option
+                          key={assignment.classAssignmentId ?? assignment.id}
+                          value={assignment.classAssignmentId}
+                        >
+                          {assignment.subjectName || 'Subject not assigned'}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    className="teacher-create-assessment-button"
+                    disabled={!selectedClassAssignment}
+                    onClick={() =>
+                      onNavigate('assessment-setup', {
+                        classId: selectedClassAssignment.classId,
+                        classAssignmentId: selectedClassAssignment.classAssignmentId,
+                      })
+                    }
+                  >
+                    <Plus size={18} strokeWidth={2.5} aria-hidden="true" />
+                    <span>Create Assessment</span>
+                  </button>
+                </div>
+              ) : null}
             </div>
-          </div>
+          )}
 
           {shouldShowClassSelection ? (
             <section className="teacher-records-class-grid" aria-label="Assigned classes">
               {isSectionsLoading ? (
                 <article className="teacher-records-empty">
                   <strong>Loading assigned classes...</strong>
-                  <span>Please wait while the class list is loaded.</span>
                 </article>
               ) : null}
 
               {!isSectionsLoading && !teacherClassOptions.length ? (
                 <article className="teacher-records-empty">
                   <strong>No assigned classes yet</strong>
-                  <span>Assigned classes from the backend will appear here.</span>
                 </article>
               ) : null}
 
@@ -1941,10 +1968,7 @@ function ClassRecordsPage({
 
                 <article className="teacher-assessment-panel">
                   <div className="teacher-assessment-panel-header">
-                    <div>
-                      <p>Assessment library</p>
-                      <strong>Assessments</strong>
-                    </div>
+                    <h3>Assessments</h3>
                     <small>{selectedClassAssessments.length} total</small>
                   </div>
 
@@ -1965,7 +1989,6 @@ function ClassRecordsPage({
                           <ClipboardList size={20} />
                         </span>
                         <strong>No assessments yet</strong>
-                        <small>No assessments have been added for this class.</small>
                       </div>
                     ) : null}
 
@@ -2029,45 +2052,6 @@ function ClassRecordsPage({
                   </div>
                 </article>
               </div>
-
-              <aside className="teacher-class-side-column" aria-label="Class controls">
-                <div className="teacher-assessment-toolbar">
-                  <label className="teacher-subject-select" htmlFor="teacherClassSubject">
-                    <span>Subject</span>
-                    <select
-                      id="teacherClassSubject"
-                      value={selectedClassAssignment?.classAssignmentId ?? ''}
-                      onChange={handleTeacherSubjectChange}
-                      disabled={!selectedClassGroupAssignments.length}
-                    >
-                      {selectedClassGroupAssignments.map((assignment) => (
-                        <option
-                          key={assignment.classAssignmentId ?? assignment.id}
-                          value={assignment.classAssignmentId}
-                        >
-                          {assignment.subjectName || 'Subject not assigned'}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <button
-                    type="button"
-                    className="teacher-create-assessment-button"
-                    disabled={!selectedClassAssignment}
-                    onClick={() =>
-                      onNavigate('assessment-setup', {
-                        classId: selectedClassAssignment.classId,
-                        classAssignmentId: selectedClassAssignment.classAssignmentId,
-                      })
-                    }
-                  >
-                    <Plus size={18} strokeWidth={2.5} />
-                    <span>Create Assessment</span>
-                  </button>
-                </div>
-
-              </aside>
             </div>
           ) : null}
 
@@ -2215,17 +2199,10 @@ function ClassRecordsPage({
     >
       {principalSection === 'classes' ? (
         <>
-          <section className="principal-class-header">
-            <h2>Teacher Class Assignment</h2>
-            <span>Manage and assign teachers to sections and subjects for the current academic year.</span>
-          </section>
+          <h1 className="classes-visually-hidden">Class assignments</h1>
 
-          <section className="principal-assignment-card">
+          <section className="principal-assignment-card" aria-label="Assign teacher to a class">
         <div className="section-toolbar">
-          <div>
-            <p className="content-card-tag">Assignment Creation Section</p>
-            <h3>Assign teacher to a class</h3>
-          </div>
           <div className="principal-assignment-toolbar-actions">
             <button type="button" className="secondary-button" onClick={openClassCreateDialog}>
               <Plus size={17} strokeWidth={2.4} aria-hidden="true" />
@@ -2233,6 +2210,7 @@ function ClassRecordsPage({
             </button>
 
             <button type="button" className="secondary-button" onClick={handlePrincipalRefresh}>
+              <RefreshCw size={16} aria-hidden="true" />
               Refresh
             </button>
           </div>
@@ -2333,12 +2311,9 @@ function ClassRecordsPage({
         </form>
       </section>
 
-      <section className="principal-assignment-card">
+      <section className="principal-assignment-card" aria-labelledby="classAssignmentsHeading">
         <div className="principal-assignment-table-header">
-          <div>
-            <p className="content-card-tag">Assignments Table</p>
-            <h3>Existing class assignments</h3>
-          </div>
+          <h2 id="classAssignmentsHeading">Assignments</h2>
           <span>{activeClassAssignments.length} assignment(s)</span>
         </div>
 
@@ -2888,16 +2863,15 @@ function ClassRecordsPage({
 
       {principalSection === 'students' ? (
         <>
-          <section className="principal-class-header">
-            <h2>Students</h2>
-            <span>Manage learner profiles, class enrollment, and roster status for your school.</span>
-          </section>
+          <h1 className="classes-visually-hidden">Students</h1>
 
       <section className="content-card principal-student-table-panel">
         <div className="section-toolbar">
-          <div>
-            <p className="content-card-tag">Student Records Table</p>
-            <h3>Class roster</h3>
+          <div className="principal-roster-heading">
+            <h2>Class roster</h2>
+            {!isStudentsLoading && !studentsError ? (
+              <span>{students.length} {students.length === 1 ? 'student' : 'students'}</span>
+            ) : null}
           </div>
           <div className="principal-assignment-toolbar-actions">
             <button
@@ -2933,9 +2907,10 @@ function ClassRecordsPage({
 
         <div className="principal-roster-controls">
           <label htmlFor="principalRosterClassId">
-            <span>Class</span>
+            <span id="principalRosterClassLabel">Class</span>
             <select
               id="principalRosterClassId"
+              aria-labelledby="principalRosterClassLabel"
               value={principalRosterClassId}
               onChange={(event) => {
                 setStudentsSuccess('')
@@ -2953,9 +2928,9 @@ function ClassRecordsPage({
             </select>
           </label>
 
-          <div className="principal-roster-status-group" aria-label="Enrollment status filter">
-            <span>Enrollment status</span>
-            <div role="group">
+          <div className="principal-roster-status-group">
+            <span id="principalRosterStatusLabel">Enrollment status</span>
+            <div role="group" aria-labelledby="principalRosterStatusLabel">
               {ENROLLMENT_STATUSES.map((status) => (
                 <button
                   type="button"
@@ -2973,17 +2948,6 @@ function ClassRecordsPage({
             </div>
           </div>
         </div>
-
-        {selectedPrincipalRosterClass ? (
-          <p className="principal-roster-context">
-            Showing {formatStatus(principalRosterStatus).toLowerCase()} learners in{' '}
-            <strong>
-              {selectedPrincipalRosterClass.gradeLevelName || 'Grade level'} -{' '}
-              {selectedPrincipalRosterClass.sectionName || selectedPrincipalRosterClass.name}
-            </strong>
-            .
-          </p>
-        ) : null}
 
         {studentsSuccess ? (
           <p className="form-message form-message-success">{studentsSuccess}</p>
@@ -3089,10 +3053,7 @@ function ClassRecordsPage({
           }`}
         >
           <div className="section-toolbar manual-student-panel-header">
-            <div>
-              <p className="content-card-tag">Manual Student Input</p>
-              <h3>Enroll one student</h3>
-            </div>
+            <h2>Enroll one student</h2>
             <button
               type="button"
               className="assignment-delete-close"
@@ -3104,11 +3065,6 @@ function ClassRecordsPage({
               <X size={18} aria-hidden="true" />
             </button>
           </div>
-          <p className="supporting-text">
-            Select the learner's class, then enter the profile details. Enrollment belongs to the
-            class and is shared by its teacher-subject assignments.
-          </p>
-
           {schoolReferenceError ? (
             <div className="manual-reference-error">
               <p className="form-message form-message-error">{schoolReferenceError}</p>
@@ -3146,19 +3102,6 @@ function ClassRecordsPage({
                 ))}
               </select>
             </label>
-
-            {selectedManualClass ? (
-              <div className="manual-class-summary">
-                <span>Selected Class</span>
-                <strong>
-                  {selectedManualClass.gradeLevelName || 'Grade level'} -{' '}
-                  {selectedManualClass.sectionName || selectedManualClass.name || 'Section'}
-                </strong>
-                <small>
-                  {formatAcademicYear(selectedManualClass, 'Academic year')} / Active class
-                </small>
-              </div>
-            ) : null}
 
             <div className="manual-student-profile-grid">
               <label htmlFor="manualStudentLrn">
@@ -3313,7 +3256,6 @@ function ClassRecordsPage({
                 <Pencil size={20} />
               </span>
               <div>
-                <p>Student profile</p>
                 <h3 id="studentProfileEditTitle">Correct learner details</h3>
               </div>
               <button
@@ -3497,7 +3439,6 @@ function ClassRecordsPage({
                 <RefreshCw size={20} />
               </span>
               <div>
-                <p>Enrollment lifecycle</p>
                 <h3 id="studentStatusTitle">Change enrollment status</h3>
               </div>
               <button

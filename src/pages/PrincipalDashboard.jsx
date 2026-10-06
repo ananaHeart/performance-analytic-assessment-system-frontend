@@ -8,10 +8,6 @@ import {
   getTeacherAccountsV3,
 } from '../api/apiV3Client'
 
-function getPrincipalName(user) {
-  return user.name || [user.firstName, user.lastName].filter(Boolean).join(' ') || 'Principal'
-}
-
 function isArchivedAssessment(assessment) {
   return String(assessment?.status ?? '').trim().toLowerCase() === 'archived'
 }
@@ -24,8 +20,7 @@ function formatAssessmentDate(value) {
     : parsedDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function PrincipalDashboard({ user, token, onNavigate }) {
-  const displayName = getPrincipalName(user)
+function PrincipalDashboard({ token, onNavigate }) {
   const [teachers, setTeachers] = useState([])
   const [students, setStudents] = useState([])
   const [isLoadingTeachers, setIsLoadingTeachers] = useState(true)
@@ -253,10 +248,7 @@ function PrincipalDashboard({ user, token, onNavigate }) {
 
   return (
     <div className="principal-dashboard-page">
-      <section className="principal-dashboard-heading">
-        <h2>Welcome back, {displayName}</h2>
-        <p>Here is a summary of the available school setup information.</p>
-      </section>
+      <h1 className="dashboard-visually-hidden">Principal dashboard</h1>
 
       {dashboardWarning ? (
         <p className="form-message form-message-warning" role="status">
@@ -284,7 +276,7 @@ function PrincipalDashboard({ user, token, onNavigate }) {
 
       <section className="principal-recent-panel" aria-labelledby="recentAssessmentsHeading">
         <div className="principal-recent-header">
-          <h3 id="recentAssessmentsHeading">Recent Assessments</h3>
+          <h2 id="recentAssessmentsHeading">Recent Assessments</h2>
         </div>
 
         <div className="principal-recent-table-wrap">

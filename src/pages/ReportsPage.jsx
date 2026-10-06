@@ -14,7 +14,6 @@ import {
   FileSpreadsheet,
   FileText,
   Inbox,
-  Menu,
   RefreshCw,
   School,
   ShieldAlert,
@@ -25,7 +24,7 @@ import {
   UserRound,
   UsersRound,
 } from 'lucide-react'
-import { HorizontalMasteryChart } from '../components/AnalyticsCharts'
+import { HorizontalMasteryChart, VerticalMasteryChart } from '../components/AnalyticsCharts'
 import {
   downloadAssessmentResultsExcelV3,
   downloadAssessmentResultsPdfV3,
@@ -395,7 +394,7 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
     initialFilters?.reportType ||
       (effectiveRole === 'principal' ? 'principal_consolidated' : 'assessment_results'),
   )
-  const [isReportTypeCollapsed, setIsReportTypeCollapsed] = useState(false)
+  const [isFiltersOpen, setIsFiltersOpen] = useState(false)
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [sourceData, setSourceData] = useState(EMPTY_SOURCE_DATA)
   const [pageState, setPageState] = useState({ status: 'loading', message: '', code: '' })
@@ -1148,6 +1147,11 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
   )
 
   const consolidatedGroups = Array.isArray(consolidatedData?.groups) ? consolidatedData.groups : []
+  const consolidatedChartData = consolidatedGroups.map((group) => ({
+    id: group.groupKey,
+    label: group.groupLabel || `Group ${group.groupKey}`,
+    value: group.meanPercentage,
+  }))
 
   const studentAssessmentResults = Array.isArray(studentProfileData?.assessmentResults)
     ? studentProfileData.assessmentResults
@@ -1172,6 +1176,13 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
     if (status === 'needs_support') return 'weak'
     return 'neutral'
   }
+
+  const itemAnalysisChartData = competencyMasteryRows.map((row) => ({
+    id: row.skillId,
+    label: row.skillName || `Skill #${row.skillId}`,
+    value: row.masteryPercentage,
+    tone: masteryToneByStatus(row.masteryStatusCode),
+  }))
 
   const masteryChartData = useMemo(
     () =>
@@ -1307,36 +1318,34 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
     filters.termPeriodId && filters.subjectId && !assessmentOptions.length
       ? 'No matching assessments are available.'
       : ''
-  const reportContextText =
-    selectedReportType === 'principal_consolidated'
-      ? consolidatedState.status === 'loading'
-        ? 'Loading the consolidated report...'
-        : getDataStatusCopy(consolidatedData?.dataStatus)
-      : selectedReportType === 'student_performance_profile'
-        ? !filters.studentId
-          ? 'Select a student to view their performance profile.'
-          : studentProfileState.status === 'loading'
-            ? 'Loading the student performance profile...'
-            : getDataStatusCopy(studentProfileData?.dataStatus)
-        : selectedReportType === 'teacher_sync_activity'
-        ? syncActivityState.status === 'loading'
-          ? 'Loading the sync activity report...'
-          : getDataStatusCopy(syncActivityData?.dataStatus)
-        : selectedReportType === 'learning_competency'
-        ? !filters.termPeriodId || !filters.gradeLevelId || !filters.subjectId
-          ? 'Select a term, grade level, and subject.'
-          : learningCompetencyState.status === 'loading'
-            ? 'Loading the learning competency report...'
-            : getDataStatusCopy(learningCompetencyData?.dataStatus)
-        : !reportContextReady
-          ? 'Select a matching class assignment and assessment.'
-          : selectedReportType === 'item_analysis_competency_mastery'
-            ? itemAnalysisState.status === 'loading'
-              ? 'Loading item analysis and competency mastery...'
-              : getDataStatusCopy(itemAnalysisData?.dataStatus)
-            : reportState.status === 'loading'
-              ? 'Loading authoritative assessment results...'
-              : getDataStatusCopy(reportData?.dataStatus)
+  const optionLabel = (options, value) => options.find((option) => sameId(option.value, value))?.label
+  const selectedScopeLabels = [
+    !isPrincipalStudentTab && optionLabel(termOptions, filters.termPeriodId),
+    ...(
+      isLearningCompetencyReport
+        ? [
+            optionLabel(learningCompetencyGradeLevelOptions, filters.gradeLevelId),
+            optionLabel(learningCompetencySubjectOptions, filters.subjectId),
+            optionLabel(learningCompetencyRootOptions, filters.rootTagId),
+            optionLabel(learningCompetencySkillOptions, filters.skillId),
+          ]
+        : isSyncActivityReport
+          ? [
+              effectiveRole === 'principal' && optionLabel(syncActivityTeacherOptions, filters.teacherUserId),
+              filters.from && `From ${filters.from}`,
+              filters.to && `To ${filters.to}`,
+            ]
+          : [
+              effectiveRole === 'teacher'
+                ? optionLabel(teacherClassOptions, `${filters.classId}::${filters.subjectId}`)
+                : optionLabel(principalClassOptions, filters.classId),
+              effectiveRole === 'principal' && !isPrincipalStudentTab && optionLabel(principalTeacherOptions, filters.teacherUserId),
+              effectiveRole === 'principal' && !isPrincipalStudentTab && optionLabel(subjectOptions, filters.subjectId),
+              selectedReportType !== 'student_performance_profile' && optionLabel(assessmentOptions, filters.testId),
+              optionLabel(studentOptions, filters.studentId),
+            ]
+    ),
+  ].filter(Boolean)
 
   if (pageState.status === 'authorization') {
     return (
@@ -1354,31 +1363,117 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
 
   return (
     <div
-      className={`reports-page ${effectiveRole === 'principal' ? 'is-principal-reports' : ''} ${
-        isReportTypeCollapsed ? 'is-type-collapsed' : ''
-      }`}
+      className={`reports-page ${effectiveRole === 'principal' ? 'is-principal-reports' : ''}`}
     >
-      <header className="reports-page-header">
-        <div>
-          <p className="reports-eyebrow">{effectiveRole} workspace</p>
-          <h1>{selectedReport?.label || 'Reports'}</h1>
-          <p>{selectedReport?.description || 'View backend-generated results for the selected reporting scope.'}</p>
+      <header className="reports-toolbar">
+        <h1 id="reportResultHeading" className="reports-visually-hidden">
+          {selectedReport?.label || 'Reports'}
+        </h1>
+        {effectiveRole === 'principal' ? (
+          <div className="reports-principal-tab-group" role="tablist" aria-label="Report view">
+            {PRINCIPAL_REPORT_TABS.map((tab) => {
+              const TabIcon = tab.icon
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={activePrincipalTab === tab.key}
+                  className={`reports-principal-tab is-${tab.tone} ${activePrincipalTab === tab.key ? 'is-active' : ''}`}
+                  onClick={() => handlePrincipalTabClick(tab)}
+                >
+                  <TabIcon size={16} strokeWidth={2.2} aria-hidden="true" />
+                  {tab.label}
+                </button>
+              )
+            })}
+          </div>
+        ) : (
+          <label className="reports-view-select" htmlFor="reportView">
+            <span id="reportViewLabel" className="reports-visually-hidden">Report type</span>
+            <select
+              id="reportView"
+              aria-labelledby="reportViewLabel"
+              value={selectedReportType}
+              title={selectedReport?.label}
+              onChange={(event) => setSelectedReportType(event.target.value)}
+            >
+              {availableReportTypes.map((reportType) => (
+                <option key={reportType.code} value={reportType.code} disabled={!reportType.enabled}>
+                  {reportType.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+        <div className="reports-toolbar-actions">
+          <button
+            type="button"
+            className="reports-filter-toggle"
+            aria-expanded={isFiltersOpen && pageState.status === 'ready'}
+            aria-controls="reportFilters"
+            disabled={pageState.status !== 'ready'}
+            onClick={() => setIsFiltersOpen((open) => !open)}
+          >
+            <SlidersHorizontal size={16} strokeWidth={2.1} aria-hidden="true" />
+            Filters
+            <ChevronDown size={14} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="reports-refresh-button"
+            onClick={loadFoundation}
+            disabled={pageState.status === 'loading'}
+          >
+            <RefreshCw
+              size={16}
+              strokeWidth={2.2}
+              className={pageState.status === 'loading' ? 'is-spinning' : ''}
+              aria-hidden="true"
+            />
+            {pageState.status === 'loading' ? 'Loading...' : 'Refresh filters'}
+          </button>
+          <div className="reports-export-actions">
+            <button
+              type="button"
+              disabled={!canExportCurrentReport || exportState.status === 'loading'}
+              title={canExportCurrentReport ? '' : REPORT_API_PENDING_MESSAGE}
+              onClick={() => handleExportCurrentReport('pdf')}
+            >
+              <Download size={16} strokeWidth={2.1} aria-hidden="true" />
+              {exportState.status === 'loading' && exportState.format === 'pdf' ? 'Preparing...' : 'PDF'}
+            </button>
+            <button
+              type="button"
+              disabled={!canExportCurrentReport || exportState.status === 'loading'}
+              title={canExportCurrentReport ? '' : REPORT_API_PENDING_MESSAGE}
+              onClick={() => handleExportCurrentReport('excel')}
+            >
+              <FileSpreadsheet size={16} strokeWidth={2.1} aria-hidden="true" />
+              {exportState.status === 'loading' && exportState.format === 'excel' ? 'Preparing...' : 'Excel'}
+            </button>
+          </div>
         </div>
-        <button
-          type="button"
-          className="reports-refresh-button"
-          onClick={loadFoundation}
-          disabled={pageState.status === 'loading'}
-        >
-          <RefreshCw
-            size={16}
-            strokeWidth={2.2}
-            className={pageState.status === 'loading' ? 'is-spinning' : ''}
-            aria-hidden="true"
-          />
-          {pageState.status === 'loading' ? 'Loading...' : 'Refresh filters'}
-        </button>
       </header>
+
+      {pageState.status === 'ready' && selectedScopeLabels.length ? (
+        <p className="reports-scope-summary" aria-label="Selected report scope">
+          {selectedScopeLabels.join(' / ')}
+        </p>
+      ) : null}
+
+      {pageState.status === 'loading' ? (
+        <div className="reports-loading-state" role="status" aria-live="polite">
+          <span className="reports-loading-spinner" aria-hidden="true" />
+          Loading report filters...
+        </div>
+      ) : null}
+
+      {exportState.status === 'error' ? (
+        <p className="form-message form-message-error" role="alert">
+          {exportState.message}
+        </p>
+      ) : null}
 
       {['unavailable', 'not-found', 'invalid'].includes(pageState.status) ? (
         <section className="reports-state-panel is-unavailable" role="alert">
@@ -1404,138 +1499,12 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
         </section>
       ) : null}
 
-      {effectiveRole === 'principal' ? (
-        <section className="reports-principal-tabs" aria-label="Report view">
-          <div className="reports-principal-tab-row">
-            <div className="reports-principal-tab-group" role="tablist">
-              {PRINCIPAL_REPORT_TABS.map((tab) => {
-                const TabIcon = tab.icon
-                const isActive = activePrincipalTab === tab.key
-
-                return (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    role="tab"
-                    aria-selected={isActive}
-                    className={`reports-principal-tab is-${tab.tone} ${isActive ? 'is-active' : ''}`}
-                    onClick={() => handlePrincipalTabClick(tab)}
-                  >
-                    <TabIcon size={16} strokeWidth={2.2} aria-hidden="true" />
-                    {tab.label}
-                  </button>
-                )
-              })}
-            </div>
-            <div className="reports-export-actions">
-              <button
-                type="button"
-                disabled={!canExportCurrentReport || exportState.status === 'loading'}
-                title={canExportCurrentReport ? '' : REPORT_API_PENDING_MESSAGE}
-                onClick={() => handleExportCurrentReport('pdf')}
-              >
-                <Download size={16} strokeWidth={2.1} aria-hidden="true" />
-                {exportState.status === 'loading' && exportState.format === 'pdf' ? 'Preparing...' : 'PDF'}
-              </button>
-              <button
-                type="button"
-                disabled={!canExportCurrentReport || exportState.status === 'loading'}
-                title={canExportCurrentReport ? '' : REPORT_API_PENDING_MESSAGE}
-                onClick={() => handleExportCurrentReport('excel')}
-              >
-                <FileSpreadsheet size={16} strokeWidth={2.1} aria-hidden="true" />
-                {exportState.status === 'loading' && exportState.format === 'excel' ? 'Preparing...' : 'Excel'}
-              </button>
-            </div>
-          </div>
-          {reportContextText ? <p className="reports-principal-context">{reportContextText}</p> : null}
-          {exportState.status === 'error' ? (
-            <p className="form-message form-message-error" role="alert">
-              {exportState.message}
-            </p>
-          ) : null}
-        </section>
-      ) : (
-        <section
-          className={`reports-type-section ${isReportTypeCollapsed ? 'is-collapsed' : ''}`}
-          aria-labelledby="reportTypeHeading"
-        >
-          <div className="reports-section-heading">
-            {!isReportTypeCollapsed ? (
-              <div>
-                <p>Report type</p>
-                <h2 id="reportTypeHeading">Select report output</h2>
-              </div>
-            ) : null}
-            <div className="reports-type-heading-actions">
-              {!isReportTypeCollapsed ? <span>Teacher scope</span> : null}
-              <button
-                type="button"
-                className="reports-type-collapse-toggle"
-                aria-expanded={!isReportTypeCollapsed}
-                aria-label={isReportTypeCollapsed ? 'Expand report type panel' : 'Collapse report type panel'}
-                title={isReportTypeCollapsed ? 'Expand' : 'Collapse'}
-                onClick={() => setIsReportTypeCollapsed((collapsed) => !collapsed)}
-              >
-                <Menu size={18} strokeWidth={2.2} aria-hidden="true" />
-              </button>
-            </div>
-          </div>
-
-          <div className="reports-type-grid">
-            {availableReportTypes.map((reportType) => {
-              const ReportIcon = reportType.icon
-              const isSelected = selectedReportType === reportType.code
-
-              return (
-                <button
-                  type="button"
-                  key={reportType.code}
-                  className={`reports-type-option ${isSelected ? 'is-selected' : ''}`}
-                  aria-pressed={isSelected}
-                  disabled={!reportType.enabled}
-                  title={!reportType.enabled ? REPORT_API_PENDING_MESSAGE : isReportTypeCollapsed ? reportType.label : ''}
-                  onClick={() => {
-                    if (reportType.enabled) setSelectedReportType(reportType.code)
-                  }}
-                >
-                  <span className="reports-type-icon" aria-hidden="true">
-                    <ReportIcon size={19} strokeWidth={2.1} />
-                  </span>
-                  {!isReportTypeCollapsed ? (
-                    <span>
-                      <strong>{reportType.label}</strong>
-                      <small>{reportType.description}</small>
-                    </span>
-                  ) : null}
-                </button>
-              )
-            })}
-          </div>
-        </section>
-      )}
-
       <section
+        id="reportFilters"
         className="reports-filter-panel"
-        aria-labelledby={effectiveRole === 'teacher' ? 'reportFiltersHeading' : undefined}
-        aria-label={effectiveRole === 'principal' ? 'Filters' : undefined}
+        aria-label="Report filters"
+        hidden={!isFiltersOpen || pageState.status !== 'ready'}
       >
-        {effectiveRole === 'teacher' ? (
-          <div className="reports-section-heading">
-            <div>
-              <p>Reporting scope</p>
-              <h2 id="reportFiltersHeading">Filters</h2>
-            </div>
-            <SlidersHorizontal size={19} strokeWidth={2} aria-hidden="true" />
-          </div>
-        ) : null}
-
-        {pageState.status === 'loading' ? (
-          <div className="reports-loading-state" role="status" aria-live="polite">
-            <span className="reports-loading-spinner" aria-hidden="true" />
-            Loading V3 report filters...
-          </div>
-        ) : (
           <div className={`reports-filter-grid is-${effectiveRole}`}>
             {!isPrincipalStudentTab ? (
               <FilterSelect
@@ -1695,55 +1664,13 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
               />
             ) : null}
           </div>
-        )}
       </section>
 
       <section
         className="reports-result-panel"
-        aria-labelledby={effectiveRole === 'teacher' ? 'reportResultHeading' : undefined}
+        aria-labelledby="reportResultHeading"
+        hidden={pageState.status !== 'ready'}
       >
-        {effectiveRole === 'teacher' ? (
-          <>
-            <div className="reports-result-copy">
-              <span className="reports-result-icon" aria-hidden="true">
-                <BarChart3 size={23} strokeWidth={1.9} />
-              </span>
-              <div>
-                <p>Selected report</p>
-                <h2 id="reportResultHeading">{selectedReport?.label || 'Report output'}</h2>
-                <span>{reportContextText}</span>
-              </div>
-            </div>
-
-            <div className="reports-export-actions">
-              <button
-                type="button"
-                disabled={!canExportCurrentReport || exportState.status === 'loading'}
-                title={canExportCurrentReport ? '' : REPORT_API_PENDING_MESSAGE}
-                onClick={() => handleExportCurrentReport('pdf')}
-              >
-                <Download size={16} strokeWidth={2.1} aria-hidden="true" />
-                {exportState.status === 'loading' && exportState.format === 'pdf' ? 'Preparing...' : 'PDF'}
-              </button>
-              <button
-                type="button"
-                disabled={!canExportCurrentReport || exportState.status === 'loading'}
-                title={canExportCurrentReport ? '' : REPORT_API_PENDING_MESSAGE}
-                onClick={() => handleExportCurrentReport('excel')}
-              >
-                <FileSpreadsheet size={16} strokeWidth={2.1} aria-hidden="true" />
-                {exportState.status === 'loading' && exportState.format === 'excel' ? 'Preparing...' : 'Excel'}
-              </button>
-            </div>
-
-            {exportState.status === 'error' ? (
-              <p className="form-message form-message-error" role="alert">
-                {exportState.message}
-              </p>
-            ) : null}
-          </>
-        ) : null}
-
         {selectedReportType === 'assessment_results' ? (
         <>
         {reportState.status === 'idle' ? (
@@ -2020,6 +1947,13 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
               </div>
             </div>
 
+            {itemAnalysisChartData.length ? (
+              <HorizontalMasteryChart
+                data={itemAnalysisChartData}
+                height={Math.max(180, itemAnalysisChartData.length * 34)}
+              />
+            ) : null}
+
             <div className="reports-results-table-wrap">
               <table className="reports-results-table">
                 <thead>
@@ -2225,6 +2159,13 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
                   </div>
                 ))}
               </div>
+            ) : null}
+
+            {consolidatedChartData.length ? (
+              <VerticalMasteryChart
+                data={consolidatedChartData}
+                height={220}
+              />
             ) : null}
 
             {consolidatedGroups.length ? (
@@ -2580,6 +2521,16 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
                             </tbody>
                           </table>
                         </div>
+
+                        <HorizontalMasteryChart
+                          data={root.skills.map((skill) => ({
+                            id: skill.skillId,
+                            label: skill.competencyName || `Skill #${skill.skillId}`,
+                            value: skill.masteryPercentage,
+                            tone: masteryToneByStatus(skill.masteryStatusCode),
+                          }))}
+                          height={Math.max(180, root.skills.length * 34)}
+                        />
                       </div>
                     ))}
                 </>

@@ -236,12 +236,7 @@ function V3Sf1ImportPanel({
               <FileSpreadsheet size={22} strokeWidth={2.3} />
             </span>
             <div>
-              <p className="content-card-tag">Smart Import (SF1)</p>
-              <h3 id="sf1ModalTitle">Import students from DepEd School Form 1</h3>
-              <p>
-                Select the target school year and grade level. Section can be selected now or read
-                from the worksheet during preview.
-              </p>
+              <h3 id="sf1ModalTitle">Import students (SF1)</h3>
             </div>
           </div>
 

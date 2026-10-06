@@ -1,0 +1,223 @@
+/* Shared shell owns page edges; each route keeps its internal layout. */
+.dashboard-shell {
+  --workspace-gutter: 24px;
+  --workspace-top: 16px;
+  --workspace-content-width: 1320px;
+  --workspace-bar-height: 52px;
+}
+
+.dashboard-shell.is-teacher-workspace .dashboard-main {
+  padding: var(--workspace-top) var(--workspace-gutter) 24px;
+}
+
+.dashboard-shell.is-teacher-workspace .dashboard-main > :is(
+  .teacher-dashboard-page,
+  .teacher-records-page,
+  .teacher-settings-page,
+  .teacher-assessment-editor-page,
+  .reports-page
+) {
+  width: min(100%, var(--workspace-content-width));
+  max-width: none;
+  min-height: 0;
+  margin: 0 auto;
+  padding: 0;
+}
+
+.dashboard-shell .principal-main {
+  padding: 0;
+}
+
+.dashboard-shell .principal-main > :is(
+  .principal-dashboard-page,
+  .principal-class-records-page,
+  .principal-teachers-page,
+  .principal-settings-page,
+  .principal-analytics-page,
+  .reports-page
+) {
+  width: 100%;
+  max-width: none;
+  min-height: 0;
+  margin: 0;
+  padding: var(--workspace-top) var(--workspace-gutter) 24px;
+}
+
+.dashboard-shell.is-teacher-workspace .teacher-workspace-topbar {
+  min-height: var(--workspace-bar-height);
+  padding: 6px var(--workspace-gutter);
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 16px;
+}
+
+.dashboard-shell.is-teacher-workspace .teacher-workspace-brand {
+  gap: 10px;
+}
+
+.dashboard-shell.is-teacher-workspace .teacher-app-title,
+.dashboard-shell .principal-brand-block strong {
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.dashboard-shell .principal-brand-block strong {
+  font-size: 0.9rem;
+  line-height: 1.2;
+}
+
+.dashboard-shell .principal-brand-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.dashboard-shell .principal-sidebar-profile > div {
+  min-width: 0;
+}
+
+.dashboard-shell .principal-sidebar-profile .principal-avatar {
+  display: inline-flex;
+  color: #ffffff;
+}
+
+.dashboard-shell.is-teacher-workspace .teacher-workspace-profile {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.dashboard-shell.is-teacher-workspace .teacher-workspace-school-year {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dashboard-shell.is-teacher-workspace .teacher-topbar-avatar {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+}
+
+.dashboard-shell .principal-topbar {
+  min-height: var(--workspace-bar-height);
+  padding: 6px var(--workspace-gutter);
+  gap: 12px;
+}
+
+.dashboard-shell .teacher-app-footer {
+  padding: 12px var(--workspace-gutter);
+}
+
+@media (min-width: 981px) {
+  .dashboard-shell .principal-sidebar {
+    width: 240px;
+    flex: 0 0 240px;
+    gap: 16px;
+    padding: 6px 16px 0;
+  }
+
+  .dashboard-shell .principal-brand-block {
+    min-height: 40px;
+  }
+
+  .dashboard-shell .principal-sidebar-footer {
+    margin: auto -16px 0;
+  }
+}
+
+@media (max-width: 980px) {
+  .dashboard-shell {
+    --workspace-gutter: 16px;
+  }
+
+  .dashboard-shell .principal-sidebar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'brand account' 'nav nav';
+    gap: 8px 12px;
+    padding: 8px var(--workspace-gutter);
+    overflow: visible;
+  }
+
+  .dashboard-shell .principal-brand-block {
+    grid-area: brand;
+    min-height: 34px;
+  }
+
+  .dashboard-shell .principal-sidebar-nav {
+    grid-area: nav;
+    min-width: 0;
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 2px;
+  }
+
+  .dashboard-shell .principal-sidebar-footer {
+    grid-area: account;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .dashboard-shell .principal-sidebar-profile {
+    display: flex;
+    width: 34px;
+    min-height: 34px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .dashboard-shell .principal-sidebar-profile > div {
+    display: none;
+  }
+
+  .dashboard-shell .principal-logout-button {
+    padding: 0 4px;
+  }
+
+  .dashboard-shell.is-teacher-workspace .teacher-workspace-topbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 30px 30px;
+    gap: 4px 10px;
+    align-items: center;
+    padding-block: 8px;
+  }
+
+  .dashboard-shell.is-teacher-workspace .teacher-workspace-brand {
+    grid-area: 1 / 1;
+    justify-self: start;
+  }
+
+  .dashboard-shell.is-teacher-workspace .teacher-workspace-profile {
+    display: contents;
+  }
+
+  .dashboard-shell.is-teacher-workspace .teacher-workspace-school-year {
+    grid-area: 1 / 2 / 2 / 4;
+    justify-self: end;
+    font-size: 0.82rem;
+  }
+
+  .dashboard-shell.is-teacher-workspace .teacher-workspace-nav {
+    grid-area: 2 / 1;
+    min-width: 0;
+    justify-content: flex-start;
+    gap: 16px;
+    padding: 0;
+    overflow-x: auto;
+  }
+
+  .dashboard-shell.is-teacher-workspace .teacher-workspace-profile > .notification-center {
+    grid-area: 2 / 2;
+  }
+
+  .dashboard-shell.is-teacher-workspace .teacher-topbar-avatar {
+    grid-area: 2 / 3;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard-shell {
+    --workspace-gutter: 12px;
+    --workspace-top: 12px;
+  }
+}

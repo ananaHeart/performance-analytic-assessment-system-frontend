@@ -245,12 +245,39 @@ function TeacherDashboard({ token, onNavigate }) {
 
   return (
     <div className="content-stack teacher-dashboard-page smart-ui">
-      <header className="teacher-dashboard-heading">
-        <div>
-          <p>Teacher workspace</p>
-          <h1>Welcome back</h1>
-          <span>Ready to prepare assessments and review class activity.</span>
-        </div>
+      <h1 className="dashboard-visually-hidden">Teacher dashboard</h1>
+      <div className="teacher-dashboard-summary">
+        <section className="teacher-dashboard-overview-grid" aria-label="Teacher summary">
+          <article>
+            <span className="teacher-dashboard-overview-icon" aria-hidden="true">
+              <BookOpen size={18} strokeWidth={2.3} />
+            </span>
+            <div>
+              <span>Assigned classes</span>
+              <strong>{isLoading ? '...' : teacherClassGroups.length}</strong>
+            </div>
+          </article>
+          <article>
+            <span className="teacher-dashboard-overview-icon" aria-hidden="true">
+              <UsersRound size={18} strokeWidth={2.3} />
+            </span>
+            <div>
+              <span>Total students</span>
+              <strong>{isLoading ? '...' : totalStudents}</strong>
+            </div>
+          </article>
+          <article>
+            <span className="teacher-dashboard-overview-icon" aria-hidden="true">
+              <ClipboardCheck size={18} strokeWidth={2.3} />
+            </span>
+            <div>
+              <span>Created assessments</span>
+              <strong>
+                {isLoading ? '...' : assessmentsAvailable ? assessments.length : 'Not available'}
+              </strong>
+            </div>
+          </article>
+        </section>
         <button
           type="button"
           className="teacher-dashboard-refresh"
@@ -260,39 +287,7 @@ function TeacherDashboard({ token, onNavigate }) {
           <RefreshCw size={16} aria-hidden="true" />
           <span>{isLoading ? 'Refreshing...' : 'Refresh'}</span>
         </button>
-      </header>
-
-      <section className="teacher-dashboard-overview-grid" aria-label="Teacher summary">
-        <article>
-          <span className="teacher-dashboard-overview-icon" aria-hidden="true">
-            <BookOpen size={18} strokeWidth={2.3} />
-          </span>
-          <div>
-            <span>Assigned classes</span>
-            <strong>{isLoading ? '...' : teacherClassGroups.length}</strong>
-          </div>
-        </article>
-        <article>
-          <span className="teacher-dashboard-overview-icon" aria-hidden="true">
-            <UsersRound size={18} strokeWidth={2.3} />
-          </span>
-          <div>
-            <span>Total students</span>
-            <strong>{isLoading ? '...' : totalStudents}</strong>
-          </div>
-        </article>
-        <article>
-          <span className="teacher-dashboard-overview-icon" aria-hidden="true">
-            <ClipboardCheck size={18} strokeWidth={2.3} />
-          </span>
-          <div>
-            <span>Created assessments</span>
-            <strong>
-              {isLoading ? '...' : assessmentsAvailable ? assessments.length : 'Not available'}
-            </strong>
-          </div>
-        </article>
-      </section>
+      </div>
 
       {pageError ? <p className="form-message form-message-error">{pageError}</p> : null}
 
@@ -302,10 +297,7 @@ function TeacherDashboard({ token, onNavigate }) {
           aria-labelledby="assessmentActivityHeading"
         >
           <div className="teacher-dashboard-panel-heading">
-            <div>
-              <p>Assessment workspace</p>
-              <h2 id="assessmentActivityHeading">Recent assessment activity</h2>
-            </div>
+            <h2 id="assessmentActivityHeading">Recent assessment activity</h2>
             <button
               type="button"
               className="teacher-dashboard-text-action"
@@ -330,7 +322,6 @@ function TeacherDashboard({ token, onNavigate }) {
             <div className="teacher-dashboard-empty-state">
               <ClipboardCheck size={22} strokeWidth={1.8} aria-hidden="true" />
               <strong>No assessments yet</strong>
-              <span>Create an assessment from the Class workspace.</span>
             </div>
           ) : null}
 
@@ -372,10 +363,7 @@ function TeacherDashboard({ token, onNavigate }) {
         <div className="teacher-dashboard-side-column">
           <section className="teacher-dashboard-panel" aria-labelledby="attentionHeading">
             <div className="teacher-dashboard-panel-heading">
-              <div>
-                <p>Work queue</p>
-                <h2 id="attentionHeading">Needs attention</h2>
-              </div>
+              <h2 id="attentionHeading">Needs attention</h2>
               <span className="teacher-dashboard-panel-icon" aria-hidden="true">
                 <CalendarClock size={18} strokeWidth={2.1} />
               </span>

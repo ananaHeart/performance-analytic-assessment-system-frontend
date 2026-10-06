@@ -2755,12 +2755,6 @@ textarea:focus,
   box-shadow: var(--shadow-soft);
 }
 
-.principal-stat-card:hover {
-  border-color: var(--border-strong);
-  box-shadow: var(--shadow);
-  transform: translateY(-1px);
-}
-
 .principal-stat-icon {
   width: 40px;
   height: 40px;
