@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import AppLayout from './components/AppLayout'
+import MarkaMark from './components/MarkaMark'
 import ProtectedRoute from './components/ProtectedRoute'
 import LandingPage from './pages/LandingPage'
 import LoginPage from './pages/LoginPage'
@@ -629,7 +630,7 @@ function App() {
           <div className="public-card">
             <div className="public-brand-panel">
               <div className="brand-mark large-mark" aria-hidden="true">
-                <span>Logo</span>
+                <MarkaMark size={52} />
               </div>
               <p className="section-tag">Account Access</p>
               <h1>Unsupported Role</h1>

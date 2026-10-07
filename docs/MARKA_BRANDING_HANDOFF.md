@@ -1,8 +1,8 @@
 # Marka Branding Handoff
 
-Date: 2026-10-06  
+Date: 2026-10-06 (decisions and master asset updated 2026-10-07)  
 Applies to: frontend, mobile, and backend-generated documents  
-Status: shared instructions documented; new logo implementation is pending
+Status: user decisions recorded; master logo r1 APPROVED by the user (2026-10-07); frontend logo replacement implemented and checked locally (not committed or deployed)
 
 ## 1. Read This First
 
@@ -39,14 +39,27 @@ The user supplied a visual reference containing two versions of the same symbol 
 - The black version in the reference is not the chosen default. Do not independently switch surfaces to black, blue, or another logo color.
 - Do not keep both the cap and the new mark together as competing product logos.
 
-The reference was supplied in the conversation. A standalone approved master asset has not been established by this task, and the reference image is not embedded in this Markdown file. A receiving AI that cannot see the image must request it before recreating the logo.
+The reference image is `D:\01CAPSTONE project materials\#4th_year_CAPSTONE_2\Figures\marka-logo-reference.png` (195×417 px; green on top, black below; use only the green). It is not embedded in this Markdown file. A receiving AI that cannot read that path must request the image. No AI should redraw the logo. Use the master asset in section 6.
 
-### Decisions still required before asset production
+### User decisions (recorded 2026-10-07)
 
-1. The approved master artwork, or approval to prepare an exact-match candidate from the reference.
-2. The exact green color value. Green is approved; no specific HEX value has been approved in this handoff. Existing greens in the repositories are not automatically the new logo color.
-3. The final proportions, transparent bounds, and safe padding of the master asset.
-4. Any special monochrome, dark-background, print-only, or platform launcher treatment.
+These were relayed by the documentation session. The backend items were reported by the backend session and have **not** been verified from the frontend.
+
+| Topic | Decision |
+| --- | --- |
+| Logo color | **#00B316 approved.** Use a fixed fill on every surface; do not inherit `currentColor` or theme greens. |
+| Master artwork | Frontend prepares one canonical master traced from the reference. Status: **r1 approved by the user on 2026-10-07** (section 6). |
+| Web brand slots | **Keep the existing pale-green tile/circle** behind the mark (principal circle, teacher tile, auth/landing tiles, favicon tile). Replace only the cap glyph, with the same slot dimensions. |
+| Web app name | **Keep `Marka Dashboard`** as the web app name: the browser `<title>` and the `Log in to Marka Dashboard` heading stay. Remove only the small `Dashboard` subtitle under the wordmark in the brand lockup. |
+| Functional education icons | Keep. The `GraduationCap` icons for Total Students, the By-teacher report tab, and the Professional background header are not the brand. |
+| Frontend ownership | `web-dashboard-32` is the single frontend branding owner. Other frontend sessions should not edit `AppLayout.jsx` or shared CSS for branding. |
+| Mobile | Launcher icon = **green mark on white**. Keep the display name `Marka Teacher`. |
+| Emails | Stay text-only (no logo). |
+| Backend: MFA issuer (changed by the user) | The default authenticator issuer is now `Marka`, for **new enrollments only**. Existing authenticator entries keep `SMART Assessment` until the user re-enrolls. |
+| Backend: bubble sheet (changed by the user) | The static header `Performance Analytics Assessment System` is now `Marka`, in the same position and size. QR payload, geometry and manifest are reported unaffected. |
+| Still protected | MFA cipher AD `SMART-V3-MFA`, `DESIGN_SYSTEM_CODE` `SMART-DYNAMIC-ANSWER-SHEET`, and all answer-sheet geometry, QR codes and registration markers. |
+
+Still undecided: any monochrome, dark-background or print-only variant of the mark.
 
 Prepare one canonical master and obtain approval before each AI produces platform-specific versions. Do not let separate agents draw slightly different checkmarks.
 
@@ -103,6 +116,23 @@ Paths are relative to `D:\CAPSTONE_2\web-dashboard`.
 
 `GraduationCap` also appears as a functional illustration for education-related data, for example in `PrincipalDashboard.jsx`, `ReportsPage.jsx`, and `TeacherApprovalPage.jsx`. Classify each occurrence before editing. A metric or report-tab icon is not necessarily the product logo. Do not blindly replace every icon import with the brand mark.
 
+Frontend Step 1 inventory, re-checked 2026-10-07 (source and route tracing only, no runtime check):
+
+- Active entry: `index.html` → `src/main.jsx` → `src/App.jsx` (hash router).
+  - Logged out: `LandingPage`, plus `LoginPage`, `TeacherSignUpPage` and `TeacherEmailVerificationPage`, which all three use `PublicAuthShell`.
+  - Logged in: `AppLayout`.
+  - `V2App`, `V2Shell` and `V2LoginPage` are not imported anywhere, so they are unreachable. Legacy `v2/*` hashes redirect to the main pages.
+- Product-brand caps to replace (4 slots + favicon):
+  - `AppLayout.jsx`: principal 30 px circle with a 20 px glyph; teacher 26 px tile with a 17 px glyph.
+  - `PublicAuthShell.jsx`: 40 px tile with a 22 px glyph.
+  - `LandingPage.jsx`: 40 px tile with a 22 px glyph.
+  - `public/favicon.svg`.
+- The lockup `Dashboard` subtitle appears in **both** `PublicAuthShell.jsx` and `LandingPage.jsx`.
+- `App.jsx` has an unsupported-role fallback whose brand slot showed the literal text `Logo`. It is reachable only for a role other than principal or teacher. The user chose on 2026-10-07 to put the mark there too; that is now done (section 10).
+- No user-facing `SMART` text remains in `src/`. The only occurrences are a CSS comment and the `principal-smart-import-card` class name.
+- The frontend owns no print or export surface. There is no `window.print`, no `@media print`, and no client PDF/Excel library.
+- Brand glyphs currently inherit theme greens (`--primary` #83e841 or `--primary-dark` #2f7d16). None of these is #00B316, so the new mark needs its own fixed fill.
+
 ### Backend and generated reports
 
 Paths below are relative to `D:\CAPSTONE_2\backend\assessment`.
@@ -151,14 +181,36 @@ No mobile build, simulator, emulator, or physical-device branding check was perf
 
 After the user approves the master asset, all owners should use the same asset revision.
 
-Recommended deliverables, not yet created:
+### Master asset: revision r1 (APPROVED by the user, 2026-10-07)
 
-- `marka-mark.svg`: canonical vector geometry, if appropriate for the approved artwork.
-- `marka-mark.png`: transparent raster export for consumers that need a bitmap.
-- Platform-specific launcher/splash/favicon derivatives made from that master, not independent redraws.
-- A small manifest recording asset revision, exact green value, viewBox or intrinsic dimensions, transparent padding, and SHA-256 checksums of delivered files.
+Prepared 2026-10-07 by the frontend session. Folder: `D:\CAPSTONE_2\web-dashboard\docs\branding\`
 
-The filenames above are proposed asset names, not existing paths. Record actual locations once created.
+| File | SHA-256 | Purpose |
+| --- | --- | --- |
+| `marka-mark.svg` | `b3750deed7c13ec1abd8a8fddaf085dcc78caf4a81d7fbbe1d0e2b4d3bfafbff` | Canonical master: the only source for derivatives |
+| `marka-mark-overlay.png` | `b494b3cd35506f47a4d29b1b1b270f047396c074886672d7bfc4081611918a50` | Approval evidence: the candidate rendered by Chrome over the reference at the same scale, with zoomed views of the tip, left end and inner corner |
+| `marka-mark.manifest.json` | (hash it on receipt) | Revision, color, viewBox, padding, construction, recorded widths, fidelity, and the SHA-256 of the other two files |
+
+Specification:
+- **Canvas and color:** `viewBox="0 0 64 64"`, transparent background, mark only. Fill `#00B316` on both paths.
+- **Path format:** exactly 2 `<path>` elements (frame and check), with attributes `fill` and `d` only. Absolute `M/L/C/Z` commands only: no arcs, relative commands, transforms or strokes.
+- **Backend port:** the path data maps 1:1 to Java2D `Path2D` and PDFBox (`moveTo/lineTo/curveTo/closePath`). Flip y for PDF space.
+- **Padding:** 4 units on all sides. The frame's outer edge spans exactly 4–60 on both axes.
+- **Frame:** uniform width 5.34 units; outer corner radius 11.35; inner corner radius 6.01 (concentric); round caps of radius 2.67; open at the upper-right.
+- **Check:** a variable-width shape (10 smooth cubics, sharp inner corner). The long arm tapers from about 9.9 to 7.2 units; the short arm is about 9.6.
+- **Fidelity:** the delivered SVG, rendered by Chrome at the reference scale, has an outline deviation from the reference of:
+  - frame: mean 0.07 px, max 0.23 px
+  - check: mean 0.05 px, max 0.24 px
+  - inner corner: 0.31 px, because the reference's corner is only blur-rounded
+
+  All values are in reference pixels; the mark is 143.7 px wide.
+- **Legibility:** checked at 16, 17, 20 and 22 px.
+
+The user approved r1 on 2026-10-07 after viewing the rendered candidate. The SVG did not change on approval; its SHA-256 above is unchanged. Only the manifest's status field changed, so hash the manifest on receipt. Builds made earlier from "candidate r1" use the same artwork. A transparent `marka-mark.png` and the mobile/backend derivatives are **not** created by the frontend. Generate them from the approved SVG; do not redraw.
+
+Frontend derivatives:
+- `src/assets/marka-mark.svg` is a byte-identical copy (same SHA-256), rendered through `src/components/MarkaMark.jsx` as a decorative `<img>`.
+- `public/favicon.svg` uses the same two paths on the existing `#e6f8e8` rounded tile, scaled about the centre to span 6–58 like the previous icon.
 
 - Use local, packaged assets; do not introduce a runtime dependency on an external image URL.
 - Preserve crisp edges at small navigation/favicon sizes and at print resolution.
@@ -231,15 +283,16 @@ The branding route is complete only after the agreed surfaces have been inspecte
 
 ## 10. Current Status and Next-Agent Report
 
-| Work item | Status at document creation |
+| Work item | Status (updated 2026-10-07) |
 | --- | --- |
-| Common handoff document | Created in the frontend `docs` folder |
+| Common handoff document | Created in the frontend `docs` folder; updated 2026-10-07 with user decisions and the master asset |
 | Green checkmark direction | Requested by the user |
-| Exact color and canonical master artwork | Pending confirmation/approval |
-| New logo files and derivatives | Not created by this task |
-| Frontend logo replacement | Not performed by this task; inspected brand slots still use caps |
-| Mobile logo replacement | Not performed by this task; inspected login still uses a cap |
-| Backend report logo replacement | Not performed by this task; inspected PDF/Excel helpers still draw caps |
+| Exact color | **#00B316 approved** (2026-10-07) |
+| Canonical master artwork | **r1 approved** by the user 2026-10-07 (`docs/branding/`, section 6) |
+| New logo files and derivatives | Master SVG, manifest and overlay. Frontend derivatives: `src/assets/marka-mark.svg` and `public/favicon.svg`. No PNG, launcher or report derivatives created by the frontend |
+| Frontend logo replacement | **Implemented 2026-10-07, not committed.** The cap is replaced in the principal sidebar, teacher top bar, `PublicAuthShell` (login/register/verify) and landing header, plus the favicon. The lockup `Dashboard` subtitle is removed (auth and landing). The unsupported-role fallback in `App.jsx` now shows the mark instead of the literal `Logo` text, at 52 px in its 84 px box. Its `.brand-mark` box changed from a saturated green gradient to the pale `--primary-soft` tile, so the green mark stays visible; the class is used only there. Kept: tiles/circles, the `<title>` and `Log in to Marka Dashboard`, and the functional education caps. Checked: ESLint on touched files, production build, and headless Chrome at 1280 and 390 px against a before-build. Slot, glyph, header and nav positions are identical, there are no console errors, and focus and home navigation work. Logged-in shells were checked on a **mocked API only**; no live backend or deployed check yet |
+| Mobile logo replacement | Not verified from the frontend. The mobile session reported on 2026-10-07 that the user asked it to build from candidate r1 now |
+| Backend report logo replacement | Not verified from the frontend. The backend session reported the MFA-issuer and bubble-sheet header text changes in section 2 |
 | Cross-platform runtime/print verification | Pending |
 | Commit, push, deployment, or release | Not performed by this task |
 

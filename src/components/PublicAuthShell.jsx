@@ -1,5 +1,6 @@
-import { ArrowLeft, GraduationCap, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, ShieldCheck } from 'lucide-react'
 import landingHero from '../assets/landing-hero.png'
+import MarkaMark from './MarkaMark'
 
 function PublicAuthShell({
   children,
@@ -20,11 +21,10 @@ function PublicAuthShell({
           aria-label="Marka home"
         >
           <span className="public-auth-brand-mark" aria-hidden="true">
-            <GraduationCap size={22} strokeWidth={2.2} />
+            <MarkaMark size={22} />
           </span>
           <span className="public-auth-brand-copy">
             <strong>Marka</strong>
-            <span>Dashboard</span>
           </span>
         </button>
 

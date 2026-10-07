@@ -3,12 +3,12 @@ import {
   BarChart3,
   CalendarDays,
   ClipboardList,
-  GraduationCap,
   LayoutDashboard,
   LogOut,
   UserRoundCheck,
   UsersRound,
 } from 'lucide-react'
+import MarkaMark from './MarkaMark'
 import NotificationCenter from './NotificationCenter'
 
 const principalNavIcons = {
@@ -84,7 +84,7 @@ function AppLayout({
         <aside className="dashboard-sidebar principal-sidebar">
           <div className="principal-brand-block">
             <span className="principal-brand-icon" aria-hidden="true">
-              <GraduationCap size={20} strokeWidth={2.3} />
+              <MarkaMark size={20} />
             </span>
             <div>
               <strong>Marka</strong>
@@ -148,7 +148,7 @@ function AppLayout({
         <header className="teacher-workspace-topbar">
           <div className="teacher-workspace-brand">
             <span className="teacher-system-mark" aria-hidden="true">
-              <GraduationCap size={17} strokeWidth={2.3} />
+              <MarkaMark size={17} />
             </span>
             <button
               type="button"

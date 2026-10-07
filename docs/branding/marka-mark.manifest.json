@@ -1,0 +1,113 @@
+{
+  "asset": "Marka mark - green checkmark in an open rounded square (glyph only)",
+  "revision": "r1",
+  "status": "APPROVED by the user on 2026-10-07 (approved the rendered r1 candidate in the frontend session). Use this revision for all platform derivatives.",
+  "created": "2026-10-07",
+  "created_by": "frontend session (D:\\CAPSTONE_2\\web-dashboard)",
+  "files": {
+    "marka-mark.svg": {
+      "sha256": "b3750deed7c13ec1abd8a8fddaf085dcc78caf4a81d7fbbe1d0e2b4d3bfafbff",
+      "bytes": 939,
+      "role": "canonical master; all platform derivatives must be generated from this file"
+    },
+    "marka-mark-overlay.png": {
+      "sha256": "b494b3cd35506f47a4d29b1b1b270f047396c074886672d7bfc4081611918a50",
+      "bytes": 314785,
+      "role": "approval evidence only (not an asset): candidate rendered by Chrome over the reference at the same scale"
+    }
+  },
+  "source_reference": {
+    "path": "D:\\01CAPSTONE project materials\\#4th_year_CAPSTONE_2\\Figures\\marka-logo-reference.png",
+    "sha256": "82b27a3b987c5d54e57119bf6665fbcf28617c6aca781cc6b101dacfd375ce8e",
+    "used": "green (upper) mark only; black (lower) mark ignored",
+    "note": "reference is 195x417 RGBA with an opaque white background; the green mark is ~143.7 px wide"
+  },
+  "color": {
+    "fill": "#00B316",
+    "approved": "yes - approved by the user 2026-10-07 (relayed by the documentation session)",
+    "rule": "fixed fill on every surface; do not inherit currentColor or theme tokens"
+  },
+  "svg": {
+    "viewBox": "0 0 64 64",
+    "width": 64,
+    "height": 64,
+    "background": "transparent",
+    "elements": "exactly 2 <path> elements (frame, check); attributes fill and d only",
+    "commands": "absolute M, L, C, Z only (no arcs, no relative commands, no transforms, no strokes)",
+    "fill_rule": "nonzero (default); the two subpaths do not overlap, so evenodd renders identically",
+    "y_axis": "points down (SVG). PDF user space points up: use y' = 64 - y or a flipping transform"
+  },
+  "padding": {
+    "units": 4,
+    "glyph_box": [
+      4,
+      4,
+      60,
+      60
+    ],
+    "note": "the frame's outer edge sits exactly on the 4-unit inset on all four sides; the check lies inside the frame box"
+  },
+  "frame": {
+    "construction": "exact geometry: open rounded-square band, uniform width, concentric corners, round caps; opening at upper-right",
+    "stroke_width": 5.34,
+    "outer_corner_radius": 11.35,
+    "inner_corner_radius": 6.01,
+    "centerline_corner_radius": 8.68,
+    "top_bar_end_cap": {
+      "centre": [
+        37.31,
+        6.67
+      ],
+      "radius": 2.67
+    },
+    "right_bar_start_cap": {
+      "centre": [
+        57.33,
+        30.68
+      ],
+      "radius": 2.67
+    }
+  },
+  "check": {
+    "construction": "10 cubic Bezier segments traced from the reference: one per edge, two per rounded end (tip, bottom, left end); smooth (G1) joins everywhere except a deliberately sharp inner corner",
+    "inner_corner": [
+      31.63,
+      34.71
+    ],
+    "bbox": [
+      15.97,
+      9.22,
+      58.43,
+      47.28
+    ],
+    "recorded_widths": {
+      "type": "variable-width shape (not a uniform stroke)",
+      "long_arm": "tapers from ~9.9 near the bottom to ~7.2 near the tip (perpendicular, units)",
+      "short_arm": "~9.6 (perpendicular, units)"
+    }
+  },
+  "fidelity": {
+    "method": "frame fitted as exact geometry to the reference's anti-aliased pixels; check traced from the reference's sub-pixel 50% contour; the delivered SVG file was rendered by headless Chrome at the reference scale and its outline compared to the reference outline",
+    "units_per_reference_px": 0.38959,
+    "reference_px_per_unit": 2.5668,
+    "outline_deviation_reference_px": {
+      "frame_mean": 0.07,
+      "frame_max": 0.23,
+      "check_mean": 0.05,
+      "check_max": 0.24,
+      "inner_corner": 0.31
+    },
+    "notes": [
+      "inner corner: the reference corner is rounded only by its image blur (the blur displaces it toward the opening, which a real fillet would not); the master keeps it sharp",
+      "rendered fill verified as exactly #00B316 (0,179,22)",
+      "legibility checked in Chrome at 16 px plain and at 17/20/22 px inside the current web tile/circle slots"
+    ]
+  },
+  "usage_rules": [
+    "Use the path data as-is. Do not redraw, simplify, restyle, recolour or stretch it.",
+    "Generate every platform derivative (web, favicon, launcher/splash PNGs, Android vector, PDF/Excel drawing) from this exact file and record this revision in the derivative's report.",
+    "Backend: the path data ports 1:1 to Java2D Path2D and PDFBox (moveTo/lineTo/curveTo/closePath); flip y for PDF.",
+    "Placement (tile/circle backgrounds, launcher background, sizes) is per-platform and is not part of this master."
+  ],
+  "approved": "2026-10-07"
+}

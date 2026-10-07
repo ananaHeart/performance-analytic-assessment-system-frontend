@@ -1,12 +1,12 @@
 import {
   BarChart3,
   ClipboardCheck,
-  GraduationCap,
   RefreshCw,
   Sparkles,
   UserPlus,
 } from 'lucide-react'
 import landingHero from '../assets/landing-hero.png'
+import MarkaMark from '../components/MarkaMark'
 
 const WORKFLOW_STEPS = [
   {
@@ -40,11 +40,10 @@ function LandingPage({ onNavigate }) {
           aria-label="Marka home"
         >
           <span className="landing-brand-mark" aria-hidden="true">
-            <GraduationCap size={22} strokeWidth={2.2} />
+            <MarkaMark size={22} />
           </span>
           <span className="landing-brand-copy">
             <strong>Marka</strong>
-            <span>Dashboard</span>
           </span>
         </button>
 
