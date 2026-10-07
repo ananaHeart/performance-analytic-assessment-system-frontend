@@ -38,7 +38,7 @@ function PublicAuthShell({
         <aside
           className="public-auth-visual"
           style={{ '--public-auth-image': `url(${landingHero})` }}
-          aria-label="Marka Dashboard"
+          aria-label="Marka"
         >
           <div className="public-auth-visual-overlay" aria-hidden="true" />
           <div className="public-auth-visual-copy">

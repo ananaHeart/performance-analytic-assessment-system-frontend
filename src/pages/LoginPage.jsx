@@ -297,7 +297,7 @@ function LoginPage({ onLoginSuccess, onAuthenticationFailure, onNavigate }) {
           <>
         <div className="public-auth-form-heading">
           <p>Account access</p>
-          <h1>Log in to Marka Dashboard</h1>
+          <h1>Log in to Marka</h1>
           <span>Use your active school account to continue.</span>
         </div>
 
