@@ -1,5 +1,9 @@
+/*
+ * Marka design tokens: the single source of truth for color, type, radius and shadow.
+ * global.css and the shadcn layer in system.css (--ui-*) point at these.
+ */
 :root {
-  --font-sans: "Inter", "Segoe UI", Arial, sans-serif;
+  --font-sans: "Inter Variable", "Inter", "Segoe UI", Arial, sans-serif;
   --font-size-xs: 0.75rem;
   --font-size-sm: 0.875rem;
   --font-size-md: 1rem;
@@ -13,20 +17,42 @@
   --space-5: 20px;
   --space-6: 24px;
   --space-8: 32px;
-  --primary: #83e841;
+
+  /* Brand green is decorative only (indicators, progress fills, accents), never behind white text. */
+  --brand: #83e841;
+  --brand-hover: #9af161;
+  --on-brand: #17320b;
+  /* Primary carries text and icons: buttons, links, selected chips. */
+  --primary: #2f7d16;
+  --primary-hover: #276912;
   --primary-dark: #2f7d16;
   --primary-soft: #f3fee8;
   --primary-border: #c9f7a8;
-  --primary-ring: rgba(131, 232, 65, 0.22);
-  --app-bg: #ffffff;
-  --page-bg: #ffffff;
+  --primary-ring: rgba(47, 125, 22, 0.28);
+  --on-primary: #ffffff;
+
+  /* Gray page canvas with white surfaces on top. */
+  --app-bg: #f1f5f9;
+  --page-bg: #f1f5f9;
   --surface: #ffffff;
   --surface-strong: #ffffff;
   --surface-muted: #f8fafc;
+  --surface-sunken: #f1f5f9;
   --border: #e2e8f0;
   --border-strong: #cbd5e1;
+
   --text: #0f172a;
-  --muted: #64748b;
+  --text-secondary: #334155;
+  --muted: #5b6b80;
+  /* Disabled text and decorative icons only; too light for body copy or placeholders. */
+  --text-faint: #94a3b8;
+  --placeholder: #64748b;
+
+  /* Landing and auth hero panel (kept as designed). */
+  --hero-bg: #294237;
+  --hero-text: #dfffc9;
+  --hero-accent: #b8fa8d;
+
   --shadow: 0 4px 0 rgba(51, 65, 85, 0.18);
   --shadow-soft: 0 2px 0 rgba(51, 65, 85, 0.14);
   --shadow-control: 0 3px 0 rgba(30, 41, 59, 0.26);
@@ -34,21 +60,52 @@
   --shadow-input: 0 2px 0 rgba(51, 65, 85, 0.12);
   --radius-card: 8px;
   --radius-control: 8px;
+  --radius-modal: 12px;
   --radius-pill: 999px;
+
   --chart-track: #eef2f7;
   --chart-grid: #e5e7eb;
-  --chart-success: #83e841;
-  --chart-warning: #f59e0b;
-  --chart-danger: #ef4444;
+  --chart-success: #4a9f27;
+  --chart-warning: #d97706;
+  --chart-danger: #dc2626;
   --chart-info: #2563eb;
+
+  --danger: #dc2626;
+  --danger-hover: #b91c1c;
   --status-success-bg: #dcfce7;
   --status-success-text: #2f7d16;
+  --status-warning-soft: #fffbeb;
   --status-warning-bg: #ffedd5;
+  --status-warning-border: #fed7aa;
   --status-warning-text: #c2410c;
+  --status-danger-soft: #fef2f2;
   --status-danger-bg: #fee2e2;
-  --status-danger-text: #dc2626;
+  --status-danger-border: #fecaca;
+  --status-danger-text: #b91c1c;
   --status-neutral-bg: #f1f5f9;
   --status-neutral-text: #475569;
+  --status-info-soft: #eff6ff;
+  --status-info-bg: #dbeafe;
+  --status-info-border: #bfdbfe;
+  --status-info-text: #1d4ed8;
+
+  /* Extra category tones (principal report tabs). */
+  --tone-purple-bg: #f5f3ff;
+  --tone-purple-border: #ddd6fe;
+  --tone-purple-text: #6d28d9;
+  --tone-teal-bg: #f0fdfa;
+  --tone-teal-border: #99f6e4;
+  --tone-teal-text: #0f766e;
+
+  /* Student avatar illustration fills. */
+  --avatar-female-start: #f9a8d4;
+  --avatar-female-end: #ec4899;
+  --avatar-female-soft: #fde7f3;
+  --avatar-male-start: #93c5fd;
+  --avatar-male-end: #2563eb;
+  --avatar-male-soft: #dbeafe;
+  --avatar-teacher-bg: #ffe5d6;
+  --avatar-teacher-text: #8b4a2d;
 }
 
 html,
@@ -163,7 +220,7 @@ h3 {
 .assessment-builder-page .answer-key-choice-item button.is-selected {
   border-color: var(--primary);
   background: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
   box-shadow: var(--shadow-control);
 }
 
@@ -237,7 +294,7 @@ h3 {
 
 .teacher-dashboard-overview-grid article:nth-child(2) .teacher-dashboard-overview-icon,
 .principal-stat-icon-blue {
-  background: #dbeafe;
+  background: var(--status-info-bg);
   color: var(--chart-info);
 }
 
@@ -272,7 +329,7 @@ textarea,
 .principal-assignment-readonly-field {
   border-color: var(--border);
   border-radius: var(--radius-control);
-  background: #ffffff;
+  background: var(--surface);
   color: var(--text);
 }
 
@@ -312,7 +369,7 @@ textarea:focus,
 .approval-table tbody tr:hover,
 .teacher-analytics-student-panel tbody tr:hover,
 .compact-table tbody tr:hover {
-  background: #fafafa;
+  background: var(--surface-muted);
 }
 
 .principal-grade-chart,
@@ -327,16 +384,16 @@ textarea:focus,
       transparent 47px,
       var(--chart-grid) 48px
     ),
-    #ffffff;
+    var(--surface);
 }
 
 .principal-grade-bar span,
 .principal-trend-bar span {
-  background: linear-gradient(180deg, #86efac 0%, var(--chart-success) 100%);
+  background: linear-gradient(180deg, var(--primary-border) 0%, var(--chart-success) 100%);
 }
 
 .principal-grade-bar:nth-child(even) span {
-  background: linear-gradient(180deg, #bfdbfe 0%, var(--chart-info) 100%);
+  background: linear-gradient(180deg, var(--status-info-border) 0%, var(--chart-info) 100%);
 }
 
 .analytics-progress-track,
@@ -369,7 +426,7 @@ textarea:focus,
 .analytics-progress-fill.analytics-tone-neutral,
 .principal-skill-track .analytics-tone-neutral,
 .student-skill-row.is-no-data .student-skill-track span {
-  background: #94a3b8;
+  background: var(--text-faint);
 }
 
 .principal-assessment-status.status-completed,
@@ -477,7 +534,7 @@ textarea:focus,
   border: 1px solid transparent;
   border-radius: var(--radius-control);
   background: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
   font-size: var(--font-size-sm);
   font-weight: 800;
   line-height: 1;
@@ -496,7 +553,7 @@ textarea:focus,
 .create-assessment-button:hover,
 .export-report-button:hover {
   background: var(--primary-dark);
-  color: #ffffff;
+  color: var(--on-primary);
   box-shadow: var(--shadow-control-hover);
   transform: translateY(-1px);
 }
@@ -693,7 +750,7 @@ textarea:focus,
 .compact-table tr:hover td,
 .teacher-analytics-student-panel tr:hover td,
 .teacher-students-table-panel tr:hover td {
-  background: #fafafa;
+  background: var(--surface-muted);
 }
 
 .field-group input,
@@ -829,15 +886,15 @@ textarea:focus,
 }
 
 .teacher-dashboard-overview-grid article:nth-child(1) {
-  border-color: #c9f7a8;
+  border-color: var(--primary-border);
 }
 
 .teacher-dashboard-overview-grid article:nth-child(2) {
-  border-color: #bfdbfe;
+  border-color: var(--status-info-border);
 }
 
 .teacher-dashboard-overview-grid article:nth-child(3) {
-  border-color: #fed7aa;
+  border-color: var(--status-warning-border);
 }
 
 .teacher-dashboard-overview-icon {
@@ -856,7 +913,7 @@ textarea:focus,
 }
 
 .teacher-dashboard-overview-grid article:nth-child(2) .teacher-dashboard-overview-icon {
-  background: #dbeafe;
+  background: var(--status-info-bg);
   color: var(--chart-info);
 }
 
@@ -994,7 +1051,7 @@ textarea:focus,
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
-  color: #94a3b8;
+  color: var(--muted);
   font-size: var(--font-size-xs);
 }
 
@@ -1096,7 +1153,7 @@ textarea:focus,
 
 .teacher-assessment-topline button:hover,
 .teacher-assessment-topline button.is-active {
-  border-bottom-color: var(--primary);
+  border-bottom-color: var(--brand);
   color: var(--primary-dark);
 }
 
@@ -1181,7 +1238,7 @@ textarea:focus,
   border: 1px solid var(--primary);
   border-radius: var(--radius-control);
   background: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
   font-size: var(--font-size-sm);
   font-weight: 850;
   box-shadow: var(--shadow-control);
@@ -1593,8 +1650,8 @@ textarea:focus,
   display: inline-grid;
   place-items: center;
   border-radius: var(--radius-pill);
-  background: #e0f2fe;
-  color: #0369a1;
+  background: var(--status-info-soft);
+  color: var(--status-info-text);
   font-size: 0.68rem;
   font-weight: 900;
 }
@@ -1710,7 +1767,7 @@ textarea:focus,
 }
 
 .teacher-intervention-step small {
-  color: #334155;
+  color: var(--text-secondary);
   font-weight: 800;
 }
 
@@ -1828,7 +1885,7 @@ textarea:focus,
 
 .teacher-assessment-row:hover,
 .teacher-assessment-row:focus-visible {
-  background: #fafafa;
+  background: var(--surface-muted);
   box-shadow: inset 3px 0 0 var(--primary);
 }
 
@@ -1854,7 +1911,7 @@ textarea:focus,
 }
 
 .teacher-assessment-copy small {
-  color: #94a3b8;
+  color: var(--muted);
   font-size: var(--font-size-xs);
   font-weight: 700;
 }
@@ -1943,7 +2000,7 @@ textarea:focus,
 }
 
 .teacher-analytics-student-panel tbody tr:hover td {
-  background: #fafafa;
+  background: var(--surface-muted);
 }
 
 .teacher-analytics-student-panel th:nth-child(2),
@@ -1983,8 +2040,8 @@ textarea:focus,
   display: inline-grid;
   place-items: center;
   border-radius: var(--radius-pill);
-  background: #e0f2fe;
-  color: #0369a1;
+  background: var(--status-info-soft);
+  color: var(--status-info-text);
   font-size: 0.68rem;
   font-weight: 900;
 }
@@ -2086,7 +2143,7 @@ textarea:focus,
   grid-template-columns: 260px minmax(0, 1fr);
   gap: var(--space-5);
   overflow: auto;
-  background: #fafafa;
+  background: var(--surface-muted);
 }
 
 .student-profile-column {
@@ -2103,9 +2160,9 @@ textarea:focus,
   display: grid;
   place-items: center;
   overflow: hidden;
-  border: 4px solid #ffffff;
+  border: 4px solid var(--surface);
   border-radius: var(--radius-pill);
-  background: #cbd5e1;
+  background: var(--border-strong);
   color: transparent;
   font-size: 0;
   box-shadow: var(--shadow-soft);
@@ -2133,15 +2190,15 @@ textarea:focus,
 }
 
 .student-info-avatar.is-female {
-  background: linear-gradient(145deg, #f9a8d4, #ec4899);
+  background: linear-gradient(145deg, var(--avatar-female-start), var(--avatar-female-end));
 }
 
 .student-info-avatar.is-male {
-  background: linear-gradient(145deg, #93c5fd, #2563eb);
+  background: linear-gradient(145deg, var(--avatar-male-start), var(--avatar-male-end));
 }
 
 .student-info-avatar.is-unknown {
-  background: linear-gradient(145deg, #cbd5e1, #94a3b8);
+  background: linear-gradient(145deg, var(--border-strong), var(--text-faint));
 }
 
 .student-profile-card {
@@ -3117,7 +3174,7 @@ textarea:focus,
 .principal-assignment-rule-warning {
   margin: 0 0 var(--space-3);
   padding: var(--space-3) var(--space-4);
-  border: 1px solid #f6d58a;
+  border: 1px solid var(--status-warning-border);
   border-radius: var(--radius-control);
   background: var(--status-warning-bg);
   color: var(--status-warning-text);
@@ -3322,14 +3379,14 @@ textarea:focus,
   padding: 0 var(--space-3);
   border: 1px solid var(--status-danger-bg);
   border-radius: var(--radius-control);
-  background: #fff7f7;
+  background: var(--status-danger-soft);
   color: var(--status-danger-text);
   font-size: var(--font-size-xs);
   font-weight: 850;
 }
 
 .manual-row-remove:hover {
-  border-color: #fecaca;
+  border-color: var(--status-danger-border);
   background: var(--status-danger-bg);
 }
 
@@ -3640,9 +3697,9 @@ textarea:focus,
   align-items: center;
   justify-content: center;
   padding: 0;
-  border: 1px solid #fecaca;
+  border: 1px solid var(--status-danger-border);
   border-radius: var(--radius-control);
-  background: #fff;
+  background: var(--surface);
   color: var(--status-danger-text);
   cursor: pointer;
 }
@@ -3763,7 +3820,7 @@ textarea:focus,
 .assignment-delete-phrase {
   display: block;
   padding: var(--space-3);
-  border: 1px solid #fecaca;
+  border: 1px solid var(--status-danger-border);
   border-radius: var(--radius-control);
   background: var(--status-danger-bg);
   color: var(--status-danger-text);
@@ -3811,7 +3868,7 @@ textarea:focus,
   border: 1px solid var(--status-danger-text);
   border-radius: var(--radius-control);
   background: var(--status-danger-text);
-  color: #fff;
+  color: var(--on-primary);
   font-weight: 850;
   cursor: pointer;
 }
@@ -3875,7 +3932,7 @@ textarea:focus,
   border: 1px solid var(--primary-dark);
   border-radius: var(--radius-control);
   background: var(--primary-dark);
-  color: #fff;
+  color: var(--on-primary);
   font-weight: 850;
   cursor: pointer;
 }
@@ -4500,11 +4557,11 @@ textarea:focus,
   width: min(100%, 96px);
   min-height: 6px;
   border-radius: var(--radius-control) var(--radius-control) 0 0;
-  background: linear-gradient(180deg, #86efac 0%, var(--chart-success) 100%);
+  background: linear-gradient(180deg, var(--primary-border) 0%, var(--chart-success) 100%);
 }
 
 .principal-grade-bar:nth-child(even) span {
-  background: linear-gradient(180deg, #bfdbfe 0%, var(--chart-info) 100%);
+  background: linear-gradient(180deg, var(--status-info-border) 0%, var(--chart-info) 100%);
 }
 
 .principal-grade-bar small,
@@ -4575,7 +4632,7 @@ textarea:focus,
 }
 
 .principal-skill-track .analytics-tone-neutral {
-  background: #94a3b8;
+  background: var(--text-faint);
 }
 
 .principal-sync-row {
@@ -4764,7 +4821,7 @@ textarea:focus,
 }
 
 .principal-teacher-tabs button.is-active {
-  border-bottom-color: var(--primary);
+  border-bottom-color: var(--brand);
   color: var(--primary-dark);
 }
 
@@ -4834,8 +4891,8 @@ textarea:focus,
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: #e0f2fe;
-  color: #0369a1;
+  background: var(--status-info-soft);
+  color: var(--status-info-text);
   font-size: var(--font-size-xs);
   font-weight: 900;
 }
@@ -4905,7 +4962,7 @@ textarea:focus,
 .principal-approve-button {
   border: 1px solid var(--primary);
   background: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
 }
 
 .principal-approve-button:hover:not(:disabled) {
@@ -4914,8 +4971,8 @@ textarea:focus,
 }
 
 .principal-reject-button {
-  border: 1px solid #fecaca;
-  background: #fff7f7;
+  border: 1px solid var(--status-danger-border);
+  background: var(--status-danger-soft);
   color: var(--status-danger-text);
 }
 
@@ -6192,17 +6249,17 @@ body {
 
 .teacher-dashboard-overview-grid article:nth-child(1) {
   border-color: var(--primary-border);
-  background: #fdfff9;
+  background: var(--surface);
 }
 
 .teacher-dashboard-overview-grid article:nth-child(2) {
-  border-color: #bfdbfe;
-  background: #f8fbff;
+  border-color: var(--status-info-border);
+  background: var(--surface-muted);
 }
 
 .teacher-dashboard-overview-grid article:nth-child(3) {
-  border-color: #fed7aa;
-  background: #fffaf3;
+  border-color: var(--status-warning-border);
+  background: var(--status-warning-soft);
 }
 
 .teacher-dashboard-overview-grid article:nth-child(1) .teacher-dashboard-overview-icon,
@@ -6254,7 +6311,7 @@ body {
 .teacher-class-card:hover,
 .teacher-class-card:focus-visible {
   border-color: var(--primary-border);
-  background: #fdfff9;
+  background: var(--surface);
   box-shadow: var(--shadow-soft);
 }
 
@@ -6316,7 +6373,7 @@ body {
   min-height: 44px;
   padding: 0 var(--space-5);
   background: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
   box-shadow: var(--shadow-control);
 }
 
@@ -6324,7 +6381,7 @@ body {
 .teacher-create-assessment-button:focus-visible {
   border-color: var(--primary-dark);
   background: var(--primary-dark);
-  color: #ffffff;
+  color: var(--on-primary);
   outline: none;
 }
 
@@ -6348,7 +6405,7 @@ body {
 
 .teacher-assessment-row:hover,
 .teacher-assessment-row:focus-visible {
-  background: #fdfff9;
+  background: var(--surface);
 }
 
 .teacher-assessment-copy strong {

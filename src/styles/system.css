@@ -12,58 +12,57 @@
 @source "../v2/V2TeacherCreatePage.jsx";
 
 /*
- * Source of truth for the new shared UI system.
- * Legacy screens keep their existing styles until each route is migrated.
+ * shadcn/Tailwind layer. Every --ui-* value points at design-tokens.css so the
+ * components (used by the assessment editor) match the rest of the app.
  */
 :root {
-  --ui-background: #ffffff;
-  --ui-foreground: #122033;
-  --ui-card: #ffffff;
-  --ui-card-foreground: #122033;
-  --ui-popover: #ffffff;
-  --ui-popover-foreground: #122033;
+  --ui-background: var(--surface);
+  --ui-foreground: var(--text);
+  --ui-card: var(--surface);
+  --ui-card-foreground: var(--text);
+  --ui-popover: var(--surface);
+  --ui-popover-foreground: var(--text);
 
-  --ui-primary: #2f7d16;
-  --ui-primary-hover: #286b13;
-  --ui-primary-foreground: #ffffff;
-  --ui-brand: #83e841;
-  --ui-brand-soft: #f0fde8;
+  --ui-primary: var(--primary);
+  --ui-primary-hover: var(--primary-hover);
+  --ui-primary-foreground: var(--on-primary);
+  --ui-brand: var(--brand);
+  --ui-brand-soft: var(--primary-soft);
 
-  --ui-secondary: #f4f7f5;
-  --ui-secondary-foreground: #20332a;
-  --ui-muted: #f7f9f8;
-  --ui-muted-foreground: #64748b;
-  --ui-accent: #eefbe8;
-  --ui-accent-foreground: #245e13;
+  --ui-secondary: var(--surface-sunken);
+  --ui-secondary-foreground: var(--text-secondary);
+  --ui-muted: var(--surface-muted);
+  --ui-muted-foreground: var(--muted);
+  --ui-accent: var(--primary-soft);
+  --ui-accent-foreground: var(--primary-dark);
 
-  --ui-destructive: #dc2626;
-  --ui-destructive-hover: #b91c1c;
-  --ui-destructive-foreground: #ffffff;
-  --ui-warning: #d97706;
-  --ui-warning-soft: #fff7e6;
-  --ui-success: #16803a;
-  --ui-success-soft: #ecfdf3;
-  --ui-info: #2563eb;
-  --ui-info-soft: #eff6ff;
+  --ui-destructive: var(--danger);
+  --ui-destructive-hover: var(--danger-hover);
+  --ui-destructive-foreground: var(--on-primary);
+  --ui-warning: var(--status-warning-text);
+  --ui-warning-soft: var(--status-warning-bg);
+  --ui-success: var(--status-success-text);
+  --ui-success-soft: var(--status-success-bg);
+  --ui-info: var(--status-info-text);
+  --ui-info-soft: var(--status-info-bg);
 
-  --ui-border: #dce4e0;
-  --ui-input: #d4ddd8;
-  --ui-ring: #4f9f2f;
+  --ui-border: var(--border);
+  --ui-input: var(--border-strong);
+  --ui-ring: var(--primary);
 
-  --ui-chart-1: #2f7d16;
-  --ui-chart-2: #2563eb;
-  --ui-chart-3: #d97706;
-  --ui-chart-4: #dc2626;
-  --ui-chart-5: #64748b;
+  --ui-chart-1: var(--chart-success);
+  --ui-chart-2: var(--chart-info);
+  --ui-chart-3: var(--chart-warning);
+  --ui-chart-4: var(--chart-danger);
+  --ui-chart-5: var(--muted);
 
-  --ui-radius-sm: 0.375rem;
-  --ui-radius-md: 0.5rem;
-  --ui-radius-lg: 0.625rem;
-  --ui-shadow-sm: 0 1px 2px rgb(15 23 42 / 0.05);
+  --ui-radius-sm: var(--radius-control);
+  --ui-radius-md: var(--radius-control);
+  --ui-radius-lg: var(--radius-card);
+  --ui-shadow-sm: var(--shadow-soft);
   --ui-shadow-md: 0 8px 24px rgb(15 23 42 / 0.08);
 
-  --ui-font-sans: "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system,
-    BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ui-font-sans: var(--font-sans);
 }
 
 @theme inline {
@@ -107,10 +106,13 @@
   --radius-sm: var(--ui-radius-sm);
   --radius-md: var(--ui-radius-md);
   --radius-lg: var(--ui-radius-lg);
+
+  /* Hard-offset "pressed" shadow, matching the app's cards and controls. */
+  --shadow-sm: var(--ui-shadow-sm);
 }
 
 .smart-ui {
-  background: var(--ui-background);
+  background: transparent;
   color: var(--ui-foreground);
   font-family: var(--ui-font-sans);
   font-synthesis: none;
