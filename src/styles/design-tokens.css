@@ -76,6 +76,8 @@
   --danger: #dc2626;
   --danger-hover: #b91c1c;
   --on-danger: #ffffff;
+  /* Strong red fill for destructive confirm buttons. */
+  --danger-strong: #b91c1c;
   --status-success-bg: #dcfce7;
   --status-success-text: #2f7d16;
   --status-warning-soft: #fffbeb;
@@ -167,6 +169,7 @@
     --danger: #ef4444;
     --danger-hover: #f87171;
     --on-danger: #0f172a;
+    --danger-strong: #ef4444;
     --status-success-bg: #163a1f;
     --status-success-text: #86efac;
     --status-warning-soft: #2a1d0e;
@@ -3966,9 +3969,9 @@ textarea:focus,
   justify-content: center;
   gap: var(--space-2);
   padding: 0 var(--space-4);
-  border: 1px solid var(--status-danger-text);
+  border: 1px solid var(--danger-strong);
   border-radius: var(--radius-control);
-  background: var(--status-danger-text);
+  background: var(--danger-strong);
   color: var(--on-danger);
   font-weight: 850;
   cursor: pointer;
@@ -6581,5 +6584,10 @@ body {
 @media screen {
   :root[data-theme="dark"] .public-brand-panel {
     background: var(--surface);
+  }
+
+  /* No CSS reset is loaded, so unstyled buttons fall back to the browser's gray "buttonface". */
+  :where(:root[data-theme="dark"] button) {
+    background-color: var(--surface-muted);
   }
 }

@@ -176,7 +176,7 @@
 
   .dashboard-shell.is-teacher-workspace .teacher-workspace-topbar {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 30px 30px;
+    grid-template-columns: minmax(0, 1fr) 30px 30px 30px;
     gap: 4px 10px;
     align-items: center;
     padding-block: 8px;
@@ -192,7 +192,7 @@
   }
 
   .dashboard-shell.is-teacher-workspace .teacher-workspace-school-year {
-    grid-area: 1 / 2 / 2 / 4;
+    grid-area: 1 / 2 / 2 / 5;
     justify-self: end;
     font-size: 0.82rem;
   }
@@ -206,12 +206,16 @@
     overflow-x: auto;
   }
 
-  .dashboard-shell.is-teacher-workspace .teacher-workspace-profile > .notification-center {
+  .dashboard-shell.is-teacher-workspace .teacher-workspace-profile > .theme-toggle-button {
     grid-area: 2 / 2;
   }
 
-  .dashboard-shell.is-teacher-workspace .teacher-topbar-avatar {
+  .dashboard-shell.is-teacher-workspace .teacher-workspace-profile > .notification-center {
     grid-area: 2 / 3;
+  }
+
+  .dashboard-shell.is-teacher-workspace .teacher-topbar-avatar {
+    grid-area: 2 / 4;
   }
 }
 
