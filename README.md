@@ -62,6 +62,19 @@ Use these settings when deploying the Vite frontend as a Render Static Site:
 
 The backend must allow the deployed frontend URL through CORS.
 
+## App download link
+
+The public "Get the app" page and the Home app section share one APK link. The QR code is generated from the same link, so they always match.
+
+To change the link, do one of these:
+
+- On Render, set `VITE_APK_URL` to the new link and redeploy.
+- Or edit `url` in `src/config/appRelease.js`.
+
+The same file holds the size and minimum Android version shown under the button. Empty values are hidden, and an empty link shows "Download link coming soon".
+
+Tip: in Google Drive, replace the old APK with **Manage versions → Upload new version**. That keeps the same share link, so the website never needs to change.
+
 ## Main Documentation
 
 The documentation files for panel review are in the `docs` folder:
