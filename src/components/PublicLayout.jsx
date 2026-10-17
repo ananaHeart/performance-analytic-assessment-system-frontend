@@ -36,7 +36,7 @@ const FOOTER_COLUMNS = [
   },
 ]
 
-function PublicLayout({ currentPage, title, scrollTarget, onNavigate, children }) {
+function PublicLayout({ currentPage, title, scrollTarget, isSignedIn = false, onNavigate, children }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const headerRef = useRef(null)
   const hasMountedRef = useRef(false)
@@ -97,7 +97,12 @@ function PublicLayout({ currentPage, title, scrollTarget, onNavigate, children }
     </a>
   ))
 
-  const accountActions = (
+  // Signed-in visitors go back to their dashboard; opening #login would sign them out.
+  const accountActions = isSignedIn ? (
+    <a href="#home" className="public-signup-link" onClick={go('home')}>
+      Go to dashboard
+    </a>
+  ) : (
     <>
       <a href="#login" className="public-login-link" onClick={go('login')}>
         Log in

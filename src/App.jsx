@@ -46,6 +46,8 @@ const PUBLIC_SITE_PAGES = {
 }
 const PUBLIC_PAGES = new Set([...Object.keys(PUBLIC_SITE_PAGES), ...PUBLIC_AUTH_ENTRY_PAGES])
 const NOT_FOUND_PAGE = 'not-found'
+// Information pages stay open after sign-in; #home, #login and #register still redirect.
+const INFO_PAGES = new Set(['features', 'get-app', 'guide', 'tech-stack', 'about', 'privacy'])
 const DEFAULT_ROLE_PAGE = {
   principal: 'principal-dashboard',
   teacher: 'teacher-dashboard',
@@ -258,7 +260,8 @@ function normalizePage(auth, page) {
   }
 
   const allowedPages = ALLOWED_PAGES_BY_ROLE[auth.user.role] ?? []
-  return allowedPages.includes(page) ? page : getDefaultPage(auth.user.role)
+  if (allowedPages.includes(page) || INFO_PAGES.has(page)) return page
+  return getDefaultPage(auth.user.role)
 }
 
 function renderProtectedPage(
@@ -637,6 +640,11 @@ function App() {
 
     const PublicSitePage = PUBLIC_SITE_PAGES[currentPage] ?? LandingPage
     return <PublicSitePage onNavigate={handleNavigate} scrollTarget={publicScrollTarget} />
+  }
+
+  if (INFO_PAGES.has(currentPage)) {
+    const InfoPage = PUBLIC_SITE_PAGES[currentPage]
+    return <InfoPage onNavigate={handleNavigate} scrollTarget={publicScrollTarget} isSignedIn />
   }
 
   const navItems = NAV_ITEMS_BY_ROLE[auth.user.role] ?? []

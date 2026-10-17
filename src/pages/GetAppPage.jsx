@@ -75,7 +75,7 @@ function InstallStep({ step }) {
   )
 }
 
-function GetAppPage({ onNavigate, scrollTarget }) {
+function GetAppPage({ onNavigate, scrollTarget, isSignedIn }) {
   const requirements = [
     APP_RELEASE.minAndroid ? `An Android phone running ${APP_RELEASE.minAndroid}` : 'An Android phone',
     'A working camera',
@@ -84,7 +84,7 @@ function GetAppPage({ onNavigate, scrollTarget }) {
   ].filter(Boolean)
 
   return (
-    <PublicLayout currentPage="get-app" title="Get the app" scrollTarget={scrollTarget} onNavigate={onNavigate}>
+    <PublicLayout currentPage="get-app" isSignedIn={isSignedIn} title="Get the app" scrollTarget={scrollTarget} onNavigate={onNavigate}>
       <div className="public-content">
         <AppSection
           id="get-app-title"

@@ -19,7 +19,7 @@ function matchesQuery(item, query) {
   return item.name.toLowerCase().includes(needle) || item.definition.toLowerCase().includes(needle)
 }
 
-function TechStackPage({ onNavigate, scrollTarget }) {
+function TechStackPage({ onNavigate, scrollTarget, isSignedIn }) {
   const [selectedGroup, setSelectedGroup] = useState(ALL_GROUPS)
   const [query, setQuery] = useState('')
   const trimmedQuery = query.trim()
@@ -47,7 +47,7 @@ function TechStackPage({ onNavigate, scrollTarget }) {
   const resultCount = visibleGroups.reduce((total, group) => total + group.items.length, 0)
 
   return (
-    <PublicLayout currentPage="tech-stack" title="Tech stack" scrollTarget={scrollTarget} onNavigate={onNavigate}>
+    <PublicLayout currentPage="tech-stack" isSignedIn={isSignedIn} title="Tech stack" scrollTarget={scrollTarget} onNavigate={onNavigate}>
       <div className="tech-stack-content">
         <section className="tech-stack-intro" aria-labelledby="tech-stack-title">
           <p className="tech-stack-eyebrow">Technical background</p>

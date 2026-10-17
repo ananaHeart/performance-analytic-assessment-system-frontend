@@ -48,9 +48,9 @@ function GuideSection({ id, number, title, children }) {
   )
 }
 
-function GuidePage({ onNavigate, scrollTarget }) {
+function GuidePage({ onNavigate, scrollTarget, isSignedIn }) {
   return (
-    <PublicLayout currentPage="guide" title="User guide" scrollTarget={scrollTarget} onNavigate={onNavigate}>
+    <PublicLayout currentPage="guide" isSignedIn={isSignedIn} title="User guide" scrollTarget={scrollTarget} onNavigate={onNavigate}>
       <div className="public-content">
         <header className="public-page-intro">
           <h1>User guide</h1>

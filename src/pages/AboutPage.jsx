@@ -8,9 +8,9 @@ const TEAM = [
   { initials: 'LS', name: 'Lovely May B. Sumalinog', role: 'Documentation' },
 ]
 
-function AboutPage({ onNavigate, scrollTarget }) {
+function AboutPage({ onNavigate, scrollTarget, isSignedIn }) {
   return (
-    <PublicLayout currentPage="about" title="About us" scrollTarget={scrollTarget} onNavigate={onNavigate}>
+    <PublicLayout currentPage="about" isSignedIn={isSignedIn} title="About us" scrollTarget={scrollTarget} onNavigate={onNavigate}>
       <div className="public-content">
         <header className="public-page-intro">
           <p className="public-eyebrow">About us</p>

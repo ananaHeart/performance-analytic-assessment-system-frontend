@@ -1,9 +1,9 @@
 import PublicLayout from '../components/PublicLayout'
 import { CONTACT_EMAIL, CONTACT_FALLBACK, SCHOOL_NAME } from '../config/site'
 
-function PrivacyPage({ onNavigate, scrollTarget }) {
+function PrivacyPage({ onNavigate, scrollTarget, isSignedIn }) {
   return (
-    <PublicLayout currentPage="privacy" title="Privacy notice" scrollTarget={scrollTarget} onNavigate={onNavigate}>
+    <PublicLayout currentPage="privacy" isSignedIn={isSignedIn} title="Privacy notice" scrollTarget={scrollTarget} onNavigate={onNavigate}>
       <div className="public-content">
         <article className="site-card public-privacy">
           <h1>Privacy notice</h1>
