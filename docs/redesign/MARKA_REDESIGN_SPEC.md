@@ -150,7 +150,9 @@ The goal is that every container is visible against the page.
 4. Confirm the six rules in section 0 still hold.
 5. Report back: what changed, the screenshot paths, any hex literals left and why, and anything you weren't sure about.
 
-## 6. Phase 2: dark mode (not now)
+## 6. Phase 2: dark mode
+
+The full spec is now in `MARKA_DARK_MODE_SPEC.md` (approved by Heart on 2026-10-17). The outline below is kept for history.
 
 This starts only after Heart approves phase 1. The plan:
 - Add a `:root[data-theme="dark"]` token block. Example values: page `#0b1220`, surface `#111a2b`, surface-muted `#172135`, border `#263246`, text `#e2e8f0`, muted `#94a3b8`. The primary button becomes `#83e841` with `#0f172a` text.
