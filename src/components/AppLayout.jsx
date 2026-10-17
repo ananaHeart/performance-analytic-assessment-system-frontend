@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import MarkaMark from './MarkaMark'
 import NotificationCenter from './NotificationCenter'
+import ThemeToggle from './ThemeToggle'
 
 const principalNavIcons = {
   'principal-dashboard': LayoutDashboard,
@@ -183,6 +184,7 @@ function AppLayout({
                 SY {schoolYearLabel}
               </div>
             ) : null}
+            <ThemeToggle variant="teacher" />
             <NotificationCenter token={token} variant="teacher" />
             <button
               type="button"
@@ -202,6 +204,7 @@ function AppLayout({
       <main className={`dashboard-main ${isTeacherWorkspaceLayout ? '' : 'principal-main'}`}>
         {!isTeacherWorkspaceLayout ? (
           <header className="principal-topbar">
+            <ThemeToggle />
             <NotificationCenter token={token} variant="principal" />
             {schoolYearLabel ? (
               <button

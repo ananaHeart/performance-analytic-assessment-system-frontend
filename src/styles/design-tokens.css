@@ -3,6 +3,7 @@
  * global.css and the shadcn layer in system.css (--ui-*) point at these.
  */
 :root {
+  color-scheme: light;
   --font-sans: "Inter Variable", "Inter", "Segoe UI", Arial, sans-serif;
   --font-size-xs: 0.75rem;
   --font-size-sm: 0.875rem;
@@ -52,6 +53,7 @@
   --hero-bg: #294237;
   --hero-text: #dfffc9;
   --hero-accent: #b8fa8d;
+  --on-hero: #ffffff;
 
   --shadow: 0 4px 0 rgba(51, 65, 85, 0.18);
   --shadow-soft: 0 2px 0 rgba(51, 65, 85, 0.14);
@@ -69,9 +71,11 @@
   --chart-warning: #d97706;
   --chart-danger: #dc2626;
   --chart-info: #2563eb;
+  --chart-cursor: rgba(15, 23, 42, 0.04);
 
   --danger: #dc2626;
   --danger-hover: #b91c1c;
+  --on-danger: #ffffff;
   --status-success-bg: #dcfce7;
   --status-success-text: #2f7d16;
   --status-warning-soft: #fffbeb;
@@ -110,6 +114,88 @@
   /* QR codes stay dark-on-light in every theme so phones can scan them. */
   --qr-dark: #0f172a;
   --qr-light: #ffffff;
+}
+
+/*
+ * Dark theme (phase 2). Screen only, so printing or saving a page as PDF stays light.
+ * Tokens not listed keep their light value: type, spacing, radius, hero, QR and avatar gradients.
+ */
+@media screen {
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+
+    --brand: #83e841;
+    --brand-hover: #9af161;
+    --on-brand: #17320b;
+    --primary: #83e841;
+    --primary-hover: #9af161;
+    --primary-dark: #a6ef75;
+    --primary-soft: #1a3010;
+    --primary-border: #3f6b1f;
+    --primary-ring: rgba(131, 232, 65, 0.35);
+    --on-primary: #0f172a;
+
+    --app-bg: #0b1220;
+    --page-bg: #0b1220;
+    --surface: #111a2b;
+    --surface-strong: #162033;
+    --surface-muted: #172135;
+    --surface-sunken: #0d1526;
+    --border: #263246;
+    --border-strong: #475569;
+
+    --text: #e2e8f0;
+    --text-secondary: #cbd5e1;
+    --muted: #94a3b8;
+    --text-faint: #64748b;
+    --placeholder: #8a99ae;
+
+    --shadow: 0 4px 0 rgba(0, 0, 0, 0.45);
+    --shadow-soft: 0 2px 0 rgba(0, 0, 0, 0.35);
+    --shadow-control: 0 3px 0 rgba(0, 0, 0, 0.5);
+    --shadow-control-hover: 0 4px 0 rgba(0, 0, 0, 0.55);
+    --shadow-input: 0 2px 0 rgba(0, 0, 0, 0.3);
+
+    --chart-track: #1e293b;
+    --chart-grid: #263246;
+    --chart-success: #83e841;
+    --chart-warning: #f59e0b;
+    --chart-danger: #f87171;
+    --chart-info: #60a5fa;
+    --chart-cursor: rgba(255, 255, 255, 0.06);
+
+    --danger: #ef4444;
+    --danger-hover: #f87171;
+    --on-danger: #0f172a;
+    --status-success-bg: #163a1f;
+    --status-success-text: #86efac;
+    --status-warning-soft: #2a1d0e;
+    --status-warning-bg: #3b2410;
+    --status-warning-border: #6b3d14;
+    --status-warning-text: #fdba74;
+    --status-danger-soft: #2a1215;
+    --status-danger-bg: #3f1619;
+    --status-danger-border: #7f1d1d;
+    --status-danger-text: #fca5a5;
+    --status-neutral-bg: #1e293b;
+    --status-neutral-text: #cbd5e1;
+    --status-info-soft: #0f1d33;
+    --status-info-bg: #172a4a;
+    --status-info-border: #1e3a6a;
+    --status-info-text: #93c5fd;
+
+    --tone-purple-bg: #241b3d;
+    --tone-purple-border: #4c3a8a;
+    --tone-purple-text: #c4b5fd;
+    --tone-teal-bg: #0f2a28;
+    --tone-teal-border: #115e59;
+    --tone-teal-text: #5eead4;
+
+    --avatar-female-soft: #3b1a2c;
+    --avatar-male-soft: #172a4a;
+    --avatar-teacher-bg: #3b2418;
+    --avatar-teacher-text: #fdba8c;
+  }
 }
 
 html,
@@ -2111,7 +2197,7 @@ textarea:focus,
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-modal);
-  background: var(--surface);
+  background: var(--surface-strong);
   box-shadow: 0 24px 80px rgba(15, 23, 42, 0.22);
 }
 
@@ -3749,7 +3835,7 @@ textarea:focus,
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
-  background: var(--surface);
+  background: var(--surface-strong);
   box-shadow: 0 24px 64px rgba(15, 23, 42, 0.24);
 }
 
@@ -3883,7 +3969,7 @@ textarea:focus,
   border: 1px solid var(--status-danger-text);
   border-radius: var(--radius-control);
   background: var(--status-danger-text);
-  color: var(--on-primary);
+  color: var(--on-danger);
   font-weight: 850;
   cursor: pointer;
 }
@@ -5197,7 +5283,7 @@ textarea:focus,
   width: min(100%, 760px);
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
-  background: var(--surface);
+  background: var(--surface-strong);
   box-shadow: 0 24px 64px rgba(15, 23, 42, 0.22);
 }
 
@@ -6489,4 +6575,11 @@ body {
 :where(button, a, input, select, textarea, summary, [role="button"], [tabindex]:not([tabindex="-1"])):where(:focus-visible) {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
+}
+
+/* Dark-only fixes for light-tinted literals that must stay exactly as they are in light mode. */
+@media screen {
+  :root[data-theme="dark"] .public-brand-panel {
+    background: var(--surface);
+  }
 }

@@ -20,7 +20,7 @@
   --ui-foreground: var(--text);
   --ui-card: var(--surface);
   --ui-card-foreground: var(--text);
-  --ui-popover: var(--surface);
+  --ui-popover: var(--surface-strong);
   --ui-popover-foreground: var(--text);
 
   --ui-primary: var(--primary);
@@ -38,7 +38,7 @@
 
   --ui-destructive: var(--danger);
   --ui-destructive-hover: var(--danger-hover);
-  --ui-destructive-foreground: var(--on-primary);
+  --ui-destructive-foreground: var(--on-danger);
   --ui-warning: var(--status-warning-text);
   --ui-warning-soft: var(--status-warning-bg);
   --ui-success: var(--status-success-text);
@@ -63,6 +63,12 @@
   --ui-shadow-md: 0 8px 24px rgb(15 23 42 / 0.08);
 
   --ui-font-sans: var(--font-sans);
+}
+
+@media screen {
+  :root[data-theme="dark"] {
+    --ui-shadow-md: 0 8px 24px rgb(0 0 0 / 0.4);
+  }
 }
 
 @theme inline {

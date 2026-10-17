@@ -18,7 +18,7 @@
   overflow: hidden;
   border: 1px solid var(--border-color, var(--border));
   border-radius: var(--radius-modal);
-  background: var(--surface);
+  background: var(--surface-strong);
   box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
 }
 

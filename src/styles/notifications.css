@@ -36,6 +36,39 @@
   color: var(--muted);
 }
 
+/* Sun/moon theme switch: the bell's twin, placed right before it. */
+.theme-toggle-button {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.theme-toggle-button:hover {
+  border-color: var(--ui-border);
+  background: var(--ui-muted);
+  color: var(--ui-foreground);
+}
+
+.theme-toggle-button:focus-visible {
+  outline: 2px solid var(--ui-primary);
+  outline-offset: 2px;
+}
+
+.theme-toggle-button.is-teacher {
+  width: 30px;
+  height: 30px;
+  color: var(--muted);
+}
+
 .notification-count-badge {
   min-width: 17px;
   height: 17px;
@@ -49,7 +82,7 @@
   border: 2px solid var(--surface);
   border-radius: var(--radius-pill);
   background: var(--danger);
-  color: var(--on-primary);
+  color: var(--on-danger);
   font-size: 0.62rem;
   font-weight: 800;
   line-height: 1;
@@ -63,7 +96,7 @@
   overflow: hidden;
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-card);
-  background: var(--surface);
+  background: var(--surface-strong);
   color: var(--ui-foreground);
   box-shadow: 0 18px 45px rgb(15 23 42 / 18%);
 }

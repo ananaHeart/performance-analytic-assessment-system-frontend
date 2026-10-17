@@ -1,6 +1,7 @@
 import { ArrowLeft, ShieldCheck } from 'lucide-react'
 import landingHero from '../assets/landing-hero.png'
 import MarkaMark from './MarkaMark'
+import ThemeToggle from './ThemeToggle'
 
 function PublicAuthShell({
   children,
@@ -28,10 +29,13 @@ function PublicAuthShell({
           </span>
         </button>
 
-        <button type="button" className="public-auth-home-link" onClick={() => onNavigate('home')}>
-          <ArrowLeft size={17} strokeWidth={2.2} aria-hidden="true" />
-          Back to home
-        </button>
+        <div className="public-auth-header-actions">
+          <ThemeToggle />
+          <button type="button" className="public-auth-home-link" onClick={() => onNavigate('home')}>
+            <ArrowLeft size={17} strokeWidth={2.2} aria-hidden="true" />
+            Back to home
+          </button>
+        </div>
       </header>
 
       <div className="public-auth-layout">

@@ -79,8 +79,8 @@ h3 {
   grid-template-columns: 1fr 460px;
   gap: 24px;
   padding: 24px;
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(255, 255, 255, 0.65);
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  border: 1px solid color-mix(in srgb, var(--surface) 65%, transparent);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow);
   backdrop-filter: blur(12px);
@@ -96,7 +96,7 @@ h3 {
   justify-content: center;
   padding: 36px;
   background:
-    linear-gradient(160deg, rgba(255, 255, 255, 0.88), rgba(232, 251, 231, 0.96)),
+    linear-gradient(160deg, color-mix(in srgb, var(--surface) 88%, transparent), rgba(232, 251, 231, 0.96)),
     var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
@@ -2149,7 +2149,7 @@ h3 {
 .approval-card,
 .stat-card,
 .toolbar-row {
-  background: rgba(255, 255, 255, 0.9);
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
   border: 1px solid var(--border);
   box-shadow: 0 14px 34px rgba(44, 83, 48, 0.06);
 }
@@ -2996,7 +2996,7 @@ h3 {
   grid-template-columns: minmax(230px, 0.8fr) minmax(420px, 1.4fr) minmax(230px, 0.8fr);
   align-items: center;
   gap: 18px;
-  background: rgba(255, 255, 255, 0.96);
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
   border-bottom: 1px solid var(--border);
   box-shadow: 0 10px 30px rgba(44, 83, 48, 0.06);
   backdrop-filter: blur(14px);
@@ -3102,7 +3102,7 @@ h3 {
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   background: var(--surface-muted);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--surface) 70%, transparent);
 }
 
 .teacher-nav-link {
@@ -3253,7 +3253,7 @@ h3 {
   border: 1px solid var(--border);
   border-top: none;
   border-radius: 0 0 var(--radius-card) var(--radius-card);
-  background: rgba(255, 255, 255, 0.88);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
   box-shadow: none;
 }
 
@@ -3522,7 +3522,7 @@ h3 {
   padding: 6px;
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
-  background: rgba(255, 255, 255, 0.72);
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
 }
 
 .builder-step {
@@ -3578,7 +3578,7 @@ h3 {
 }
 
 .builder-section.is-locked {
-  background: rgba(255, 255, 255, 0.72);
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
 }
 
 .builder-section-heading {
@@ -3696,7 +3696,7 @@ h3 {
   align-items: stretch;
   border-color: rgba(131, 232, 65, 0.36);
   background:
-    linear-gradient(160deg, rgba(242, 255, 243, 0.96), rgba(255, 255, 255, 0.98)),
+    linear-gradient(160deg, rgba(242, 255, 243, 0.96), color-mix(in srgb, var(--surface) 98%, transparent)),
     var(--surface);
 }
 
@@ -5207,7 +5207,7 @@ h3 {
 .teacher-empty-chart p {
   padding: 7px 13px;
   border-radius: var(--radius-card);
-  background: rgba(255, 255, 255, 0.88);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
   color: var(--text-secondary);
   font-weight: 900;
 }
@@ -7958,7 +7958,7 @@ h3 {
 .teacher-timetable-form-actions .danger-button {
   border: 1px solid var(--status-danger-border);
   background: var(--danger);
-  color: var(--on-primary);
+  color: var(--on-danger);
   font: inherit;
   font-weight: 750;
 }

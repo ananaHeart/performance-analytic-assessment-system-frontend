@@ -141,11 +141,15 @@
   background: var(--primary-hover);
 }
 
+.public-theme-slot {
+  display: inline-flex;
+  margin-right: calc(var(--space-6) * -1 + var(--space-2));
+}
+
 .public-menu-button {
   display: none;
   width: 42px;
   height: 42px;
-  margin-left: auto;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--border-strong);
@@ -956,6 +960,12 @@
 
   .public-menu-button {
     display: inline-flex;
+  }
+
+  /* On phones the sun/moon sits in the top bar next to the menu button. */
+  .public-theme-slot {
+    margin-left: auto;
+    margin-right: 0;
   }
 
   /* Overlays the page under the sticky header, so opening it never shifts the content. */

@@ -65,6 +65,12 @@
   font-weight: 700;
 }
 
+.public-auth-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .public-auth-home-link {
   min-height: 40px;
   display: inline-flex;
@@ -147,7 +153,7 @@
 .public-auth-visual-copy {
   width: min(100%, 650px);
   padding: clamp(40px, 6vw, 80px);
-  color: var(--on-primary);
+  color: var(--on-hero);
 }
 
 .public-auth-visual-eyebrow {
@@ -162,7 +168,7 @@
 .public-auth-visual-copy h2 {
   max-width: 570px;
   margin: 0;
-  color: var(--on-primary);
+  color: var(--on-hero);
   font-size: clamp(2.2rem, 4vw, 3.7rem);
   font-weight: 900;
   line-height: 1.06;

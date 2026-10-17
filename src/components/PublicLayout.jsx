@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { Menu, X } from 'lucide-react'
 import MarkaMark from './MarkaMark'
+import ThemeToggle from './ThemeToggle'
 import { SCHOOL_NAME } from '../config/site'
 import { linkTo } from '../utils/publicNav'
 
@@ -127,6 +128,10 @@ function PublicLayout({ currentPage, title, scrollTarget, isSignedIn = false, on
           <nav className="public-nav" aria-label="Main">
             {navLinks}
           </nav>
+
+          <span className="public-theme-slot">
+            <ThemeToggle />
+          </span>
 
           <div className="public-header-actions">{accountActions}</div>
 

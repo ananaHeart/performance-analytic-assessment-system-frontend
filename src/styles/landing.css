@@ -47,7 +47,7 @@
 
 .landing-hero-copy {
   width: min(100%, 630px);
-  color: var(--on-primary);
+  color: var(--on-hero);
 }
 
 .landing-eyebrow {
@@ -65,7 +65,7 @@
 .landing-hero h1 {
   max-width: 620px;
   margin: 0;
-  color: var(--on-primary);
+  color: var(--on-hero);
   font-size: 3.75rem;
   font-weight: 900;
   line-height: 1.04;
@@ -114,7 +114,7 @@
 .landing-secondary-action {
   border: 1px solid rgba(255, 255, 255, 0.72);
   background: rgba(255, 255, 255, 0.12);
-  color: var(--on-primary);
+  color: var(--on-hero);
   box-shadow: var(--shadow-control);
 }
 

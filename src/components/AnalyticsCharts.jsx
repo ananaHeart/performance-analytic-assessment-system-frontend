@@ -9,6 +9,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import { useTheme } from '../lib/theme'
 
 // SVG attributes cannot take var(), so chart colors are read from the design tokens at render time.
 function readToken(styles, name) {
@@ -28,6 +29,7 @@ function getChartColors() {
     axis: readToken(styles, '--text-secondary'),
     axisMuted: readToken(styles, '--muted'),
     label: readToken(styles, '--text'),
+    cursor: readToken(styles, '--chart-cursor'),
   }
 }
 
@@ -99,6 +101,7 @@ function AnalyticsTooltip({ active, payload, label }) {
 }
 
 export function VerticalMasteryChart({ data, height = 280 }) {
+  useTheme() // re-render, and so re-read the token colors, when the theme changes
   const colors = getChartColors()
   const rows = normalizeRows(data, colors)
 
@@ -123,7 +126,7 @@ export function VerticalMasteryChart({ data, height = 280 }) {
             domain={[0, 100]}
             width={42}
           />
-          <Tooltip cursor={{ fill: 'rgba(15, 23, 42, 0.04)' }} content={<AnalyticsTooltip />} />
+          <Tooltip cursor={{ fill: colors.cursor }} content={<AnalyticsTooltip />} />
           <Bar dataKey="value" radius={[7, 7, 0, 0]} maxBarSize={84}>
             {rows.map((row) => (
               <Cell key={row.id} fill={row.fill} />
@@ -143,6 +146,7 @@ export function VerticalMasteryChart({ data, height = 280 }) {
 }
 
 export function HorizontalMasteryChart({ data, height = 220 }) {
+  useTheme() // re-render, and so re-read the token colors, when the theme changes
   const colors = getChartColors()
   const rows = normalizeRows(data, colors)
 
@@ -166,7 +170,7 @@ export function HorizontalMasteryChart({ data, height = 220 }) {
             tickFormatter={(label) => truncateLabel(label, 24)}
             width={150}
           />
-          <Tooltip cursor={{ fill: 'rgba(15, 23, 42, 0.04)' }} content={<AnalyticsTooltip />} />
+          <Tooltip cursor={{ fill: colors.cursor }} content={<AnalyticsTooltip />} />
           <Bar dataKey="value" radius={[0, 7, 7, 0]} barSize={12}>
             {rows.map((row) => (
               <Cell key={row.id} fill={row.fill} />
