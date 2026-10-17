@@ -1,59 +1,17 @@
-import {
-  BarChart3,
-  ClipboardCheck,
-  RefreshCw,
-  Sparkles,
-  UserPlus,
-} from 'lucide-react'
+import { ArrowRight, BarChart3, ScanLine, School, Sparkles, UserPlus, WifiOff } from 'lucide-react'
 import landingHero from '../assets/landing-hero.png'
-import MarkaMark from '../components/MarkaMark'
+import PublicLayout from '../components/PublicLayout'
+import { AppSection, HowItWorksSteps } from '../components/PublicBlocks'
+import { FEATURE_HIGHLIGHTS } from '../data/publicSite'
+import { linkTo } from '../utils/publicNav'
 
-const WORKFLOW_STEPS = [
-  {
-    title: 'Prepare assessments',
-    description: 'Build structured assessments for the classes and subjects you handle.',
-    icon: ClipboardCheck,
-    tone: 'green',
-  },
-  {
-    title: 'Review and synchronize',
-    description: 'Bring verified classroom results into one dependable school record.',
-    icon: RefreshCw,
-    tone: 'blue',
-  },
-  {
-    title: 'Act on evidence',
-    description: 'See mastery patterns and identify the teaching action needed next.',
-    icon: BarChart3,
-    tone: 'amber',
-  },
-]
+const HIGHLIGHT_ICONS = { ScanLine, WifiOff, BarChart3, School }
 
-function LandingPage({ onNavigate }) {
+function LandingPage({ onNavigate, scrollTarget }) {
+  const go = (page, options) => linkTo(onNavigate, page, options)
+
   return (
-    <main className="landing-page">
-      <header className="landing-header">
-        <button
-          type="button"
-          className="landing-brand"
-          onClick={() => onNavigate('home')}
-          aria-label="Marka home"
-        >
-          <span className="landing-brand-mark" aria-hidden="true">
-            <MarkaMark size={22} />
-          </span>
-          <span className="landing-brand-copy">
-            <strong>Marka</strong>
-          </span>
-        </button>
-
-        <nav className="landing-header-actions" aria-label="Account access">
-          <button type="button" className="landing-login-link" onClick={() => onNavigate('login')}>
-            Log in
-          </button>
-        </nav>
-      </header>
-
+    <PublicLayout currentPage="home" scrollTarget={scrollTarget} onNavigate={onNavigate}>
       <section
         className="landing-hero"
         style={{ '--landing-hero-image': `url(${landingHero})` }}
@@ -93,38 +51,64 @@ function LandingPage({ onNavigate }) {
         </div>
       </section>
 
-      <section className="landing-workflow" aria-labelledby="landing-workflow-title">
-        <div className="landing-section-inner">
-          <div className="landing-workflow-heading">
-            <p className="landing-section-label">One connected workflow</p>
-            <h2 id="landing-workflow-title">From checked papers to clear next steps.</h2>
-          </div>
+      <div className="public-content">
+        <section className="public-section" aria-labelledby="home-how-title">
+          <p className="public-eyebrow">How Marka works</p>
+          <h2 id="home-how-title" className="public-section-title">Paper tests in, clear next steps out.</h2>
+          <HowItWorksSteps />
+        </section>
 
-          <div className="landing-workflow-list">
-            {WORKFLOW_STEPS.map(({ title, description, icon: Icon, tone }, index) => (
-              <article className="landing-workflow-item" key={title}>
-                <span className={`landing-workflow-icon is-${tone}`} aria-hidden="true">
-                  <Icon size={21} strokeWidth={2.1} />
-                </span>
-                <div>
-                  <span className="landing-workflow-number">0{index + 1}</span>
-                  <h3>{title}</h3>
-                  <p>{description}</p>
-                </div>
-              </article>
-            ))}
+        <section className="public-section" aria-labelledby="home-features-title">
+          <h2 id="home-features-title" className="public-section-title">Features</h2>
+          <div className="public-highlight-grid">
+            {FEATURE_HIGHLIGHTS.map((feature) => {
+              const Icon = HIGHLIGHT_ICONS[feature.icon]
+              return (
+                <article className="public-card public-highlight-card" key={feature.title}>
+                  <span className="public-icon-tile" aria-hidden="true">
+                    <Icon size={20} strokeWidth={2.1} />
+                  </span>
+                  <h3>{feature.title}</h3>
+                  <p>{feature.body}</p>
+                </article>
+              )
+            })}
           </div>
+          <a className="public-text-link" href="#features" onClick={go('features')}>
+            See all features <ArrowRight size={16} aria-hidden="true" />
+          </a>
+        </section>
+
+        <div className="public-section">
+          <AppSection
+            id="home-app-title"
+            eyebrow="Marka for Android"
+            title="Start on the web. Scan with your phone."
+            lead="Marka works in two parts. You set up your classes and assessments here, then check answer sheets with the Marka app. Scanning works without internet, and you send the results when you're back online."
+            qrSize={132}
+            secondaryAction={
+              <a className="secondary-button" href="#get-app" onClick={go('get-app')}>
+                How to install
+              </a>
+            }
+            note="For teachers. Principals use Marka on a computer."
+          />
         </div>
-      </section>
 
-      <footer className="landing-footer">
-        <span>© 2026 Marka</span>
-        <button type="button" className="landing-footer-link" onClick={() => onNavigate('tech-stack')}>
-          Tech stack
-        </button>
-        <span>Built for evidence-informed teaching.</span>
-      </footer>
-    </main>
+        <section className="public-section public-cta" aria-labelledby="home-cta-title">
+          <h2 id="home-cta-title">Ready to start?</h2>
+          <p>Create your teacher account. Once your principal approves it, you can set up your first assessment.</p>
+          <div className="public-cta-actions">
+            <a className="primary-button" href="#register" onClick={go('register')}>
+              Create your teacher account
+            </a>
+            <a className="secondary-button" href="#login" onClick={go('login')}>
+              Log in
+            </a>
+          </div>
+        </section>
+      </div>
+    </PublicLayout>
   )
 }
 

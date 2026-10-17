@@ -4,6 +4,12 @@ import MarkaMark from './components/MarkaMark'
 import ProtectedRoute from './components/ProtectedRoute'
 import LandingPage from './pages/LandingPage'
 import TechStackPage from './pages/TechStackPage'
+import FeaturesPage from './pages/FeaturesPage'
+import GetAppPage from './pages/GetAppPage'
+import GuidePage from './pages/GuidePage'
+import AboutPage from './pages/AboutPage'
+import PrivacyPage from './pages/PrivacyPage'
+import NotFoundPage from './pages/NotFoundPage'
 import LoginPage from './pages/LoginPage'
 import TeacherSignUpPage from './pages/TeacherSignUpPage'
 import TeacherEmailVerificationPage from './pages/TeacherEmailVerificationPage'
@@ -29,6 +35,17 @@ const AUTH_STORAGE_KEY = 'assessment-auth-session'
 const TEACHER_WORKSPACE_CONTEXT_KEY = 'teacher-workspace-context'
 const DEFAULT_PUBLIC_PAGE = 'home'
 const PUBLIC_AUTH_ENTRY_PAGES = new Set(['login', 'register', 'verify-email'])
+const PUBLIC_SITE_PAGES = {
+  home: LandingPage,
+  features: FeaturesPage,
+  'get-app': GetAppPage,
+  guide: GuidePage,
+  'tech-stack': TechStackPage,
+  about: AboutPage,
+  privacy: PrivacyPage,
+}
+const PUBLIC_PAGES = new Set([...Object.keys(PUBLIC_SITE_PAGES), ...PUBLIC_AUTH_ENTRY_PAGES])
+const NOT_FOUND_PAGE = 'not-found'
 const DEFAULT_ROLE_PAGE = {
   principal: 'principal-dashboard',
   teacher: 'teacher-dashboard',
@@ -64,6 +81,7 @@ const ALLOWED_PAGES_BY_ROLE = {
     'teacher-settings',
   ],
 }
+const APP_PAGES = new Set(Object.values(ALLOWED_PAGES_BY_ROLE).flat())
 
 function readStoredAuth() {
   const storedSession = localStorage.getItem(AUTH_STORAGE_KEY)
@@ -234,9 +252,9 @@ function getDefaultPage(role) {
 
 function normalizePage(auth, page) {
   if (!auth?.user?.role) {
-    return ['home', 'tech-stack', 'login', 'register', 'verify-email'].includes(page)
-      ? page
-      : DEFAULT_PUBLIC_PAGE
+    if (PUBLIC_PAGES.has(page)) return page
+    // App routes still send signed-out visitors home; anything else is a public 404.
+    return APP_PAGES.has(page) ? DEFAULT_PUBLIC_PAGE : NOT_FOUND_PAGE
   }
 
   const allowedPages = ALLOWED_PAGES_BY_ROLE[auth.user.role] ?? []
@@ -336,6 +354,7 @@ function App() {
   const [schoolYearLabel, setSchoolYearLabel] = useState('')
   const [reportsInitialFilters, setReportsInitialFilters] = useState(null)
   const [settingsScrollTarget, setSettingsScrollTarget] = useState(null)
+  const [publicScrollTarget, setPublicScrollTarget] = useState(null)
 
   useEffect(() => {
     let isMounted = true
@@ -344,7 +363,7 @@ function App() {
       const requestedPage = getRequestedPage()
       const nextPage = normalizePage(nextAuth, resolveLegacyRoute(requestedPage))
 
-      if (requestedPage !== nextPage) {
+      if (requestedPage !== nextPage && nextPage !== NOT_FOUND_PAGE) {
         replaceHashPage(nextPage)
       }
 
@@ -433,6 +452,8 @@ function App() {
 
     const handleHashChange = () => {
       const requestedPage = getHashPage()
+      // A section target only applies to the page it was set for.
+      setPublicScrollTarget((target) => (target && target.page !== requestedPage ? null : target))
 
       if (PUBLIC_AUTH_ENTRY_PAGES.has(requestedPage)) {
         clearAuth()
@@ -569,6 +590,12 @@ function App() {
       setSettingsScrollTarget(options.scrollTo ?? null)
     }
 
+    if (PUBLIC_PAGES.has(page)) {
+      setPublicScrollTarget((previous) =>
+        options.scrollTo ? { page, id: options.scrollTo, key: (previous?.key ?? 0) + 1 } : null,
+      )
+    }
+
     const nextPage = normalizePage(auth, page)
     setCurrentPage(nextPage)
     setHashPage(nextPage)
@@ -604,11 +631,12 @@ function App() {
       return <TeacherEmailVerificationPage onNavigate={handleNavigate} />
     }
 
-    if (currentPage === 'tech-stack') {
-      return <TechStackPage onNavigate={handleNavigate} />
+    if (currentPage === NOT_FOUND_PAGE) {
+      return <NotFoundPage onNavigate={handleNavigate} />
     }
 
-    return <LandingPage onNavigate={handleNavigate} />
+    const PublicSitePage = PUBLIC_SITE_PAGES[currentPage] ?? LandingPage
+    return <PublicSitePage onNavigate={handleNavigate} scrollTarget={publicScrollTarget} />
   }
 
   const navItems = NAV_ITEMS_BY_ROLE[auth.user.role] ?? []

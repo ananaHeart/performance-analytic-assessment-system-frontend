@@ -106,6 +106,10 @@
   --avatar-male-soft: #dbeafe;
   --avatar-teacher-bg: #ffe5d6;
   --avatar-teacher-text: #8b4a2d;
+
+  /* QR codes stay dark-on-light in every theme so phones can scan them. */
+  --qr-dark: #0f172a;
+  --qr-light: #ffffff;
 }
 
 html,

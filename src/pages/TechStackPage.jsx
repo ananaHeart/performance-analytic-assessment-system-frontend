@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Cloud, LayoutDashboard, Search, Server, Smartphone, Wrench } from 'lucide-react'
-import MarkaMark from '../components/MarkaMark'
+import PublicLayout from '../components/PublicLayout'
 import { TECH_STACK, TECH_STACK_GROUPS } from '../data/techStack'
 
 const GROUP_ICONS = {
@@ -19,7 +19,7 @@ function matchesQuery(item, query) {
   return item.name.toLowerCase().includes(needle) || item.definition.toLowerCase().includes(needle)
 }
 
-function TechStackPage({ onNavigate }) {
+function TechStackPage({ onNavigate, scrollTarget }) {
   const [selectedGroup, setSelectedGroup] = useState(ALL_GROUPS)
   const [query, setQuery] = useState('')
   const trimmedQuery = query.trim()
@@ -46,35 +46,8 @@ function TechStackPage({ onNavigate }) {
 
   const resultCount = visibleGroups.reduce((total, group) => total + group.items.length, 0)
 
-  // Arriving from the landing footer should start at the top of the page.
-  useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'instant' })
-  }, [])
-
   return (
-    <main className="landing-page tech-stack-page">
-      <header className="landing-header">
-        <button
-          type="button"
-          className="landing-brand"
-          onClick={() => onNavigate('home')}
-          aria-label="Marka home"
-        >
-          <span className="landing-brand-mark" aria-hidden="true">
-            <MarkaMark size={22} />
-          </span>
-          <span className="landing-brand-copy">
-            <strong>Marka</strong>
-          </span>
-        </button>
-
-        <nav className="landing-header-actions" aria-label="Account access">
-          <button type="button" className="landing-login-link" onClick={() => onNavigate('login')}>
-            Log in
-          </button>
-        </nav>
-      </header>
-
+    <PublicLayout currentPage="tech-stack" title="Tech stack" scrollTarget={scrollTarget} onNavigate={onNavigate}>
       <div className="tech-stack-content">
         <section className="tech-stack-intro" aria-labelledby="tech-stack-title">
           <p className="tech-stack-eyebrow">Technical background</p>
@@ -159,14 +132,7 @@ function TechStackPage({ onNavigate }) {
           })
         )}
       </div>
-
-      <footer className="landing-footer">
-        <span>© 2026 Marka</span>
-        <button type="button" className="landing-footer-link" onClick={() => onNavigate('home')}>
-          Home
-        </button>
-      </footer>
-    </main>
+    </PublicLayout>
   )
 }
 
