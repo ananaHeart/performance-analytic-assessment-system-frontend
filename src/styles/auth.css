@@ -5,7 +5,7 @@
      which would stop the sticky visual panel from sticking. */
   overflow-x: clip;
   padding-top: var(--public-header-height);
-  background: #ffffff;
+  background: var(--surface);
   color: var(--text);
 }
 
@@ -22,7 +22,7 @@
   gap: var(--space-5);
   padding: 12px max(24px, calc((100% - 1280px) / 2));
   border-bottom: 1px solid var(--border);
-  background: #ffffff;
+  background: var(--surface);
 }
 
 .public-auth-brand {
@@ -74,7 +74,7 @@
   padding: 0 var(--space-4);
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
-  background: #ffffff;
+  background: var(--surface);
   color: var(--text);
   font-size: var(--font-size-sm);
   font-weight: 800;
@@ -115,7 +115,7 @@
   display: flex;
   align-items: flex-end;
   overflow: hidden;
-  background-color: #294237;
+  background-color: var(--hero-bg);
   background-image: var(--public-auth-image);
   background-position: center;
   background-repeat: no-repeat;
@@ -147,12 +147,12 @@
 .public-auth-visual-copy {
   width: min(100%, 650px);
   padding: clamp(40px, 6vw, 80px);
-  color: #ffffff;
+  color: var(--on-primary);
 }
 
 .public-auth-visual-eyebrow {
   margin: 0 0 var(--space-3);
-  color: #dfffc9;
+  color: var(--hero-text);
   font-size: var(--font-size-xs);
   font-weight: 850;
   letter-spacing: 0.1em;
@@ -162,7 +162,7 @@
 .public-auth-visual-copy h2 {
   max-width: 570px;
   margin: 0;
-  color: #ffffff;
+  color: var(--on-primary);
   font-size: clamp(2.2rem, 4vw, 3.7rem);
   font-weight: 900;
   line-height: 1.06;
@@ -195,7 +195,7 @@
 
 .public-auth-trust-note svg {
   flex: 0 0 auto;
-  color: #b8fa8d;
+  color: var(--hero-accent);
 }
 
 .public-auth-form-region {
@@ -204,7 +204,7 @@
   align-items: center;
   justify-content: center;
   padding: clamp(32px, 5vw, 72px);
-  background: #ffffff;
+  background: var(--surface);
 }
 
 .public-auth-form-content {
@@ -255,7 +255,7 @@
   padding: var(--space-5);
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
-  background: #ffffff;
+  background: var(--surface);
   box-shadow: var(--shadow);
 }
 
@@ -283,7 +283,7 @@
   min-height: 48px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-control);
-  background: #ffffff;
+  background: var(--surface);
   color: var(--text);
   font-size: var(--font-size-sm);
   font-weight: 600;
@@ -331,7 +331,7 @@
 
 .public-auth-field input::placeholder,
 .public-auth-input-wrap input::placeholder {
-  color: #8a98aa;
+  color: var(--placeholder);
   opacity: 1;
 }
 
@@ -391,9 +391,9 @@
 }
 
 .public-auth-message.is-error {
-  border-color: #fecaca;
-  background: #fff1f2;
-  color: #b42318;
+  border-color: var(--status-danger-border);
+  background: var(--status-danger-soft);
+  color: var(--status-danger-text);
 }
 
 .public-auth-message.is-success {
@@ -409,10 +409,10 @@
   justify-content: center;
   gap: var(--space-2);
   padding: 0 var(--space-5);
-  border: 1px solid var(--ui-primary, #2f7d16);
+  border: 1px solid var(--ui-primary, var(--primary));
   border-radius: var(--radius-control);
-  background: var(--ui-primary, #2f7d16);
-  color: #ffffff;
+  background: var(--ui-primary, var(--primary));
+  color: var(--on-primary);
   font-size: var(--font-size-sm);
   font-weight: 850;
   box-shadow: var(--shadow-control);
@@ -421,8 +421,8 @@
 
 .public-auth-submit:hover:not(:disabled),
 .public-auth-submit:focus-visible:not(:disabled) {
-  border-color: var(--ui-primary-hover, #286b13);
-  background: var(--ui-primary-hover, #286b13);
+  border-color: var(--ui-primary-hover, var(--primary));
+  background: var(--ui-primary-hover, var(--primary-hover));
   box-shadow: var(--shadow-control-hover);
   transform: translateY(-1px);
 }
@@ -515,7 +515,7 @@
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
-  background: #ffffff;
+  background: var(--surface);
   color: var(--muted);
   text-align: left;
   box-shadow: var(--shadow-soft);
@@ -543,7 +543,7 @@
 }
 
 .teacher-registration-step.is-complete {
-  border-color: #b9e99a;
+  border-color: var(--primary-border);
   color: var(--text);
 }
 
@@ -562,7 +562,7 @@
 .teacher-registration-step.is-current .teacher-registration-step-icon,
 .teacher-registration-step.is-complete .teacher-registration-step-icon {
   background: var(--primary-dark);
-  color: #ffffff;
+  color: var(--on-primary);
 }
 
 .teacher-registration-step-copy {
@@ -597,7 +597,7 @@
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
-  background: #ffffff;
+  background: var(--surface);
   box-shadow: var(--shadow);
 }
 
@@ -675,11 +675,11 @@
 .teacher-registration-form-grid input[aria-invalid='true'],
 .teacher-registration-form-grid select[aria-invalid='true'],
 .teacher-registration-form-grid .public-auth-input-wrap:has(input[aria-invalid='true']) {
-  border-color: #ef4444;
+  border-color: var(--danger);
 }
 
 .teacher-registration-field-error {
-  color: #b42318;
+  color: var(--status-danger-text);
   font-size: var(--font-size-xs);
   font-weight: 650;
   line-height: 1.35;
@@ -724,7 +724,7 @@
   padding: var(--space-4);
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
-  background: #ffffff;
+  background: var(--surface);
   color: var(--text);
   cursor: pointer;
   box-shadow: var(--shadow-control);
@@ -769,7 +769,7 @@
 }
 
 .teacher-verification-method.is-unavailable .teacher-verification-method-icon {
-  background: #ffffff;
+  background: var(--surface);
   color: var(--muted);
 }
 
@@ -797,7 +797,7 @@
 }
 
 .teacher-verification-method-copy .is-unavailable-reason {
-  color: #8a4b08;
+  color: var(--status-warning-text);
 }
 
 .teacher-verification-empty {
@@ -901,7 +901,7 @@
   padding: 0 var(--space-4);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-control);
-  background: #ffffff;
+  background: var(--surface);
   color: var(--text);
   font-size: var(--font-size-sm);
   font-weight: 800;
@@ -946,7 +946,7 @@
   padding: var(--space-5);
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
-  background: #ffffff;
+  background: var(--surface);
   box-shadow: var(--shadow);
 }
 
@@ -1008,7 +1008,7 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-control);
-  background: #ffffff;
+  background: var(--surface);
   color: var(--primary-dark);
 }
 
@@ -1061,7 +1061,7 @@
   padding: 0 var(--space-3);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-control);
-  background: #ffffff;
+  background: var(--surface);
   color: var(--primary-dark);
   font-size: var(--font-size-sm);
   font-weight: 850;

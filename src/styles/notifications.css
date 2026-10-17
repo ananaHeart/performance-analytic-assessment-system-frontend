@@ -14,7 +14,7 @@
   border: 1px solid transparent;
   border-radius: 50%;
   background: transparent;
-  color: #42516a;
+  color: var(--text-secondary);
 }
 
 .notification-bell-button:hover,
@@ -33,7 +33,7 @@
 .notification-center.is-teacher .notification-bell-button {
   width: 30px;
   height: 30px;
-  color: #52606d;
+  color: var(--muted);
 }
 
 .notification-count-badge {
@@ -46,10 +46,10 @@
   align-items: center;
   justify-content: center;
   padding: 0 4px;
-  border: 2px solid #ffffff;
+  border: 2px solid var(--surface);
   border-radius: 999px;
-  background: #dc2626;
-  color: #ffffff;
+  background: var(--danger);
+  color: var(--on-primary);
   font-size: 0.62rem;
   font-weight: 800;
   line-height: 1;
@@ -63,7 +63,7 @@
   overflow: hidden;
   border: 1px solid var(--ui-border);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--surface);
   color: var(--ui-foreground);
   box-shadow: 0 18px 45px rgb(15 23 42 / 18%);
 }
@@ -121,7 +121,7 @@
   align-items: center;
   justify-content: center;
   border: 1px solid var(--ui-border);
-  background: #ffffff;
+  background: var(--surface);
   color: var(--ui-muted-foreground);
   font: inherit;
 }
@@ -161,9 +161,9 @@
   justify-content: space-between;
   gap: 12px;
   padding: 10px 14px;
-  border-bottom: 1px solid #fecaca;
-  background: #fff1f2;
-  color: #b91c1c;
+  border-bottom: 1px solid var(--status-danger-border);
+  background: var(--status-danger-soft);
+  color: var(--status-danger-text);
   font-size: 0.75rem;
   line-height: 1.4;
 }
@@ -172,9 +172,9 @@
   min-height: 30px;
   flex: 0 0 auto;
   padding: 0 9px;
-  border-color: #fecaca;
+  border-color: var(--status-danger-border);
   border-radius: 6px;
-  color: #b91c1c;
+  color: var(--status-danger-text);
   font-size: 0.7rem;
   font-weight: 750;
 }
@@ -227,12 +227,12 @@
 }
 
 .notification-item.is-unread {
-  background: #f5fbf3;
+  background: var(--primary-soft);
   box-shadow: inset 3px 0 0 var(--ui-primary);
 }
 
 .notification-item.is-read {
-  background: #ffffff;
+  background: var(--surface);
 }
 
 .notification-type-icon {
@@ -242,8 +242,8 @@
   align-items: center;
   justify-content: center;
   border-radius: 8px;
-  background: #edf4fb;
-  color: #2563a8;
+  background: var(--surface-sunken);
+  color: var(--status-info-text);
 }
 
 .notification-item.is-unread .notification-type-icon {
@@ -296,7 +296,7 @@
 }
 
 .notification-item-footer time {
-  color: #7c8797;
+  color: var(--muted);
   font-size: 0.68rem;
 }
 

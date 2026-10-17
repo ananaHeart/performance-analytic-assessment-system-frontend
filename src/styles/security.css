@@ -169,9 +169,9 @@
   justify-content: center;
   gap: var(--space-2);
   padding: 0 var(--space-5);
-  border: 1px solid #fecaca;
+  border: 1px solid var(--status-danger-border);
   border-radius: var(--radius-control);
-  background: #ffffff;
+  background: var(--surface);
   color: var(--status-danger-text);
   font-size: var(--font-size-sm);
   font-weight: 800;
@@ -312,7 +312,7 @@
   height: 240px;
   display: block;
   border: 1px solid var(--border);
-  background: #ffffff;
+  background: var(--surface);
   object-fit: contain;
 }
 

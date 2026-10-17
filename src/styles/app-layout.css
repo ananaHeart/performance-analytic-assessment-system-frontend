@@ -76,7 +76,7 @@
 
 .dashboard-shell .principal-sidebar-profile .principal-avatar {
   display: inline-flex;
-  color: #ffffff;
+  color: var(--on-primary);
 }
 
 .dashboard-shell.is-teacher-workspace .teacher-workspace-profile {

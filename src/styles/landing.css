@@ -3,7 +3,7 @@
   min-height: 100vh;
   overflow-x: hidden;
   padding-top: var(--public-header-height);
-  background: #ffffff;
+  background: var(--surface);
   color: var(--text);
 }
 
@@ -20,7 +20,7 @@
   gap: var(--space-5);
   padding: 12px max(24px, calc((100% - 1280px) / 2));
   border-bottom: 1px solid var(--border);
-  background: #ffffff;
+  background: var(--surface);
 }
 
 .landing-brand {
@@ -91,16 +91,16 @@
 
 .landing-login-link {
   padding: 0 var(--space-5);
-  border: 1px solid var(--primary);
-  background: var(--primary);
-  color: #17320b;
+  border: 1px solid var(--brand);
+  background: var(--brand);
+  color: var(--on-brand);
   box-shadow: var(--shadow-control);
 }
 
 .landing-login-link:hover,
 .landing-login-link:focus-visible {
-  border-color: #9af161;
-  background: #9af161;
+  border-color: var(--brand-hover);
+  background: var(--brand-hover);
   box-shadow: var(--shadow-control-hover);
   transform: translateY(-1px);
 }
@@ -116,7 +116,7 @@
 .landing-header-register:hover,
 .landing-header-register:focus-visible {
   border-color: var(--primary);
-  background: #e9fbdc;
+  background: var(--status-success-bg);
   box-shadow: var(--shadow-control-hover);
   transform: translateY(-1px);
 }
@@ -128,7 +128,7 @@
   max-height: 720px;
   isolation: isolate;
   overflow: hidden;
-  background-color: #294237;
+  background-color: var(--hero-bg);
   background-image: var(--landing-hero-image);
   background-position: center;
   background-repeat: no-repeat;
@@ -153,7 +153,7 @@
 
 .landing-hero-copy {
   width: min(100%, 630px);
-  color: #ffffff;
+  color: var(--on-primary);
 }
 
 .landing-eyebrow,
@@ -166,13 +166,13 @@
 }
 
 .landing-eyebrow {
-  color: #dfffc9;
+  color: var(--hero-text);
 }
 
 .landing-hero h1 {
   max-width: 620px;
   margin: 0;
-  color: #ffffff;
+  color: var(--on-primary);
   font-size: 3.75rem;
   font-weight: 900;
   line-height: 1.04;
@@ -194,7 +194,7 @@
   align-items: flex-start;
   gap: var(--space-3);
   margin: var(--space-4) 0 0;
-  color: #dfffc9;
+  color: var(--hero-text);
   font-size: 1.02rem;
   font-weight: 750;
   line-height: 1.5;
@@ -203,7 +203,7 @@
 .landing-hero-pitch svg {
   flex: 0 0 auto;
   margin-top: 2px;
-  color: #b8fa8d;
+  color: var(--hero-accent);
 }
 
 .landing-hero-actions {
@@ -220,16 +220,16 @@
 }
 
 .landing-primary-action {
-  border: 1px solid var(--primary);
-  background: var(--primary);
-  color: #17320b;
+  border: 1px solid var(--brand);
+  background: var(--brand);
+  color: var(--on-brand);
   box-shadow: var(--shadow-control);
 }
 
 .landing-primary-action:hover,
 .landing-primary-action:focus-visible {
-  border-color: #9af161;
-  background: #9af161;
+  border-color: var(--brand-hover);
+  background: var(--brand-hover);
   box-shadow: var(--shadow-control-hover);
   transform: translateY(-1px);
 }
@@ -237,7 +237,7 @@
 .landing-secondary-action {
   border: 1px solid rgba(255, 255, 255, 0.72);
   background: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
+  color: var(--on-primary);
   box-shadow: var(--shadow-control);
 }
 
@@ -266,7 +266,7 @@
 .landing-workflow {
   padding: 48px 32px 52px;
   border-bottom: 1px solid var(--border);
-  background: #ffffff;
+  background: var(--surface);
 }
 
 .landing-section-inner {
@@ -329,13 +329,13 @@
 }
 
 .landing-workflow-icon.is-blue {
-  background: #eff6ff;
-  color: #2563eb;
+  background: var(--status-info-soft);
+  color: var(--chart-info);
 }
 
 .landing-workflow-icon.is-amber {
-  background: #fff7e8;
-  color: #c56a00;
+  background: var(--status-warning-soft);
+  color: var(--status-warning-text);
 }
 
 .landing-workflow-number {
@@ -369,7 +369,7 @@
   justify-content: space-between;
   gap: var(--space-4);
   padding: 20px max(24px, calc((100% - 1280px) / 2));
-  background: #ffffff;
+  background: var(--surface);
   color: var(--muted);
   font-size: var(--font-size-xs);
   font-weight: 650;
