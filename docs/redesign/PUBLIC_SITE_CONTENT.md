@@ -28,7 +28,9 @@ The hero stays as it is today.
   1. **Set up your assessment.** Tag: Web. Build the test, its answer key, essay rubrics, and the skill each item measures. Then print the bubble answer sheets.
   2. **Download your class.** Tag: App. While you're online, log in to the Marka app and open your assessment, so your class and its answer key are saved on your phone.
   3. **Scan and check.** Tag: App. Photograph each answer sheet. Multiple choice and true or false answers are read for you. You review every sheet and score the written answers. No internet needed.
-  4. **Send and see results.** Tag: Web. Send your results when you're back online. Marka computes the official scores and builds the item analysis and least mastered skills.
+  4. **See the results.** Tag: Web. After you send your results from the app, Marka computes the official scores and builds the item analysis and least mastered skills here on the web.
+
+Card and step titles have no final period; the bold-plus-period format above is only for this file.
 
 ### Feature highlights
 Each card has an icon, a title and one line.
