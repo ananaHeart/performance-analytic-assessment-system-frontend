@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Cloud, LayoutDashboard, Search, Server, Smartphone, Wrench } from 'lucide-react'
 import MarkaMark from '../components/MarkaMark'
 import { TECH_STACK, TECH_STACK_GROUPS } from '../data/techStack'
@@ -45,6 +45,11 @@ function TechStackPage({ onNavigate }) {
   )
 
   const resultCount = visibleGroups.reduce((total, group) => total + group.items.length, 0)
+
+  // Arriving from the landing footer should start at the top of the page.
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }, [])
 
   return (
     <main className="landing-page tech-stack-page">

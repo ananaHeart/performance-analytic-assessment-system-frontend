@@ -131,6 +131,10 @@
   outline: none;
 }
 
+.tech-stack-search input:focus {
+  box-shadow: none;
+}
+
 .tech-stack-search input::placeholder {
   color: var(--placeholder);
 }

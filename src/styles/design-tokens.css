@@ -327,10 +327,15 @@ textarea,
 .teacher-signup-input-wrap,
 .academic-year-display,
 .principal-assignment-readonly-field {
-  border-color: var(--border);
+  border-color: var(--border-strong);
   border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text);
+}
+
+.academic-year-display,
+.principal-assignment-readonly-field {
+  border-color: var(--border);
 }
 
 input:focus,
@@ -6474,7 +6479,7 @@ body {
 }
 
 /* Keyboard focus ring. :where() keeps it below any component that draws its own focus style. */
-:where(button, a, input, select, textarea, summary, [role="button"], [tabindex]:not([tabindex="-1"])):focus-visible {
+:where(button, a, input, select, textarea, summary, [role="button"], [tabindex]:not([tabindex="-1"])):where(:focus-visible) {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
