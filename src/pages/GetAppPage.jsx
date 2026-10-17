@@ -109,7 +109,7 @@ function GetAppPage({ onNavigate, scrollTarget }) {
           }
         />
 
-        <section className="public-card public-text-card" aria-labelledby="get-app-requirements">
+        <section className="site-card public-text-card" aria-labelledby="get-app-requirements">
           <h2 id="get-app-requirements">Requirements</h2>
           <ul className="public-check-list">
             {requirements.map((item) => (
@@ -118,7 +118,7 @@ function GetAppPage({ onNavigate, scrollTarget }) {
           </ul>
         </section>
 
-        <section className="public-card public-text-card public-anchor" id="how-to-install" aria-labelledby="get-app-install">
+        <section className="site-card public-text-card public-anchor" id="how-to-install" aria-labelledby="get-app-install">
           <h2 id="get-app-install">How to install</h2>
           <ol className="public-numbered-list">
             {INSTALL_STEPS.map((step) => (
@@ -129,7 +129,7 @@ function GetAppPage({ onNavigate, scrollTarget }) {
           </ol>
         </section>
 
-        <section className="public-card public-text-card" aria-labelledby="get-app-updating">
+        <section className="site-card public-text-card" aria-labelledby="get-app-updating">
           <h2 id="get-app-updating">Updating the app</h2>
           <Callout tone="warning">
             Never uninstall Marka to update it. Uninstalling deletes any results on your phone that you
@@ -138,7 +138,7 @@ function GetAppPage({ onNavigate, scrollTarget }) {
           <p>To update, download the new APK from this page and install it over the old one. Your saved results stay on the phone.</p>
         </section>
 
-        <section className="public-card public-text-card" aria-labelledby="get-app-before-scan">
+        <section className="site-card public-text-card" aria-labelledby="get-app-before-scan">
           <h2 id="get-app-before-scan">Before you scan</h2>
           <ul className="public-check-list">
             {BEFORE_YOU_SCAN.map((item) => (

@@ -10,7 +10,8 @@
   color: var(--text);
 }
 
-.public-site a {
+/* Zero specificity so button and link classes keep their own colors. */
+:where(.public-site a) {
   color: inherit;
 }
 
@@ -280,7 +281,7 @@
   margin-bottom: calc(var(--space-4) * -1 + var(--space-1));
 }
 
-.public-card {
+.site-card {
   min-width: 0;
   padding: 20px;
   border: 1px solid var(--border);
@@ -289,49 +290,49 @@
   box-shadow: var(--shadow-soft);
 }
 
-.public-card h2 {
+.site-card h2 {
   margin: 0 0 var(--space-3);
   color: var(--text);
   font-size: var(--font-size-lg);
   font-weight: 850;
 }
 
-.public-card h3 {
+.site-card h3 {
   margin: 0 0 var(--space-1);
   color: var(--text);
   font-size: var(--font-size-md);
   font-weight: 800;
 }
 
-.public-card p,
-.public-card li {
+.site-card p,
+.site-card li {
   color: var(--text-secondary);
   font-size: var(--font-size-sm);
   line-height: 1.65;
 }
 
-.public-card p {
+.site-card p {
   margin: 0 0 var(--space-3);
 }
 
-.public-card p:last-child {
+.site-card p:last-child {
   margin-bottom: 0;
 }
 
-.public-card ul,
-.public-card ol {
+.site-card ul,
+.site-card ol {
   margin: 0 0 var(--space-3);
   padding-left: 1.3rem;
   display: grid;
   gap: var(--space-2);
 }
 
-.public-card ul ul,
-.public-card ol ul {
+.site-card ul ul,
+.site-card ol ul {
   margin: var(--space-2) 0 0;
 }
 
-.public-card li::marker {
+.site-card li::marker {
   color: var(--primary-dark);
   font-weight: 800;
 }
@@ -648,7 +649,7 @@
   align-items: start;
 }
 
-.public-card .public-feature-list {
+.site-card .public-feature-list {
   margin: 0;
   padding: 0;
   display: grid;
@@ -838,7 +839,7 @@
   gap: var(--space-3);
 }
 
-.public-card .public-stat {
+.site-card .public-stat {
   margin: 0;
   padding: 14px 16px;
   display: grid;
@@ -886,7 +887,7 @@
   font-weight: 900;
 }
 
-.public-card .public-card-label {
+.site-card .site-card-label {
   margin: 0 0 2px;
   color: var(--muted);
   font-size: var(--font-size-xs);
@@ -957,12 +958,19 @@
     display: inline-flex;
   }
 
+  /* Overlays the page under the sticky header, so opening it never shifts the content. */
   .public-mobile-menu:not([hidden]) {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
     padding: 8px 16px 16px;
     display: grid;
     gap: var(--space-3);
     border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
     background: var(--surface);
+    box-shadow: var(--ui-shadow-md);
   }
 
   .public-mobile-nav {

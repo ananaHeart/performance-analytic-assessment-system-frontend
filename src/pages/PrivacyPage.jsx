@@ -5,7 +5,7 @@ function PrivacyPage({ onNavigate, scrollTarget }) {
   return (
     <PublicLayout currentPage="privacy" title="Privacy notice" scrollTarget={scrollTarget} onNavigate={onNavigate}>
       <div className="public-content">
-        <article className="public-card public-privacy">
+        <article className="site-card public-privacy">
           <h1>Privacy notice</h1>
           <p className="public-updated">Last updated: October 17, 2026</p>
 

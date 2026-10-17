@@ -81,7 +81,7 @@ const LIMITS = [
 
 function FeatureColumn({ id, title, features }) {
   return (
-    <section className="public-card public-feature-column" aria-labelledby={id}>
+    <section className="site-card public-feature-column" aria-labelledby={id}>
       <h2 id={id}>{title}</h2>
       <ol className="public-feature-list">
         {features.map((feature) => (
@@ -127,7 +127,7 @@ function FeaturesPage({ onNavigate, scrollTarget }) {
           <HowItWorksSteps />
         </section>
 
-        <section className="public-card public-limits-card" aria-labelledby="features-limits-title">
+        <section className="site-card public-limits-card" aria-labelledby="features-limits-title">
           <h2 id="features-limits-title">What Marka doesn&apos;t do</h2>
           <ul>
             {LIMITS.map((limit) => (

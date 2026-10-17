@@ -39,7 +39,7 @@ function scrollToSection(id) {
 
 function GuideSection({ id, number, title, children }) {
   return (
-    <section className="public-card public-guide-section public-anchor" id={id} aria-labelledby={`${id}-title`}>
+    <section className="site-card public-guide-section public-anchor" id={id} aria-labelledby={`${id}-title`}>
       <h2 id={`${id}-title`}>
         <span className="public-guide-number">{number}.</span> {title}
       </h2>

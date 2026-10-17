@@ -64,7 +64,7 @@ function LandingPage({ onNavigate, scrollTarget }) {
             {FEATURE_HIGHLIGHTS.map((feature) => {
               const Icon = HIGHLIGHT_ICONS[feature.icon]
               return (
-                <article className="public-card public-highlight-card" key={feature.title}>
+                <article className="site-card public-highlight-card" key={feature.title}>
                   <span className="public-icon-tile" aria-hidden="true">
                     <Icon size={20} strokeWidth={2.1} />
                   </span>

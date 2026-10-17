@@ -21,14 +21,14 @@ function AboutPage({ onNavigate, scrollTarget }) {
           </p>
         </header>
 
-        <section className="public-card public-text-card" aria-labelledby="about-study">
+        <section className="site-card public-text-card" aria-labelledby="about-study">
           <h2 id="about-study">The study</h2>
           <p>
             <strong>A Mobile and Web Performance Analytic Assessment System.</strong> We named the system Marka.
           </p>
         </section>
 
-        <section className="public-card public-text-card" aria-labelledby="about-problem">
+        <section className="site-card public-text-card" aria-labelledby="about-problem">
           <h2 id="about-problem">The problem</h2>
           <p>
             In many provincial public schools, tests are still checked, tallied, and recorded by hand. Teachers at
@@ -48,7 +48,7 @@ function AboutPage({ onNavigate, scrollTarget }) {
           </div>
         </section>
 
-        <section className="public-card public-text-card" aria-labelledby="about-built">
+        <section className="site-card public-text-card" aria-labelledby="about-built">
           <h2 id="about-built">What we built</h2>
           <p>
             Marka keeps paper tests. It uses a phone camera to check them and turns the results into item analysis
@@ -60,7 +60,7 @@ function AboutPage({ onNavigate, scrollTarget }) {
           <h2 id="about-team" className="public-section-title">The team</h2>
           <ul className="public-team-grid">
             {TEAM.map((member) => (
-              <li className="public-card public-person-card" key={member.name}>
+              <li className="site-card public-person-card" key={member.name}>
                 <span className="public-person-avatar" aria-hidden="true">
                   {member.initials}
                 </span>
@@ -74,23 +74,23 @@ function AboutPage({ onNavigate, scrollTarget }) {
         </section>
 
         <div className="public-two-column">
-          <section className="public-card public-person-card" aria-labelledby="about-adviser">
+          <section className="site-card public-person-card" aria-labelledby="about-adviser">
             <span className="public-person-avatar" aria-hidden="true">
               LJ
             </span>
             <div>
-              <h2 id="about-adviser" className="public-card-label">Adviser</h2>
+              <h2 id="about-adviser" className="site-card-label">Adviser</h2>
               <h3>Prof. Leonila R. Juanatas, MIT</h3>
               <p>Capstone adviser</p>
             </div>
           </section>
 
-          <section className="public-card public-person-card" aria-labelledby="about-school">
+          <section className="site-card public-person-card" aria-labelledby="about-school">
             <span className="public-icon-tile" aria-hidden="true">
               <GraduationCap size={20} strokeWidth={2.1} />
             </span>
             <div>
-              <h2 id="about-school" className="public-card-label">School</h2>
+              <h2 id="about-school" className="site-card-label">School</h2>
               <h3>{SCHOOL_NAME}</h3>
               <p>College of Engineering and Technology Education</p>
               <p>Bachelor of Science in Information Technology</p>
@@ -98,7 +98,7 @@ function AboutPage({ onNavigate, scrollTarget }) {
           </section>
         </div>
 
-        <section className="public-card public-text-card" aria-labelledby="about-thanks">
+        <section className="site-card public-text-card" aria-labelledby="about-thanks">
           <h2 id="about-thanks">Acknowledgment</h2>
           <p>
             We thank the principal and teachers of San Roque National High School for their time, feedback, and
@@ -106,7 +106,7 @@ function AboutPage({ onNavigate, scrollTarget }) {
           </p>
         </section>
 
-        <section className="public-card public-text-card public-anchor" id="contact" aria-labelledby="about-contact">
+        <section className="site-card public-text-card public-anchor" id="contact" aria-labelledby="about-contact">
           <h2 id="about-contact">Contact</h2>
           {CONTACT_EMAIL ? (
             <p>
