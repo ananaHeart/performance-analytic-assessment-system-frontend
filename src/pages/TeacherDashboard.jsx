@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ArrowRight,
   BookOpen,
-  CalendarClock,
   ClipboardCheck,
   FilePenLine,
+  Plus,
   RefreshCw,
   UsersRound,
 } from 'lucide-react'
@@ -13,6 +13,7 @@ import {
   getAssessmentsV3,
   getTeacherClassStudentsV3,
 } from '../api/apiV3Client'
+import TeacherStudentSupport from '../components/TeacherStudentSupport'
 
 function formatClassName(assignment) {
   return [
@@ -97,18 +98,36 @@ function isArchivedAssessment(assessment) {
   return String(assessment?.status ?? assessment?.testStatus ?? '').toLowerCase() === 'archived'
 }
 
+function getAssessmentActivityBadge(assessment, status) {
+  const learnerCount = Number(assessment.learnerCount)
+  const uploadedCount = Number(assessment.uploadedCount)
+  const hasCounts = Number.isFinite(learnerCount) && Number.isFinite(uploadedCount)
+
+  if (status === 'active' && hasCounts) {
+    if (learnerCount > 0 && uploadedCount >= learnerCount) {
+      return { label: 'Completed', toneClass: 'is-completed' }
+    }
+    if (uploadedCount > 0) {
+      return { label: `Active · ${uploadedCount}/${learnerCount} uploaded`, toneClass: 'is-active' }
+    }
+  }
+  return { label: formatStatus(status), toneClass: `is-${status}` }
+}
+
 function isActiveClassAssignment(assignment) {
   const status = String(assignment?.status ?? '').trim().toLowerCase()
   return !status || status === 'active'
 }
 
-function TeacherDashboard({ token, onNavigate }) {
+function TeacherDashboard({ user, token, onNavigate }) {
   const [classAssignments, setClassAssignments] = useState([])
   const [classStudentCounts, setClassStudentCounts] = useState({})
   const [assessments, setAssessments] = useState([])
   const [assessmentsAvailable, setAssessmentsAvailable] = useState(true)
   const [pageError, setPageError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
+  const [supportRefreshKey, setSupportRefreshKey] = useState(0)
+  const [creationAssignmentId, setCreationAssignmentId] = useState('')
 
   const teacherClassGroups = useMemo(() => {
     const groupedAssignments = new Map()
@@ -160,16 +179,9 @@ function TeacherDashboard({ token, onNavigate }) {
     [assessments],
   )
 
-  const draftAssessments = useMemo(
-    () =>
-      assessments
-        .filter(
-          (assessment) =>
-            String(assessment.status ?? assessment.testStatus ?? '').toLowerCase() === 'draft',
-        )
-        .slice(0, 4),
-    [assessments],
-  )
+  const creationAssignment = classAssignments.find((assignment) =>
+    String(assignment.classAssignmentId) === creationAssignmentId,
+  ) ?? (classAssignments.length === 1 ? classAssignments[0] : null)
 
   const loadDashboardData = useCallback(async () => {
     setIsLoading(true)
@@ -281,7 +293,10 @@ function TeacherDashboard({ token, onNavigate }) {
         <button
           type="button"
           className="teacher-dashboard-refresh"
-          onClick={loadDashboardData}
+          onClick={() => {
+            loadDashboardData()
+            setSupportRefreshKey((value) => value + 1)
+          }}
           disabled={isLoading}
         >
           <RefreshCw size={16} aria-hidden="true" />
@@ -332,6 +347,7 @@ function TeacherDashboard({ token, onNavigate }) {
                 const status = String(
                   assessment.status ?? assessment.testStatus ?? 'draft',
                 ).toLowerCase()
+                const activityBadge = getAssessmentActivityBadge(assessment, status)
 
                 return (
                   <li key={assessment.testId}>
@@ -348,8 +364,8 @@ function TeacherDashboard({ token, onNavigate }) {
                         </span>
                         <small>{getAssessmentSchedule(assessment)}</small>
                       </span>
-                      <span className={`teacher-dashboard-assessment-status is-${status}`}>
-                        {formatStatus(status)}
+                      <span className={`teacher-dashboard-assessment-status ${activityBadge.toneClass}`}>
+                        {activityBadge.label}
                       </span>
                       <ArrowRight size={16} aria-hidden="true" />
                     </button>
@@ -361,42 +377,31 @@ function TeacherDashboard({ token, onNavigate }) {
         </section>
 
         <div className="teacher-dashboard-side-column">
-          <section className="teacher-dashboard-panel" aria-labelledby="attentionHeading">
-            <div className="teacher-dashboard-panel-heading">
-              <h2 id="attentionHeading">Needs attention</h2>
-              <span className="teacher-dashboard-panel-icon" aria-hidden="true">
-                <CalendarClock size={18} strokeWidth={2.1} />
-              </span>
+          <TeacherStudentSupport token={token} teacherUserId={user?.userId ?? user?.id}
+            refreshKey={supportRefreshKey} onNavigate={onNavigate} />
+          <div className="teacher-dashboard-new-assessment">
+            <label htmlFor="dashboardCreationAssignment">Class / subject</label>
+            <div>
+              <select id="dashboardCreationAssignment" value={creationAssignment?.classAssignmentId ?? ''}
+                disabled={isLoading || !classAssignments.length}
+                onChange={(event) => setCreationAssignmentId(event.target.value)}>
+                <option value="">{isLoading ? 'Loading classes...' : classAssignments.length ? 'Select class / subject' : 'No assigned classes'}</option>
+                {classAssignments.map((assignment) => <option key={assignment.classAssignmentId} value={assignment.classAssignmentId}>
+                  {formatClassName(assignment)} | {assignment.subjectName || 'Subject'}
+                </option>)}
+              </select>
+              <button type="button" disabled={isLoading || !creationAssignment} onClick={() => {
+                if (!creationAssignment) return
+                onNavigate('assessment-setup', {
+                  classId: creationAssignment.classId,
+                  classAssignmentId: creationAssignment.classAssignmentId,
+                  assessmentId: null,
+                })
+              }}>
+                <Plus size={16} aria-hidden="true" /> New assessment
+              </button>
             </div>
-
-            {!isLoading && assessmentsAvailable && draftAssessments.length > 0 ? (
-              <ul className="teacher-dashboard-attention-list">
-                {draftAssessments.map((assessment) => (
-                  <li key={assessment.testId}>
-                    <button type="button" onClick={() => openAssessment(assessment)}>
-                      <span>
-                        <strong>{assessment.testName || 'Untitled assessment'}</strong>
-                        <small>Draft assessment</small>
-                      </span>
-                      <ArrowRight size={15} aria-hidden="true" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-
-            {!isLoading && assessmentsAvailable && draftAssessments.length === 0 ? (
-              <div className="teacher-dashboard-compact-empty">No draft assessments need attention.</div>
-            ) : null}
-
-            {!isLoading && !assessmentsAvailable ? (
-              <div className="teacher-dashboard-compact-empty">Work queue unavailable.</div>
-            ) : null}
-
-            {isLoading ? (
-              <div className="teacher-dashboard-compact-empty">Loading work queue...</div>
-            ) : null}
-          </section>
+          </div>
         </div>
       </div>
     </div>

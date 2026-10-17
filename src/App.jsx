@@ -560,7 +560,7 @@ function App() {
 
     if (page === 'reports') {
       setReportsInitialFilters(
-        Object.prototype.hasOwnProperty.call(options, 'testId') ? options : null,
+        Object.prototype.hasOwnProperty.call(options, 'testId') || options.reportType ? options : null,
       )
     }
 

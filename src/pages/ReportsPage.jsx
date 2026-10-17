@@ -26,6 +26,8 @@ import {
 } from 'lucide-react'
 import { HorizontalMasteryChart, VerticalMasteryChart } from '../components/AnalyticsCharts'
 import {
+  downloadAllAssessmentResultsExcelV3,
+  downloadAllAssessmentResultsPdfV3,
   downloadAssessmentResultsExcelV3,
   downloadAssessmentResultsPdfV3,
   downloadConsolidatedReportExcelV3,
@@ -250,6 +252,12 @@ function selectInitialTerm(termPeriods, academicYearId) {
   )
 }
 
+function selectNewestUploadedAssessment(assessments) {
+  return assessments
+    .filter((assessment) => !isArchivedAssessment(assessment) && hasId(assessment.lastUploadedAt))
+    .sort((left, right) => new Date(right.lastUploadedAt) - new Date(left.lastUploadedAt))[0] ?? null
+}
+
 function getErrorMessage(error, fallback) {
   const fieldMessages = Object.entries(error?.errors ?? {})
     .filter(([field, message]) => field !== 'code' && typeof message === 'string' && message.trim())
@@ -413,6 +421,7 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
   const [learningCompetencyState, setLearningCompetencyState] = useState({ status: 'idle', message: '', code: '' })
   const [expandedSkillIds, setExpandedSkillIds] = useState(() => new Set())
   const [exportState, setExportState] = useState({ format: '', status: 'idle', message: '' })
+  const [downloadAllState, setDownloadAllState] = useState({ format: '', status: 'idle', message: '' })
 
   const toggleSkillExpanded = (skillId) => {
     setExpandedSkillIds((current) => {
@@ -459,7 +468,7 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
         termPeriodId: initialTerm ? String(initialTerm.termPeriodId) : '',
       }
 
-      if (hasId(presetFilters?.testId)) {
+      if (hasId(presetFilters?.testId) || presetFilters?.reportType) {
         Object.keys(EMPTY_FILTERS).forEach((filterKey) => {
           if (hasId(presetFilters[filterKey])) {
             nextFilters[filterKey] = String(presetFilters[filterKey])
@@ -467,6 +476,23 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
         })
         if (presetFilters.reportType) {
           setSelectedReportType(presetFilters.reportType)
+        }
+      } else if (effectiveRole === 'principal') {
+        const newestUploaded = selectNewestUploadedAssessment(referenceData.assessments ?? [])
+        const uploadedAssignment = newestUploaded
+          ? referenceData.classAssignments.find((assignment) =>
+              sameId(assignment.classAssignmentId, newestUploaded.classAssignmentId),
+            )
+          : null
+        if (newestUploaded && uploadedAssignment) {
+          nextFilters.academicYearId = String(uploadedAssignment.academicYearId)
+          nextFilters.termPeriodId = hasId(newestUploaded.termPeriodId)
+            ? String(newestUploaded.termPeriodId)
+            : nextFilters.termPeriodId
+          nextFilters.classId = String(uploadedAssignment.classId)
+          nextFilters.teacherUserId = String(uploadedAssignment.teacherUserId)
+          nextFilters.subjectId = String(uploadedAssignment.subjectId)
+          nextFilters.testId = String(newestUploaded.testId)
         }
       }
 
@@ -845,6 +871,26 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
         format,
         status: 'error',
         message: exportError.message || `Unable to export the ${format.toUpperCase()} report.`,
+      })
+    }
+  }
+
+  const handleDownloadAll = async (format) => {
+    if (downloadAllState.status === 'loading') return
+
+    setDownloadAllState({ format, status: 'loading', message: '' })
+
+    try {
+      const extension = format === 'pdf' ? 'pdf' : 'xlsx'
+      const download = format === 'pdf' ? downloadAllAssessmentResultsPdfV3 : downloadAllAssessmentResultsExcelV3
+      const blob = await download(filters, token)
+      triggerBlobDownload(blob, `all-assessment-results.${extension}`)
+      setDownloadAllState({ format, status: 'idle', message: '' })
+    } catch (downloadError) {
+      setDownloadAllState({
+        format,
+        status: 'error',
+        message: downloadError.message || `Unable to download all ${format.toUpperCase()} reports.`,
       })
     }
   }
@@ -1318,34 +1364,6 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
     filters.termPeriodId && filters.subjectId && !assessmentOptions.length
       ? 'No matching assessments are available.'
       : ''
-  const optionLabel = (options, value) => options.find((option) => sameId(option.value, value))?.label
-  const selectedScopeLabels = [
-    !isPrincipalStudentTab && optionLabel(termOptions, filters.termPeriodId),
-    ...(
-      isLearningCompetencyReport
-        ? [
-            optionLabel(learningCompetencyGradeLevelOptions, filters.gradeLevelId),
-            optionLabel(learningCompetencySubjectOptions, filters.subjectId),
-            optionLabel(learningCompetencyRootOptions, filters.rootTagId),
-            optionLabel(learningCompetencySkillOptions, filters.skillId),
-          ]
-        : isSyncActivityReport
-          ? [
-              effectiveRole === 'principal' && optionLabel(syncActivityTeacherOptions, filters.teacherUserId),
-              filters.from && `From ${filters.from}`,
-              filters.to && `To ${filters.to}`,
-            ]
-          : [
-              effectiveRole === 'teacher'
-                ? optionLabel(teacherClassOptions, `${filters.classId}::${filters.subjectId}`)
-                : optionLabel(principalClassOptions, filters.classId),
-              effectiveRole === 'principal' && !isPrincipalStudentTab && optionLabel(principalTeacherOptions, filters.teacherUserId),
-              effectiveRole === 'principal' && !isPrincipalStudentTab && optionLabel(subjectOptions, filters.subjectId),
-              selectedReportType !== 'student_performance_profile' && optionLabel(assessmentOptions, filters.testId),
-              optionLabel(studentOptions, filters.studentId),
-            ]
-    ),
-  ].filter(Boolean)
 
   if (pageState.status === 'authorization') {
     return (
@@ -1455,12 +1473,6 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
           </div>
         </div>
       </header>
-
-      {pageState.status === 'ready' && selectedScopeLabels.length ? (
-        <p className="reports-scope-summary" aria-label="Selected report scope">
-          {selectedScopeLabels.join(' / ')}
-        </p>
-      ) : null}
 
       {pageState.status === 'loading' ? (
         <div className="reports-loading-state" role="status" aria-live="polite">
@@ -2062,7 +2074,35 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
                   <strong>Assessments</strong>
                   <span>Select an assessment to view its consolidated results.</span>
                 </div>
+                <div className="reports-export-actions">
+                  <button
+                    type="button"
+                    disabled={downloadAllState.status === 'loading'}
+                    onClick={() => handleDownloadAll('pdf')}
+                  >
+                    <Download size={16} strokeWidth={2.1} aria-hidden="true" />
+                    {downloadAllState.status === 'loading' && downloadAllState.format === 'pdf'
+                      ? 'Preparing...'
+                      : 'Download all (PDF)'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={downloadAllState.status === 'loading'}
+                    onClick={() => handleDownloadAll('excel')}
+                  >
+                    <FileSpreadsheet size={16} strokeWidth={2.1} aria-hidden="true" />
+                    {downloadAllState.status === 'loading' && downloadAllState.format === 'excel'
+                      ? 'Preparing...'
+                      : 'Download all (Excel)'}
+                  </button>
+                </div>
               </div>
+            ) : null}
+
+            {downloadAllState.status === 'error' ? (
+              <p className="form-message form-message-error" role="alert">
+                {downloadAllState.message}
+              </p>
             ) : null}
 
             {principalAssessmentCards.length ? (

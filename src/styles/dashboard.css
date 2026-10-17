@@ -144,6 +144,170 @@
   padding: 12px;
 }
 
+.teacher-dashboard-page .teacher-dashboard-side-column {
+  gap: 12px;
+}
+
+.teacher-support-scope {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--ui-border);
+  font-size: 0.75rem;
+}
+
+.teacher-support-scope label,
+.teacher-dashboard-new-assessment > label {
+  color: var(--ui-foreground);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.teacher-support-scope > span {
+  color: var(--ui-muted-foreground);
+  margin-left: auto;
+}
+
+.teacher-support-scope select,
+.teacher-dashboard-new-assessment select {
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 36px;
+  padding: 6px 28px 6px 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ui-foreground);
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+.teacher-support-scope select {
+  flex: 1 1 130px;
+}
+
+.teacher-support-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.teacher-support-list li + li {
+  border-top: 1px solid var(--ui-border);
+}
+
+.teacher-support-list button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  color: var(--ui-foreground);
+  text-align: left;
+}
+
+.teacher-support-list button:hover {
+  background: #f8fbf9;
+}
+
+.teacher-support-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+
+.teacher-support-copy strong,
+.teacher-support-competency {
+  font-size: 0.8rem;
+}
+
+.teacher-support-copy small {
+  color: var(--ui-muted-foreground);
+  font-size: 0.72rem;
+}
+
+.teacher-support-status {
+  color: #8a4b14;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.teacher-support-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  color: #8a4b14;
+  background: #fffaf2;
+  font-size: 0.8rem;
+}
+
+.teacher-support-notice > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.teacher-support-warnings {
+  padding: 8px 12px;
+  border-top: 1px solid var(--ui-border);
+  color: var(--ui-muted-foreground);
+  font-size: 0.72rem;
+  overflow-wrap: anywhere;
+}
+
+.teacher-support-warnings p {
+  margin: 0;
+}
+
+.teacher-support-warnings p + p {
+  margin-top: 4px;
+}
+
+.teacher-dashboard-new-assessment {
+  display: grid;
+  gap: 6px;
+}
+
+.teacher-dashboard-new-assessment > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.teacher-dashboard-new-assessment select {
+  flex: 1 1 180px;
+  width: 100%;
+}
+
+.teacher-dashboard-new-assessment button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--ui-primary);
+  border-radius: 6px;
+  background: var(--ui-primary);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.teacher-dashboard-new-assessment button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .principal-dashboard-page .principal-recent-panel {
   min-width: 0;
   padding: 0;

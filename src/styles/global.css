@@ -7457,6 +7457,13 @@ h3 {
   color: #237b1b;
 }
 
+.teacher-dashboard-assessment-status.is-completed {
+  border-color: #bbf0cb;
+  background: var(--status-success-bg, #dcfce7);
+  color: var(--status-success-text, #2f7d16);
+  font-weight: 800;
+}
+
 .teacher-dashboard-assessment-status.is-draft {
   border-color: #d8e0dc;
   background: #f5f7f6;

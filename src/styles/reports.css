@@ -68,14 +68,6 @@
   border: 0;
 }
 
-.reports-scope-summary {
-  margin: 0;
-  overflow-wrap: anywhere;
-  color: var(--ui-muted-foreground);
-  font-size: 0.76rem;
-  line-height: 1.4;
-}
-
 .reports-state-panel p,
 .reports-unavailable-state span {
   margin: 0;
@@ -937,6 +929,7 @@
   align-content: start;
   gap: 10px;
   padding: 14px;
+  min-width: 0;
   border: 1px solid var(--ui-border);
   border-radius: 8px;
   background: var(--surface-muted, #f8fafc);
@@ -1029,7 +1022,19 @@
   gap: 8px;
 }
 
+.reports-skill-heading .performance-pill {
+  min-width: 0;
+  height: auto;
+  min-height: 24px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
 .reports-skill-heading small {
+  flex: 0 0 auto;
   font-weight: 700;
 }
 

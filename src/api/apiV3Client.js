@@ -485,6 +485,46 @@ export function downloadAssessmentResultsExcelV3(testId, classAssignmentId, toke
   )
 }
 
+function buildAssessmentResultsAllQuery(filters) {
+  const {
+    academicYearId,
+    termPeriodId,
+    gradeLevelId,
+    classId,
+    teacherUserId,
+    subjectId,
+  } = filters ?? {}
+
+  return buildQuery({
+    academicYearId,
+    termPeriodId,
+    gradeLevelId,
+    classId,
+    teacherUserId,
+    subjectId,
+  })
+}
+
+export function downloadAllAssessmentResultsPdfV3(filters, token) {
+  return requestV3(
+    `/api/v3/reports/assessment-results/all/pdf${buildAssessmentResultsAllQuery(filters)}`,
+    { token, responseType: 'blob', headers: { Accept: 'application/pdf' } },
+  )
+}
+
+export function downloadAllAssessmentResultsExcelV3(filters, token) {
+  return requestV3(
+    `/api/v3/reports/assessment-results/all/excel${buildAssessmentResultsAllQuery(filters)}`,
+    {
+      token,
+      responseType: 'blob',
+      headers: {
+        Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      },
+    },
+  )
+}
+
 export async function getItemAnalysisReportV3(testId, classAssignmentId, token) {
   const payload = await requestV3(
     `/api/v3/reports/item-analysis${buildQuery({ testId, classAssignmentId })}`,
@@ -1078,12 +1118,23 @@ export function downloadAnswerSheetPdfV3(answerSheetVersionId, token) {
   })
 }
 
-export function downloadTestQuestionnairePdfV3(testId, token) {
-  return requestV3(`/api/v3/assessments/${testId}/questionnaire/pdf`, {
+export async function downloadTestQuestionnairePdfV3(testId, token) {
+  const pdf = await requestV3(`/api/v3/assessments/${testId}/questionnaire/pdf`, {
     token,
     responseType: 'blob',
-    headers: { Accept: 'application/pdf' },
+    // JSON errors must remain negotiable: a PDF-only Accept can mask an endpoint
+    // error with an authentication failure during the backend's error dispatch.
+    headers: { Accept: 'application/pdf, application/json' },
   })
+
+  if (pdf.type.split(';')[0].trim().toLowerCase() !== 'application/pdf' ||
+      await pdf.slice(0, 5).text() !== '%PDF-') {
+    const error = new Error('The backend did not return a valid questionnaire PDF. Check the backend deployment and try again.')
+    error.code = 'QUESTIONNAIRE_PDF_INVALID_RESPONSE'
+    throw error
+  }
+
+  return pdf
 }
 
 export async function previewSf1V3(
