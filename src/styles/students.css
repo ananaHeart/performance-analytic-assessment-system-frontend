@@ -250,7 +250,7 @@
 .is-student-workspace .sf1-modal {
   width: min(1120px, 100%);
   max-height: calc(100dvh - 32px);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
 }
 
 .is-student-workspace :is(.sf1-modal-header, .sf1-modal-body, .sf1-modal-footer) {
@@ -277,14 +277,14 @@
   width: 32px;
   height: 32px;
   flex-basis: 32px;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
 }
 
 .is-student-workspace .sf1-modal-close {
   width: 34px;
   height: 34px;
   flex-basis: 34px;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
 }
 
 .is-student-workspace .sf1-modal-config-card {
@@ -312,7 +312,7 @@
 .is-student-workspace .sf1-modal-footer button {
   min-width: 0;
   min-height: 38px;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   font-size: 0.84rem;
 }
 

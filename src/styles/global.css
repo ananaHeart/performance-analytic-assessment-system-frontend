@@ -81,7 +81,7 @@ h3 {
   padding: 24px;
   background: rgba(255, 255, 255, 0.78);
   border: 1px solid rgba(255, 255, 255, 0.65);
-  border-radius: 28px;
+  border-radius: var(--radius-card);
   box-shadow: var(--shadow);
   backdrop-filter: blur(12px);
 }
@@ -99,7 +99,7 @@ h3 {
     linear-gradient(160deg, rgba(255, 255, 255, 0.88), rgba(232, 251, 231, 0.96)),
     var(--surface);
   border: 1px solid var(--border);
-  border-radius: 24px;
+  border-radius: var(--radius-card);
 }
 
 .brand-mark {
@@ -108,7 +108,7 @@ h3 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 18px;
+  border-radius: var(--radius-control);
   background: var(--primary-soft);
 }
 
@@ -116,7 +116,7 @@ h3 {
   width: 84px;
   height: 84px;
   margin-bottom: 24px;
-  border-radius: 22px;
+  border-radius: var(--radius-control);
 }
 
 .brand-kicker,
@@ -154,7 +154,7 @@ h3 {
 
 .feature-list span {
   padding: 9px 12px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--primary-soft);
   color: var(--primary-dark);
   font-size: 0.92rem;
@@ -168,7 +168,7 @@ h3 {
   padding: 34px;
   background: var(--surface-strong);
   border: 1px solid var(--border);
-  border-radius: 22px;
+  border-radius: var(--radius-card);
 }
 
 .field-group {
@@ -192,8 +192,8 @@ h3 {
 .field-group input {
   width: 100%;
   padding: 13px 14px;
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -202,8 +202,8 @@ h3 {
 .field-group select {
   width: 100%;
   padding: 13px 14px;
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -220,7 +220,7 @@ h3 {
 .secondary-button,
 .text-button {
   border: none;
-  border-radius: 14px;
+  border-radius: var(--radius-control);
   padding: 13px 18px;
   font-weight: 700;
   transition: transform 0.2s ease, background-color 0.2s ease;
@@ -263,7 +263,7 @@ h3 {
 .form-message {
   margin: 0;
   padding: 12px 14px;
-  border-radius: 14px;
+  border-radius: var(--radius-card);
   font-size: 0.95rem;
 }
 
@@ -316,7 +316,7 @@ h3 {
 .sidebar-link {
   padding: 13px 16px;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text);
   text-align: left;
@@ -332,7 +332,7 @@ h3 {
   margin-top: auto;
   padding: 18px;
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -415,7 +415,7 @@ h3 {
   gap: 8px;
   padding: 8px 10px;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--text-secondary);
   font-size: 0.88rem;
@@ -602,7 +602,7 @@ h3 {
   gap: 12px;
   padding: 16px 22px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   box-shadow: 0 2px 5px rgba(15, 23, 42, 0.04);
 }
@@ -614,7 +614,7 @@ h3 {
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
 }
 
 .principal-stat-icon-green {
@@ -651,7 +651,7 @@ h3 {
 .principal-recent-panel {
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   box-shadow: 0 2px 5px rgba(15, 23, 42, 0.04);
 }
@@ -747,7 +747,7 @@ h3 {
   display: inline-flex;
   justify-content: center;
   padding: 3px 12px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 0.68rem;
   font-weight: 800;
 }
@@ -867,8 +867,8 @@ h3 {
   width: 100%;
   min-height: 42px;
   padding: 9px 11px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text);
   font: inherit;
@@ -989,7 +989,7 @@ h3 {
   display: grid;
   grid-template-columns: repeat(var(--term-count, 4), minmax(0, 1fr));
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   overflow: hidden;
 }
 
@@ -1011,7 +1011,7 @@ h3 {
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--primary-soft);
   color: var(--primary-dark);
   font-weight: 900;
@@ -1131,7 +1131,7 @@ h3 {
   margin-top: 18px;
   padding: 14px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--surface);
 }
 
@@ -1153,7 +1153,7 @@ h3 {
   gap: 8px;
   padding: 8px 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text);
   font-size: 0.85rem;
@@ -1163,7 +1163,7 @@ h3 {
 .principal-assignment-toolbar-actions .secondary-button {
   min-height: 36px;
   padding-inline: 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
 }
 
 .principal-smart-import-card {
@@ -1176,7 +1176,7 @@ h3 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: var(--status-success-bg);
   color: var(--primary);
 }
@@ -1244,7 +1244,7 @@ h3 {
   margin-top: 16px;
   padding: 18px 20px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   box-shadow: 0 2px 5px rgba(15, 23, 42, 0.04);
 }
@@ -1275,8 +1275,8 @@ h3 {
   min-height: 38px;
   width: 100%;
   padding: 0 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text);
   font-weight: 700;
@@ -1290,7 +1290,7 @@ h3 {
   align-content: center;
   gap: 2px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface-muted);
 }
 
@@ -1319,7 +1319,7 @@ h3 {
 
 .principal-assignment-form .primary-button {
   min-height: 38px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
 }
 
 .sf1-import-modal-backdrop {
@@ -1339,7 +1339,7 @@ h3 {
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-modal);
   background: var(--surface);
   box-shadow: 0 24px 70px rgba(15, 23, 42, 0.24);
 }
@@ -1367,7 +1367,7 @@ h3 {
   min-height: 36px;
   padding: 0 14px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--muted);
   font-weight: 900;
@@ -1391,7 +1391,7 @@ h3 {
   margin-top: 14px;
   padding: 14px 16px;
   border: 1px solid rgba(131, 232, 65, 0.28);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--primary-soft);
 }
 
@@ -1434,7 +1434,7 @@ h3 {
   justify-content: space-between;
   gap: 18px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--surface);
 }
 
@@ -1450,14 +1450,14 @@ h3 {
 .sf1-confirm-actions .primary-button {
   flex: 0 0 auto;
   min-height: 42px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
 }
 
 .sf1-review-table-wrap {
   max-height: clamp(210px, 34vh, 360px);
   overflow: auto;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
 }
 
 .sf1-review-table-wrap .approval-table {
@@ -1479,7 +1479,7 @@ h3 {
 .sf1-review-summary-grid .mini-stat-card {
   margin: 0;
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
 }
 
 .sf1-review-summary-grid .mini-stat-card span {
@@ -1498,7 +1498,7 @@ h3 {
 .sf1-review-summary-grid .field-group select {
   min-height: 38px;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   font-size: 0.9rem;
 }
 
@@ -1617,7 +1617,7 @@ h3 {
 .principal-teachers-table-panel {
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   box-shadow: 0 2px 5px rgba(15, 23, 42, 0.04);
 }
@@ -1696,7 +1696,7 @@ h3 {
   display: inline-flex;
   justify-content: center;
   padding: 4px 12px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 0.68rem;
   font-weight: 800;
 }
@@ -1728,7 +1728,7 @@ h3 {
 .principal-manage-button {
   min-height: 24px;
   padding: 0 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   font-size: 0.7rem;
   font-weight: 800;
 }
@@ -1811,7 +1811,7 @@ h3 {
 .principal-total-assessment {
   min-height: 34px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text-secondary);
   font-size: 0.8rem;
@@ -1849,7 +1849,7 @@ h3 {
 .principal-analytics-panel {
   padding: 18px 20px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   box-shadow: 0 2px 5px rgba(15, 23, 42, 0.04);
 }
@@ -1858,7 +1858,7 @@ h3 {
   width: fit-content;
   margin: 0 0 18px;
   padding: 8px 18px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: var(--status-success-bg);
   color: var(--text);
   font-size: 1.25rem;
@@ -1954,7 +1954,7 @@ h3 {
 .principal-skill-track {
   height: 9px;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface-sunken);
 }
 
@@ -1983,7 +1983,7 @@ h3 {
   margin-bottom: 12px;
   padding: 12px 14px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -2003,7 +2003,7 @@ h3 {
   width: fit-content;
   grid-column: 2;
   padding: 2px 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--status-success-bg);
   color: var(--primary);
   font-size: 0.55rem;
@@ -2158,7 +2158,7 @@ h3 {
 .content-card,
 .approval-card,
 .toolbar-row {
-  border-radius: 24px;
+  border-radius: var(--radius-card);
   padding: 24px;
 }
 
@@ -2175,7 +2175,7 @@ h3 {
 
 .stat-card {
   padding: 22px;
-  border-radius: 22px;
+  border-radius: var(--radius-card);
 }
 
 .stat-card p {
@@ -2237,7 +2237,7 @@ h3 {
   display: grid;
   gap: 4px;
   border: 1px solid rgba(131, 232, 65, 0.28);
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   background: var(--primary-soft);
 }
 
@@ -2287,8 +2287,8 @@ h3 {
   width: 100%;
   min-height: 44px;
   padding: 9px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text);
   font-weight: 800;
@@ -2342,7 +2342,7 @@ h3 {
 .manual-student-table-wrap {
   overflow-x: auto;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -2387,7 +2387,7 @@ h3 {
   min-height: 38px;
   padding: 8px 10px;
   border: 1px solid transparent;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text);
   font-weight: 800;
@@ -2401,7 +2401,7 @@ h3 {
 .manual-row-remove {
   padding: 7px 10px;
   border: 1px solid var(--status-danger-border);
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   background: var(--status-danger-soft);
   color: var(--danger);
   font-size: 0.78rem;
@@ -2446,7 +2446,7 @@ h3 {
 .confirm-file-indicator {
   padding: 16px;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -2503,7 +2503,7 @@ h3 {
 
 .status-pill {
   padding: 7px 12px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 0.82rem;
   font-weight: 700;
 }
@@ -2621,7 +2621,7 @@ h3 {
   align-items: center;
   justify-content: center;
   padding: 7px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--primary-soft);
   color: var(--primary-dark);
 }
@@ -2642,7 +2642,7 @@ h3 {
   width: 100%;
   height: 10px;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface-sunken);
 }
 
@@ -2660,7 +2660,7 @@ h3 {
   width: fit-content;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 0.82rem;
   font-weight: 800;
 }
@@ -2746,7 +2746,7 @@ h3 {
   margin: 0 auto;
   padding: 24px 28px 28px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
@@ -2839,8 +2839,8 @@ h3 {
 .assessment-builder-page .field-group input,
 .assessment-builder-page .field-group select {
   min-height: 54px;
-  border-color: var(--border);
-  border-radius: 8px;
+  border-color: var(--border-strong);
+  border-radius: var(--radius-control);
 }
 
 .assessment-builder-page .answer-key-builder {
@@ -2876,7 +2876,7 @@ h3 {
 .assessment-builder-page .builder-form-actions .primary-button,
 .assessment-builder-page .builder-wizard-actions .primary-button,
 .assessment-builder-page .builder-wizard-actions .secondary-button {
-  border-radius: 8px;
+  border-radius: var(--radius-control);
 }
 
 .assessment-builder-page .draft-part-list {
@@ -2889,7 +2889,7 @@ h3 {
 
 .assessment-builder-page .draft-part-card {
   border-color: var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   box-shadow: none;
 }
 
@@ -2926,7 +2926,7 @@ h3 {
   grid-template-columns: 44px 1fr;
   align-items: center;
   gap: 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface-muted);
 }
 
@@ -2948,7 +2948,7 @@ h3 {
   min-width: 0;
   padding: 0;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text);
   font-size: 0.92rem;
@@ -3052,7 +3052,7 @@ h3 {
 .teacher-app-home-link:focus-visible {
   outline: 2px solid rgba(131, 232, 65, 0.35);
   outline-offset: 4px;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
 }
 
 .teacher-app-title strong {
@@ -3078,7 +3078,7 @@ h3 {
 .teacher-brand-mark {
   width: 42px;
   height: 42px;
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   box-shadow: none;
 }
 
@@ -3100,7 +3100,7 @@ h3 {
   gap: 6px;
   padding: 5px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface-muted);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7);
 }
@@ -3108,7 +3108,7 @@ h3 {
 .teacher-nav-link {
   padding: 9px 13px;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--muted);
   font-size: 0.9rem;
@@ -3159,7 +3159,7 @@ h3 {
 
 .teacher-workspace-profile strong {
   padding: 5px 9px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--primary-soft);
   color: var(--primary-dark);
   font-size: 0.8rem;
@@ -3175,7 +3175,7 @@ h3 {
   display: none;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--status-success-bg);
   color: var(--primary-dark);
   font-size: 0.78rem;
@@ -3187,7 +3187,7 @@ h3 {
   height: 34px;
   position: relative;
   border: none;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
 }
 
@@ -3196,8 +3196,8 @@ h3 {
   position: absolute;
   inset: 9px 11px 8px 11px;
   border: 2px solid var(--muted);
-  border-top-left-radius: 999px;
-  border-top-right-radius: 999px;
+  border-top-left-radius: var(--radius-pill);
+  border-top-right-radius: var(--radius-pill);
   border-bottom: 0;
 }
 
@@ -3208,7 +3208,7 @@ h3 {
   right: 8px;
   width: 6px;
   height: 6px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--danger);
 }
 
@@ -3234,7 +3234,7 @@ h3 {
   align-items: flex-start;
   gap: 18px;
   border: 1px solid var(--border);
-  border-radius: 24px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   box-shadow: 0 14px 34px rgba(20, 42, 24, 0.05);
 }
@@ -3252,7 +3252,7 @@ h3 {
   gap: clamp(40px, 10vw, 180px);
   border: 1px solid var(--border);
   border-top: none;
-  border-radius: 0 0 16px 16px;
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
   background: rgba(255, 255, 255, 0.88);
   box-shadow: none;
 }
@@ -3303,7 +3303,7 @@ h3 {
 .teacher-summary-grid article,
 .teacher-focus-card {
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   box-shadow: 0 10px 24px rgba(20, 42, 24, 0.04);
 }
@@ -3321,7 +3321,7 @@ h3 {
   align-items: center;
   justify-content: center;
   margin-bottom: 12px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--primary);
   color: var(--on-primary);
   font-weight: 900;
@@ -3429,7 +3429,7 @@ h3 {
 .teacher-dashboard-highlight {
   padding: 18px;
   border: 1px solid rgba(131, 232, 65, 0.28);
-  border-radius: 18px;
+  border-radius: var(--radius-card);
   background: var(--primary-soft);
 }
 
@@ -3459,7 +3459,7 @@ h3 {
   width: 100%;
   padding: 14px;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   text-align: left;
 }
@@ -3521,7 +3521,7 @@ h3 {
   gap: 10px;
   padding: 6px;
   border: 1px solid var(--border);
-  border-radius: 22px;
+  border-radius: var(--radius-card);
   background: rgba(255, 255, 255, 0.72);
 }
 
@@ -3532,7 +3532,7 @@ h3 {
   align-items: center;
   gap: 12px;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   color: var(--muted);
 }
@@ -3545,7 +3545,7 @@ h3 {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--primary-soft);
   color: var(--primary-dark);
   font-weight: 800;
@@ -3572,7 +3572,7 @@ h3 {
 .builder-section {
   padding: 26px;
   border: 1px solid var(--border);
-  border-radius: 24px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   box-shadow: 0 14px 34px rgba(20, 42, 24, 0.05);
 }
@@ -3600,7 +3600,7 @@ h3 {
   flex-direction: column;
   gap: 15px;
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   color: var(--text);
   text-align: left;
@@ -3666,7 +3666,7 @@ h3 {
   align-items: center;
   align-self: flex-start;
   padding: 8px 11px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--primary-soft);
 }
 
@@ -3684,7 +3684,7 @@ h3 {
 .answer-key-builder {
   padding: 18px;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius-control);
   background: var(--surface);
 }
 
@@ -3716,7 +3716,7 @@ h3 {
 .review-summary-grid article {
   padding: 14px;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   color: var(--muted);
   font-weight: 700;
@@ -3732,7 +3732,7 @@ h3 {
 .student-roster-wrap {
   max-height: 260px;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -3760,7 +3760,7 @@ h3 {
   align-items: center;
   gap: 14px;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -3789,7 +3789,7 @@ h3 {
   gap: 6px;
   min-height: 42px;
   padding: 10px 14px;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   white-space: nowrap;
 }
 
@@ -3805,7 +3805,7 @@ h3 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 20px;
+  border-radius: var(--radius-control);
   background: var(--primary);
   color: var(--on-primary);
   font-size: 1.5rem;
@@ -3835,13 +3835,13 @@ h3 {
   display: grid;
   gap: 18px;
   align-content: start;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
 }
 
 .teacher-account-summary .teacher-profile-avatar {
   width: 76px;
   height: 76px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
 }
 
 .teacher-account-summary > div {
@@ -3883,7 +3883,7 @@ h3 {
   justify-content: center;
   gap: 8px;
   border: 1px solid var(--status-danger-border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--danger);
   font: inherit;
@@ -3964,7 +3964,7 @@ h3 {
   align-items: center;
   gap: 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface-muted);
 }
 
@@ -3975,7 +3975,7 @@ h3 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   background: var(--status-neutral-bg);
   color: var(--status-neutral-text);
 }
@@ -4041,7 +4041,7 @@ h3 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   background: var(--primary-soft);
   color: var(--primary);
 }
@@ -4098,7 +4098,7 @@ h3 {
 .teacher-workspace-topbar.is-dashboard-topbar .teacher-workspace-profile .secondary-button {
   padding: 7px 14px;
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   background: var(--surface-muted);
   color: var(--muted);
   font-size: 0.72rem;
@@ -4167,7 +4167,7 @@ h3 {
   bottom: 2px;
   left: 0;
   height: 2px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
 }
 
@@ -4229,7 +4229,7 @@ h3 {
 
 .dashboard-shell.is-teacher-workspace .teacher-workspace-profile .secondary-button {
   padding: 8px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--primary-soft);
   color: var(--primary-dark);
   font-size: 0.78rem;
@@ -4260,7 +4260,7 @@ h3 {
 .dashboard-shell.is-teacher-workspace .teacher-system-mark {
   width: 30px;
   height: 30px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--primary-soft);
   color: var(--primary);
 }
@@ -4322,7 +4322,7 @@ h3 {
   justify-content: center;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--status-success-bg);
   color: var(--primary-dark);
   font-size: 0.72rem;
@@ -4368,7 +4368,7 @@ h3 {
   display: block;
   grid-template-columns: none;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   box-shadow: none;
 }
@@ -4388,7 +4388,7 @@ h3 {
   align-items: center;
   gap: 10px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -4399,7 +4399,7 @@ h3 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--primary-soft);
   color: var(--primary);
 }
@@ -4476,7 +4476,7 @@ h3 {
   height: 76px;
   flex: 0 0 auto;
   border: 3px solid var(--surface);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background:
     linear-gradient(145deg, rgba(255, 224, 199, 0.88), rgba(243, 179, 143, 0.92)),
     var(--primary-soft);
@@ -4550,7 +4550,7 @@ h3 {
   align-content: start;
   gap: 8px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   color: var(--text-secondary);
   text-align: left;
@@ -4570,7 +4570,7 @@ h3 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   background: var(--primary-soft);
   color: var(--primary);
 }
@@ -4649,7 +4649,7 @@ h3 {
   align-items: center;
   gap: 8px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   color: var(--muted);
   font-size: 0.84rem;
@@ -4669,7 +4669,7 @@ h3 {
   min-height: 136px;
   padding: 18px 20px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
@@ -4751,7 +4751,7 @@ h3 {
   margin: 0 auto;
   padding: 22px 26px 28px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
@@ -4822,7 +4822,7 @@ h3 {
   align-items: center;
   gap: 16px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--surface);
 }
 
@@ -4835,9 +4835,9 @@ h3 {
   flex: 1;
   min-width: 0;
   padding: 5px 34px 5px 12px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface-muted);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface);
   color: var(--text-secondary);
   font-weight: 700;
 }
@@ -4850,7 +4850,7 @@ h3 {
   justify-content: center;
   gap: 9px;
   border: none;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   background: var(--primary);
   color: var(--on-primary);
   font-weight: 900;
@@ -4865,7 +4865,7 @@ h3 {
 .teacher-assessment-panel {
   margin-top: 26px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   overflow: hidden;
 }
@@ -4936,7 +4936,7 @@ h3 {
   align-items: center;
   justify-content: center;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--muted);
   cursor: pointer;
@@ -4974,7 +4974,7 @@ h3 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   background: var(--primary-soft);
   color: var(--primary);
 }
@@ -5028,7 +5028,7 @@ h3 {
   align-content: center;
   gap: 5px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -5051,8 +5051,8 @@ h3 {
   width: 100%;
   min-width: 0;
   padding: 6px 34px 6px 12px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
   background: var(--surface-muted);
   color: var(--text-secondary);
   font-weight: 800;
@@ -5064,7 +5064,7 @@ h3 {
 .teacher-intervention-panel,
 .teacher-analytics-empty-panel {
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -5130,7 +5130,7 @@ h3 {
 
 .teacher-lms-bar-track {
   height: 12px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface-sunken);
   overflow: hidden;
 }
@@ -5149,7 +5149,7 @@ h3 {
   place-items: center;
   gap: 7px;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background:
     linear-gradient(var(--border) 1px, transparent 1px) 0 24px / 100% 48px,
     linear-gradient(90deg, transparent 0, transparent 54px, var(--text-faint) 55px, transparent 56px),
@@ -5201,7 +5201,7 @@ h3 {
 
 .teacher-empty-chart p {
   padding: 7px 13px;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: rgba(255, 255, 255, 0.88);
   color: var(--text-secondary);
   font-weight: 900;
@@ -5242,7 +5242,7 @@ h3 {
   justify-content: space-between;
   gap: 18px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -5272,7 +5272,7 @@ h3 {
   align-content: center;
   gap: 7px;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--surface-sunken);
   color: var(--primary-hover);
   text-align: center;
@@ -5385,7 +5385,7 @@ h3 {
   width: fit-content;
   max-width: 100%;
   padding: 7px 11px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 0.72rem;
   font-weight: 900;
   line-height: 1.2;
@@ -5413,7 +5413,7 @@ h3 {
   display: grid;
   gap: 4px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -5444,7 +5444,7 @@ h3 {
   grid-template-columns: 38px minmax(0, 1fr);
   gap: 10px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -5453,7 +5453,7 @@ h3 {
   height: 34px;
   display: grid;
   place-items: center;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--primary-soft);
   color: var(--primary-dark);
   font-size: 0.78rem;
@@ -5504,14 +5504,14 @@ h3 {
   flex-wrap: wrap;
   gap: 6px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   list-style: none;
 }
 
 .teacher-intervention-learners li {
   padding: 5px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--status-success-bg);
   color: var(--primary-hover);
   font-size: 0.76rem;
@@ -5523,7 +5523,7 @@ h3 {
   display: grid;
   gap: 6px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -5576,7 +5576,7 @@ h3 {
   align-items: center;
   gap: 8px;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text-secondary);
   font-weight: 900;
@@ -5617,7 +5617,7 @@ h3 {
 .teacher-performance-summary-card {
   padding: 18px 20px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -5737,7 +5737,7 @@ h3 {
   align-content: center;
   gap: 4px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -5818,7 +5818,7 @@ h3 {
   height: 28px;
   display: inline-grid;
   place-items: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface-sunken);
   color: var(--muted);
   font-size: 0.68rem;
@@ -5833,7 +5833,7 @@ h3 {
 .performance-pill {
   padding: 5px 9px;
   display: inline-flex;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 0.68rem;
   font-weight: 900;
   white-space: nowrap;
@@ -5913,7 +5913,7 @@ h3 {
   align-items: center;
   gap: 16px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -5927,8 +5927,8 @@ h3 {
   flex: 1;
   min-width: 0;
   padding: 6px 34px 6px 12px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
   background: var(--surface-muted);
   color: var(--text-secondary);
   font-weight: 800;
@@ -5989,7 +5989,7 @@ h3 {
 .student-info-modal-header button {
   padding: 13px 20px;
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--muted);
   font-size: 0.8rem;
@@ -6015,7 +6015,7 @@ h3 {
   height: 142px;
   display: grid;
   place-items: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--text-faint);
   color: transparent;
   position: relative;
@@ -6030,7 +6030,7 @@ h3 {
   top: 28px;
   width: 40px;
   height: 40px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--border-strong);
 }
 
@@ -6076,7 +6076,7 @@ h3 {
   width: 100%;
   min-height: 250px;
   padding: 38px 20px;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   display: grid;
   align-content: start;
@@ -6100,14 +6100,14 @@ h3 {
 .student-performance-card {
   min-height: 210px;
   padding: 14px 24px 24px;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   background: var(--surface);
 }
 
 .student-performance-card h4 {
   margin: 0;
   padding: 8px 24px;
-  border-radius: 5px;
+  border-radius: var(--radius-card);
   background: var(--primary-soft);
   color: var(--text-secondary);
   font-size: 1.35rem;
@@ -6163,7 +6163,7 @@ h3 {
 
 .student-skill-track {
   height: 12px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface-sunken);
   overflow: hidden;
 }
@@ -6236,7 +6236,7 @@ h3 {
 .empty-chip {
   padding: 12px 14px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text);
   text-align: left;
@@ -6286,8 +6286,8 @@ h3 {
 .answer-key-item select {
   width: 100%;
   padding: 11px 12px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text);
 }
@@ -6314,7 +6314,7 @@ h3 {
   justify-content: space-between;
   gap: 18px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface-muted);
 }
 
@@ -6337,7 +6337,7 @@ h3 {
   height: 42px;
   padding: 0 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text);
   font-size: 0.92rem;
@@ -6364,7 +6364,7 @@ h3 {
   align-items: center;
   gap: 14px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface-muted);
 }
 
@@ -6376,7 +6376,7 @@ h3 {
 
 .assessment-builder-page .answer-key-item input {
   height: 42px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   font-weight: 800;
 }
 
@@ -6574,7 +6574,7 @@ h3 {
   gap: 16px;
   padding: 16px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface-muted);
 }
 
@@ -6607,7 +6607,7 @@ h3 {
   align-items: center;
   padding: 10px 11px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface-muted);
   color: var(--text);
   font-size: 0.95rem;
@@ -6632,7 +6632,7 @@ h3 {
   align-items: center;
   padding: 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -6666,8 +6666,8 @@ h3 {
 .range-inputs input {
   width: 100%;
   padding: 10px 11px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text);
 }
@@ -6680,7 +6680,7 @@ h3 {
 .mapping-preview-panel {
   padding: 12px;
   border: 1px dashed var(--primary-border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -6692,7 +6692,7 @@ h3 {
 
 .mapping-preview-list span {
   padding: 7px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--primary-soft);
   color: var(--text);
   font-size: 0.88rem;
@@ -6742,7 +6742,7 @@ h3 {
   gap: 13px;
   padding: 26px 25px 28px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   box-shadow: 0 18px 30px rgba(17, 45, 24, 0.12);
 }
@@ -6791,8 +6791,8 @@ h3 {
   align-items: center;
   gap: 8px;
   padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--muted);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -6855,7 +6855,7 @@ h3 {
   gap: 7px;
   padding: 9px 14px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   background: var(--primary);
   color: var(--on-primary);
   font-size: 0.83rem;
@@ -6901,7 +6901,7 @@ h3 {
   justify-content: center;
   gap: 8px;
   border: 1px solid var(--border);
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text);
   font: inherit;
@@ -6944,7 +6944,7 @@ h3 {
   gap: 13px;
   padding: 27px 28px 25px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   box-shadow: 0 18px 30px rgba(17, 45, 24, 0.12);
 }
@@ -6989,8 +6989,8 @@ h3 {
 .teacher-signup-field > select,
 .teacher-signup-input-wrap {
   min-height: 36px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text-secondary);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -7051,7 +7051,7 @@ h3 {
   margin-top: 8px;
   padding: 10px 14px;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   background: var(--primary);
   color: var(--on-primary);
   font-size: 0.86rem;
@@ -7190,7 +7190,7 @@ h3 {
   justify-content: center;
   gap: 8px;
   border: 1px solid var(--ui-input);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   color: var(--ui-foreground);
   font-size: 0.84rem;
@@ -7218,7 +7218,7 @@ h3 {
   padding: 18px 20px;
   gap: 14px;
   border-color: var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   box-shadow: var(--ui-shadow-sm);
 }
@@ -7244,7 +7244,7 @@ h3 {
 .teacher-dashboard-page .teacher-dashboard-overview-icon {
   width: 40px;
   height: 40px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
 }
 
 .teacher-dashboard-page .teacher-dashboard-overview-grid article span:not(.teacher-dashboard-overview-icon) {
@@ -7281,7 +7281,7 @@ h3 {
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   box-shadow: var(--ui-shadow-sm);
 }
@@ -7320,7 +7320,7 @@ h3 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--surface-sunken);
   color: var(--muted);
 }
@@ -7333,7 +7333,7 @@ h3 {
   justify-content: center;
   gap: 6px;
   border: 1px solid transparent;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--ui-primary);
   font-size: 0.8rem;
@@ -7385,7 +7385,7 @@ h3 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--ui-brand-soft);
   color: var(--ui-primary);
 }
@@ -7430,7 +7430,7 @@ h3 {
   align-items: center;
   justify-content: center;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface-sunken);
   color: var(--muted);
   font-size: 0.7rem;
@@ -7548,7 +7548,7 @@ h3 {
   align-items: center;
   gap: 7px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   color: var(--ui-primary);
   font-size: 0.84rem;
   font-weight: 700;
@@ -7570,7 +7570,7 @@ h3 {
   padding: 18px;
   gap: 10px;
   border-color: var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   color: var(--ui-foreground);
   box-shadow: var(--ui-shadow-sm);
 }
@@ -7591,7 +7591,7 @@ h3 {
 .teacher-dashboard-page .teacher-class-icon {
   width: 36px;
   height: 36px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--ui-brand-soft);
   color: var(--ui-primary);
 }
@@ -7721,7 +7721,7 @@ h3 {
   gap: 14px;
   padding: 16px;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   box-shadow: var(--ui-shadow-sm);
 }
@@ -7743,7 +7743,7 @@ h3 {
   min-height: 42px;
   padding: 0 36px 0 12px;
   border-color: var(--ui-input);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--ui-foreground);
   font-size: 0.84rem;
@@ -7755,7 +7755,7 @@ h3 {
   min-width: 0;
   min-height: 42px;
   padding: 0 16px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--ui-primary);
   font-size: 0.86rem;
   font-weight: 750;
@@ -7769,7 +7769,7 @@ h3 {
 .teacher-timetable-panel {
   margin-top: 0;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   box-shadow: var(--ui-shadow-sm);
   overflow: hidden;
@@ -7824,7 +7824,7 @@ h3 {
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--ui-brand-soft);
   color: var(--ui-primary);
 }
@@ -7854,7 +7854,7 @@ h3 {
   justify-content: center;
   gap: 7px;
   padding: 8px 13px;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
 }
 
 .icon-action-button {
@@ -7865,7 +7865,7 @@ h3 {
   align-items: center;
   justify-content: center;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--ui-muted-foreground);
 }
@@ -7896,7 +7896,7 @@ h3 {
   margin: 14px 18px;
   padding: 14px;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface-muted);
 }
 
@@ -7931,7 +7931,7 @@ h3 {
   min-height: 40px;
   padding: 8px 10px;
   border: 1px solid var(--ui-input);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--ui-foreground);
   font: inherit;
@@ -8085,7 +8085,7 @@ h3 {
 .teacher-records-page .teacher-assessment-panel {
   margin-top: 0;
   border-color: var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   box-shadow: var(--ui-shadow-sm);
 }
 
@@ -8146,7 +8146,7 @@ h3 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--ui-brand-soft);
   color: var(--ui-primary);
 }
@@ -8168,7 +8168,7 @@ h3 {
 .teacher-assessment-editor-page > header {
   padding: 20px;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   box-shadow: var(--ui-shadow-sm);
 }
@@ -8203,11 +8203,11 @@ h3 {
 
 .teacher-assessment-editor-page > section,
 .teacher-assessment-editor-page > div.rounded-lg {
-  border-radius: 8px;
+  border-radius: var(--radius-card);
 }
 
 .teacher-assessment-editor-page > div.sticky {
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   box-shadow: var(--ui-shadow-md);
 }
 
@@ -8232,7 +8232,7 @@ h3 {
 
 .assessment-editor-summary-card {
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   box-shadow: var(--ui-shadow-sm);
 }
 
@@ -8294,7 +8294,7 @@ h3 {
   margin: 14px 0 0;
   padding: 11px 12px;
   border: 1px solid rgb(220 38 38 / 0.2);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: rgb(220 38 38 / 0.08);
   color: var(--ui-destructive);
   font-size: 0.78rem;
@@ -8324,7 +8324,7 @@ h3 {
   display: flex;
   align-items: center;
   border: 1px solid var(--ui-input);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--ui-muted);
   color: var(--ui-foreground);
   font-size: 0.875rem;
@@ -8507,7 +8507,7 @@ h3 {
   flex-shrink: 0;
   padding: 18px 24px;
   border-top: 1px solid var(--border);
-  background: var(--surface);
+  background: transparent;
   color: var(--muted);
   font-size: 0.86rem;
   font-weight: 650;

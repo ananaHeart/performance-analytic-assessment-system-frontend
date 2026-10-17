@@ -55,7 +55,7 @@
 .principal-dashboard-page .principal-stat-icon {
   width: 34px;
   height: 34px;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
 }
 
 .teacher-dashboard-page .teacher-dashboard-overview-grid article span:not(.teacher-dashboard-overview-icon),
@@ -178,7 +178,7 @@
   min-height: 36px;
   padding: 6px 28px 6px 8px;
   border: 1px solid var(--ui-border);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--ui-foreground);
   font: inherit;
@@ -296,7 +296,7 @@
   min-height: 36px;
   padding: 6px 10px;
   border: 1px solid var(--ui-primary);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: var(--ui-primary);
   color: var(--on-primary);
   font-size: 0.8rem;

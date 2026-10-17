@@ -3,7 +3,7 @@
   min-height: 100vh;
   overflow-x: hidden;
   padding-top: var(--public-header-height);
-  background: var(--surface);
+  background: var(--page-bg);
   color: var(--text);
 }
 
@@ -266,7 +266,7 @@
 .landing-workflow {
   padding: 48px 32px 52px;
   border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  background: transparent;
 }
 
 .landing-section-inner {
@@ -369,7 +369,7 @@
   justify-content: space-between;
   gap: var(--space-4);
   padding: 20px max(24px, calc((100% - 1280px) / 2));
-  background: var(--surface);
+  background: transparent;
   color: var(--muted);
   font-size: var(--font-size-xs);
   font-weight: 650;

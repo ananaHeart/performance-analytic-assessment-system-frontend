@@ -5,7 +5,7 @@
      which would stop the sticky visual panel from sticking. */
   overflow-x: clip;
   padding-top: var(--public-header-height);
-  background: var(--surface);
+  background: var(--page-bg);
   color: var(--text);
 }
 
@@ -204,7 +204,7 @@
   align-items: center;
   justify-content: center;
   padding: clamp(32px, 5vw, 72px);
-  background: var(--surface);
+  background: transparent;
 }
 
 .public-auth-form-content {

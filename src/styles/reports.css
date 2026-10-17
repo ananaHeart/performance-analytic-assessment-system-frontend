@@ -48,7 +48,7 @@
   min-height: 38px;
   padding: 0 10px;
   border: 1px solid var(--ui-border);
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--ui-foreground);
   font: inherit;
@@ -84,7 +84,7 @@
   gap: 7px;
   padding: 0 13px;
   border: 1px solid var(--ui-border);
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--ui-foreground);
   font: inherit;
@@ -130,7 +130,7 @@
 
 .reports-result-panel {
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -153,7 +153,7 @@
   min-height: 38px;
   padding: 7px 10px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface);
   color: var(--muted);
   font-size: 0.78rem;
@@ -230,8 +230,8 @@
   width: 100%;
   min-height: 38px;
   padding: 0 11px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
   background-color: var(--surface);
   color: var(--ui-foreground);
   font: inherit;
@@ -401,7 +401,7 @@
   display: inline-flex;
   align-items: center;
   width: fit-content;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-weight: 750;
 }
 
@@ -542,7 +542,7 @@
   display: grid;
   gap: 1px;
   border: 1px solid var(--ui-border);
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   overflow: hidden;
   background: var(--ui-border);
 }
@@ -639,7 +639,7 @@
 .reports-warning-list > div {
   padding: 9px 11px;
   border: 1px solid var(--status-warning-border);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: var(--status-warning-soft);
   color: var(--status-warning-text);
 }
@@ -659,7 +659,7 @@
   min-width: 0;
   overflow-x: auto;
   border: 1px solid var(--ui-border);
-  border-radius: 7px;
+  border-radius: var(--radius-control);
 }
 
 .reports-results-table {
@@ -746,7 +746,7 @@
   display: grid;
   gap: 4px;
   padding: 6px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   border: 1px solid var(--ui-border);
   font-size: 0.76rem;
@@ -779,7 +779,7 @@
   gap: 12px;
   padding: 14px 16px;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -931,7 +931,7 @@
   padding: 14px;
   min-width: 0;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface-muted, var(--surface-muted));
 }
 
@@ -1040,7 +1040,7 @@
 
 .reports-skill-bar {
   height: 5px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface-sunken);
   overflow: hidden;
 }
@@ -1070,7 +1070,7 @@
 
 .reports-mastery-pill {
   padding: 4px 9px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 0.72rem;
   font-weight: 750;
   white-space: nowrap;

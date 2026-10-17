@@ -47,7 +47,7 @@
   justify-content: center;
   padding: 0 4px;
   border: 2px solid var(--surface);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--danger);
   color: var(--on-primary);
   font-size: 0.62rem;
@@ -62,7 +62,7 @@
   right: 0;
   overflow: hidden;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   color: var(--ui-foreground);
   box-shadow: 0 18px 45px rgb(15 23 42 / 18%);
@@ -130,7 +130,7 @@
   min-height: 32px;
   gap: 5px;
   padding: 0 9px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   font-size: 0.7rem;
   font-weight: 700;
 }
@@ -139,7 +139,7 @@
   width: 32px;
   height: 32px;
   padding: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
 }
 
 .notification-mark-all-button:hover:not(:disabled),
@@ -173,7 +173,7 @@
   flex: 0 0 auto;
   padding: 0 9px;
   border-color: var(--status-danger-border);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   color: var(--status-danger-text);
   font-size: 0.7rem;
   font-weight: 750;
@@ -241,7 +241,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--surface-sunken);
   color: var(--status-info-text);
 }
@@ -304,7 +304,7 @@
   min-height: 27px;
   gap: 4px;
   padding: 0 7px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   font-size: 0.66rem;
   font-weight: 700;
 }

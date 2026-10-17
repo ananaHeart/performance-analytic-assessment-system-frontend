@@ -17,7 +17,7 @@
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--border-color, var(--border));
-  border-radius: 22px;
+  border-radius: var(--radius-modal);
   background: var(--surface);
   box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
 }
@@ -55,7 +55,7 @@
   flex: 0 0 44px;
   display: grid;
   place-items: center;
-  border-radius: 14px;
+  border-radius: var(--radius-control);
   background: var(--primary-soft);
   color: var(--primary-dark);
 }
@@ -67,7 +67,7 @@
   display: grid;
   place-items: center;
   border: 1px solid var(--border-color, var(--border));
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text-secondary);
   cursor: pointer;
@@ -92,7 +92,7 @@
 .sf1-modal-config-card {
   padding: 18px;
   border: 1px solid var(--border-color, var(--border));
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
 
@@ -132,7 +132,7 @@
   min-height: 48px;
   padding: 7px;
   border: 1px solid var(--border-color, var(--border));
-  border-radius: 12px;
+  border-radius: var(--radius-control);
   background: var(--surface);
 }
 
@@ -150,7 +150,7 @@
   justify-content: space-between;
   gap: 14px;
   border: 1px solid var(--status-danger-border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--status-danger-soft);
   color: var(--status-danger-text);
 }
@@ -181,7 +181,7 @@
   margin-top: 16px;
   padding: 12px 14px;
   border: 1px solid var(--status-warning-border);
-  border-radius: 8px;
+  border-radius: var(--radius-card);
   background: var(--status-warning-soft);
   color: var(--status-warning-text);
 }
@@ -225,7 +225,7 @@
   min-width: 0;
   padding: 14px 16px;
   border: 1px solid var(--primary-border);
-  border-radius: 14px;
+  border-radius: var(--radius-card);
   background: var(--primary-soft);
 }
 
@@ -245,7 +245,7 @@
 .sf1-preview-section {
   margin-top: 18px;
   border: 1px solid var(--border-color, var(--border));
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   overflow: hidden;
   background: var(--surface);
 }
@@ -284,7 +284,7 @@
   justify-content: center;
   min-width: 70px;
   padding: 5px 9px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 0.74rem;
   font-weight: 800;
 }
@@ -317,7 +317,7 @@
   justify-content: center;
   gap: 8px;
   border: 1px dashed var(--border-strong);
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   color: var(--muted);
   text-align: center;
@@ -353,7 +353,7 @@
   .sf1-modal {
     width: 100%;
     max-height: 95vh;
-    border-radius: 18px;
+    border-radius: var(--radius-modal);
   }
 
   .sf1-modal-header,
