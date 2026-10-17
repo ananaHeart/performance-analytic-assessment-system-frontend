@@ -433,9 +433,12 @@
 }
 
 .public-auth-submit:disabled {
-  cursor: not-allowed;
-  opacity: 0.58;
+  border-color: var(--border);
+  background: var(--surface-sunken);
+  color: var(--text-faint);
   box-shadow: none;
+  opacity: 1;
+  cursor: not-allowed;
   transform: none;
 }
 

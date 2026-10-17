@@ -83,6 +83,7 @@
   --color-secondary-foreground: var(--ui-secondary-foreground);
   --color-muted: var(--ui-muted);
   --color-muted-foreground: var(--ui-muted-foreground);
+  --color-faint: var(--text-faint);
   --color-accent: var(--ui-accent);
   --color-accent-foreground: var(--ui-accent-foreground);
   --color-destructive: var(--ui-destructive);

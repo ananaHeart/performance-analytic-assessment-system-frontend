@@ -304,8 +304,13 @@
 }
 
 .teacher-dashboard-new-assessment button:disabled {
-  opacity: 0.5;
+  border-color: var(--border);
+  background: var(--surface-sunken);
+  color: var(--text-faint);
+  box-shadow: none;
+  opacity: 1;
   cursor: not-allowed;
+  transform: none;
 }
 
 .principal-dashboard-page .principal-recent-panel {

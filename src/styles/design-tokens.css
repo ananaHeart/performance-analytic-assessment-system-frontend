@@ -574,9 +574,12 @@ textarea:focus,
 .builder-wizard-actions .primary-button:disabled,
 .create-assessment-button:disabled,
 .export-report-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.65;
+  border-color: var(--border);
+  background: var(--surface-sunken);
+  color: var(--text-faint);
   box-shadow: none;
+  opacity: 1;
+  cursor: not-allowed;
   transform: none;
 }
 
