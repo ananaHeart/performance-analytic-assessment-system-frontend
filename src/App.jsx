@@ -3,6 +3,7 @@ import AppLayout from './components/AppLayout'
 import MarkaMark from './components/MarkaMark'
 import ProtectedRoute from './components/ProtectedRoute'
 import LandingPage from './pages/LandingPage'
+import TechStackPage from './pages/TechStackPage'
 import LoginPage from './pages/LoginPage'
 import TeacherSignUpPage from './pages/TeacherSignUpPage'
 import TeacherEmailVerificationPage from './pages/TeacherEmailVerificationPage'
@@ -233,7 +234,7 @@ function getDefaultPage(role) {
 
 function normalizePage(auth, page) {
   if (!auth?.user?.role) {
-    return ['home', 'login', 'register', 'verify-email'].includes(page)
+    return ['home', 'tech-stack', 'login', 'register', 'verify-email'].includes(page)
       ? page
       : DEFAULT_PUBLIC_PAGE
   }
@@ -601,6 +602,10 @@ function App() {
 
     if (currentPage === 'verify-email') {
       return <TeacherEmailVerificationPage onNavigate={handleNavigate} />
+    }
+
+    if (currentPage === 'tech-stack') {
+      return <TechStackPage onNavigate={handleNavigate} />
     }
 
     return <LandingPage onNavigate={handleNavigate} />

@@ -375,6 +375,22 @@
   font-weight: 650;
 }
 
+.landing-footer-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--primary-dark);
+  font: inherit;
+  font-weight: 750;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.landing-footer-link:hover {
+  color: var(--primary-hover);
+}
+
 .landing-brand:focus-visible,
 .landing-login-link:focus-visible,
 .landing-header-register:focus-visible,

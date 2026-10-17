@@ -119,6 +119,9 @@ function LandingPage({ onNavigate }) {
 
       <footer className="landing-footer">
         <span>© 2026 Marka</span>
+        <button type="button" className="landing-footer-link" onClick={() => onNavigate('tech-stack')}>
+          Tech stack
+        </button>
         <span>Built for evidence-informed teaching.</span>
       </footer>
     </main>
