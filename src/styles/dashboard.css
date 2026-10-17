@@ -179,7 +179,7 @@
   padding: 6px 28px 6px 8px;
   border: 1px solid var(--ui-border);
   border-radius: 6px;
-  background: #fff;
+  background: var(--surface);
   color: var(--ui-foreground);
   font: inherit;
   font-size: 0.8rem;
@@ -208,13 +208,13 @@
   padding: 10px 12px;
   border: 0;
   border-radius: 0;
-  background: #fff;
+  background: var(--surface);
   color: var(--ui-foreground);
   text-align: left;
 }
 
 .teacher-support-list button:hover {
-  background: #f8fbf9;
+  background: var(--surface-muted);
 }
 
 .teacher-support-copy {
@@ -236,7 +236,7 @@
 }
 
 .teacher-support-status {
-  color: #8a4b14;
+  color: var(--status-warning-text);
   font-size: 0.72rem;
   font-weight: 700;
 }
@@ -246,8 +246,8 @@
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  color: #8a4b14;
-  background: #fffaf2;
+  color: var(--status-warning-text);
+  background: var(--status-warning-soft);
   font-size: 0.8rem;
 }
 
@@ -298,7 +298,7 @@
   border: 1px solid var(--ui-primary);
   border-radius: 6px;
   background: var(--ui-primary);
-  color: #fff;
+  color: var(--on-primary);
   font-size: 0.8rem;
   font-weight: 700;
 }
