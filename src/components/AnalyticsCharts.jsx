@@ -10,12 +10,25 @@ import {
   YAxis,
 } from 'recharts'
 
-const chartColors = {
-  strong: '#22c55e',
-  warning: '#f59e0b',
-  weak: '#ef4444',
-  neutral: '#94a3b8',
-  info: '#2563eb',
+// SVG attributes cannot take var(), so chart colors are read from the design tokens at render time.
+function readToken(styles, name) {
+  return styles.getPropertyValue(name).trim() || 'currentColor'
+}
+
+function getChartColors() {
+  const styles = getComputedStyle(document.documentElement)
+
+  return {
+    strong: readToken(styles, '--chart-success'),
+    warning: readToken(styles, '--chart-warning'),
+    weak: readToken(styles, '--chart-danger'),
+    neutral: readToken(styles, '--text-faint'),
+    info: readToken(styles, '--chart-info'),
+    grid: readToken(styles, '--chart-grid'),
+    axis: readToken(styles, '--text-secondary'),
+    axisMuted: readToken(styles, '--muted'),
+    label: readToken(styles, '--text'),
+  }
 }
 
 function normalizePercent(value) {
@@ -54,7 +67,7 @@ function truncateLabel(label, limit = 18) {
   return text.length > limit ? `${text.slice(0, limit - 1)}...` : text
 }
 
-function normalizeRows(data = []) {
+function normalizeRows(data = [], chartColors) {
   return data.map((item, index) => {
     const value = normalizePercent(item.value)
     const tone = item.tone || getTone(value)
@@ -86,25 +99,26 @@ function AnalyticsTooltip({ active, payload, label }) {
 }
 
 export function VerticalMasteryChart({ data, height = 280 }) {
-  const rows = normalizeRows(data)
+  const colors = getChartColors()
+  const rows = normalizeRows(data, colors)
 
   return (
     <div className="analytics-chart-shell" style={{ height }}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={rows} margin={{ top: 22, right: 14, left: 0, bottom: 8 }}>
-          <CartesianGrid stroke="#e5e7eb" vertical={false} />
+          <CartesianGrid stroke={colors.grid} vertical={false} />
           <XAxis
             dataKey="label"
             axisLine={false}
             tickLine={false}
-            tick={{ fill: '#334155', fontSize: 12, fontWeight: 800 }}
+            tick={{ fill: colors.axis, fontSize: 12, fontWeight: 800 }}
             tickFormatter={(label) => truncateLabel(label)}
             interval={0}
           />
           <YAxis
             axisLine={false}
             tickLine={false}
-            tick={{ fill: '#64748b', fontSize: 12, fontWeight: 700 }}
+            tick={{ fill: colors.axisMuted, fontSize: 12, fontWeight: 700 }}
             tickFormatter={(value) => `${value}%`}
             domain={[0, 100]}
             width={42}
@@ -117,7 +131,7 @@ export function VerticalMasteryChart({ data, height = 280 }) {
             <LabelList
               dataKey="displayValue"
               position="top"
-              fill="#0f172a"
+              fill={colors.label}
               fontSize={12}
               fontWeight={900}
             />
@@ -129,7 +143,8 @@ export function VerticalMasteryChart({ data, height = 280 }) {
 }
 
 export function HorizontalMasteryChart({ data, height = 220 }) {
-  const rows = normalizeRows(data)
+  const colors = getChartColors()
+  const rows = normalizeRows(data, colors)
 
   return (
     <div className="analytics-chart-shell" style={{ height }}>
@@ -140,14 +155,14 @@ export function HorizontalMasteryChart({ data, height = 220 }) {
           margin={{ top: 8, right: 48, left: 8, bottom: 8 }}
           barCategoryGap={14}
         >
-          <CartesianGrid stroke="#e5e7eb" horizontal={false} />
+          <CartesianGrid stroke={colors.grid} horizontal={false} />
           <XAxis type="number" domain={[0, 100]} hide />
           <YAxis
             dataKey="label"
             type="category"
             axisLine={false}
             tickLine={false}
-            tick={{ fill: '#0f172a', fontSize: 12, fontWeight: 850 }}
+            tick={{ fill: colors.label, fontSize: 12, fontWeight: 850 }}
             tickFormatter={(label) => truncateLabel(label, 24)}
             width={150}
           />
@@ -159,7 +174,7 @@ export function HorizontalMasteryChart({ data, height = 220 }) {
             <LabelList
               dataKey="displayValue"
               position="right"
-              fill="#0f172a"
+              fill={colors.label}
               fontSize={12}
               fontWeight={900}
             />
