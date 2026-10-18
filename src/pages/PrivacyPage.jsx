@@ -50,7 +50,7 @@ function PrivacyPage({ onNavigate, scrollTarget, isSignedIn }) {
           <h3>Scanned answer sheets</h3>
           <ul>
             <li>Photos of scanned pages, and cropped images of written answers for teacher checking.</li>
-            <li>On the current hosting, these image files are erased whenever the server restarts. Scores and records are kept.</li>
+            <li>On the current hosting, these image files are erased whenever the server restarts or goes to sleep after about 15 minutes without use. Scores and records are kept.</li>
           </ul>
 
           <h2>Why</h2>

@@ -363,7 +363,7 @@ The researchers of this study (Heart M. Añana, Kent John B. Baja, and Lovely Ma
 
 **Scanned answer sheets:**
 - Photos of scanned pages, and cropped images of written answers for teacher checking.
-- On the current hosting, these image files are erased whenever the server restarts. Scores and records are kept.
+- On the current hosting, these image files are erased whenever the server restarts or goes to sleep after about 15 minutes without use. Scores and records are kept.
 
 ### Why
 To check assessments, compute scores, produce reports for teachers and the principal, verify accounts, and keep sign-ins secure. Marka doesn't use personal data for advertising and doesn't sell it.
