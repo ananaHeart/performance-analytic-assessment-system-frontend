@@ -1100,3 +1100,55 @@
   background: var(--surface-sunken);
   color: var(--muted);
 }
+
+/* Students Needing Support report: one row per learner, each weak skill listed in the row. */
+.reports-support-table td {
+  vertical-align: top;
+}
+
+.reports-support-concerns {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  list-style: none;
+}
+
+.reports-support-concerns li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+.reports-support-skill {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--primary-dark);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* inline-block keeps the link underline off the subject label */
+.reports-support-skill > span {
+  display: inline-block;
+  margin-right: 6px;
+  color: var(--muted);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.reports-support-skill:hover {
+  color: var(--primary-hover);
+}
+
+.reports-support-suggestion {
+  color: var(--status-warning-text);
+  font-size: 0.72rem;
+  font-weight: 750;
+}

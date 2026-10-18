@@ -178,3 +178,28 @@ test('does not start additional batches after navigation, filter changes or auth
   })
   assert.equal(requests, 3)
 })
+
+test('follows a chosen school year when the Reports page passes one', () => {
+  const data = getStudentSupportContext(reference, 9, Date.parse('2026-10-07T00:00:00Z'), 1)
+  assert.equal(data.year.academicYearId, 1)
+  assert.deepEqual(data.terms.map((term) => term.termPeriodId), [11])
+  assert.deepEqual(data.scopes.map((scope) => [...scope.classIds]), [['14']])
+  assert.equal(getStudentSupportContext(reference, 9, Date.now(), 99).scopes.length, 0)
+})
+
+test('keeps every concern per student, weakest first, for the full report', () => {
+  const [english, science] = context().scopes
+  const englishReport = report(english, [student(1, 50)])
+  englishReport.rootCompetencies[0].skills.push({
+    skillId: 102, competencyName: 'Inference', weakStudents: [student(1, 35)],
+  })
+  const result = summarizeStudentSupport([
+    fulfilled(english, englishReport), fulfilled(science, report(science, [student(1, 20)])),
+  ])
+  assert.deepEqual(result.rows[0].concerns.map((concern) => [concern.subjectName, concern.competencyName, concern.masteryPercentage]), [
+    ['Science', 'Reading comprehension', 20],
+    ['English', 'Inference', 35],
+    ['English', 'Reading comprehension', 50],
+  ])
+  assert.equal(result.rows[0].concernCount, result.rows[0].concerns.length)
+})

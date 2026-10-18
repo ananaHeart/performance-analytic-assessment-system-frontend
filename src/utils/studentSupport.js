@@ -1,8 +1,11 @@
 const sameId = (left, right) => left != null && right != null && String(left) === String(right)
 const active = (value) => String(value ?? '').toLowerCase() === 'active'
 
-export function getStudentSupportContext(reference, teacherUserId, now = Date.now()) {
-  const year = reference.academicYears.find((item) => active(item.status))
+// academicYearId lets the Reports page follow its school-year filter; the dashboard uses the active year.
+export function getStudentSupportContext(reference, teacherUserId, now = Date.now(), academicYearId = null) {
+  const year = academicYearId
+    ? reference.academicYears.find((item) => sameId(item.academicYearId, academicYearId))
+    : reference.academicYears.find((item) => active(item.status))
   const assignments = reference.classAssignments.filter((item) =>
     sameId(item.teacherUserId, teacherUserId) &&
     sameId(item.academicYearId, year?.academicYearId) && active(item.status),
@@ -130,7 +133,7 @@ export function summarizeStudentSupport(results) {
       Number(a.masteryPercentage) - Number(b.masteryPercentage) ||
       a.competencyName.localeCompare(b.competencyName),
     )
-    return { ...ordered[0], studentId, concernCount: ordered.length }
+    return { ...ordered[0], studentId, concernCount: ordered.length, concerns: ordered }
   }).sort((a, b) => Number(a.masteryPercentage) - Number(b.masteryPercentage) ||
     String(a.fullName ?? '').localeCompare(String(b.fullName ?? '')) || a.studentId.localeCompare(b.studentId))
 

@@ -14,6 +14,7 @@ import {
   FileSpreadsheet,
   FileText,
   Inbox,
+  LifeBuoy,
   RefreshCw,
   School,
   ShieldAlert,
@@ -25,6 +26,11 @@ import {
   UsersRound,
 } from 'lucide-react'
 import { HorizontalMasteryChart, VerticalMasteryChart } from '../components/AnalyticsCharts'
+import {
+  getStudentSupportContext,
+  loadStudentSupportReports,
+  summarizeStudentSupport,
+} from '../utils/studentSupport'
 import {
   downloadAllAssessmentResultsExcelV3,
   downloadAllAssessmentResultsPdfV3,
@@ -98,6 +104,14 @@ const REPORT_TYPES = [
     description: 'Least mastered competencies for a term, and who needs help.',
     roles: ['principal', 'teacher'],
     icon: Target,
+    enabled: true,
+  },
+  {
+    code: 'students_needing_support',
+    label: 'Students Needing Support',
+    description: 'Every learner the backend flags for support in a term, across your classes.',
+    roles: ['teacher'],
+    icon: LifeBuoy,
     enabled: true,
   },
 ]
@@ -422,6 +436,9 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
   const [expandedSkillIds, setExpandedSkillIds] = useState(() => new Set())
   const [exportState, setExportState] = useState({ format: '', status: 'idle', message: '' })
   const [downloadAllState, setDownloadAllState] = useState({ format: '', status: 'idle', message: '' })
+  const [supportSummary, setSupportSummary] = useState(null)
+  const [supportState, setSupportState] = useState({ status: 'idle', message: '' })
+  const [supportScopeKey, setSupportScopeKey] = useState('')
 
   const toggleSkillExpanded = (skillId) => {
     setExpandedSkillIds((current) => {
@@ -1131,6 +1148,96 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
   }, [filters.gradeLevelId, filters.subjectId, filters.termPeriodId, selectedReportType, token])
   /* eslint-enable react-hooks/set-state-in-effect */
 
+  // Students Needing Support: the full list behind the dashboard card. Same backend data
+  // (learning competency weak-student lists) and the same summary rules; no scores computed here.
+  const isSupportReport = selectedReportType === 'students_needing_support'
+  const supportContext = useMemo(() => {
+    if (effectiveRole !== 'teacher' || !filters.academicYearId) return null
+    return getStudentSupportContext(sourceData, currentTeacherUserId, undefined, filters.academicYearId)
+  }, [currentTeacherUserId, effectiveRole, filters.academicYearId, sourceData])
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    let isCurrent = true
+
+    setSupportSummary(null)
+
+    if (!isSupportReport || pageState.status !== 'ready' || !filters.termPeriodId) {
+      setSupportState({ status: 'idle', message: '' })
+      return () => {
+        isCurrent = false
+      }
+    }
+
+    if (!supportContext?.scopes.length) {
+      setSupportState({ status: 'idle', message: 'No assigned classes in the selected school year.' })
+      return () => {
+        isCurrent = false
+      }
+    }
+
+    setSupportState({ status: 'loading', message: '' })
+
+    loadStudentSupportReports(
+      supportContext.scopes,
+      filters.termPeriodId,
+      (reportFilters) => getLearningCompetencyReportV3(reportFilters, token),
+      () => isCurrent,
+    )
+      .then((results) => {
+        if (!isCurrent) return
+        const summary = summarizeStudentSupport(results)
+        if (summary.failedScopes === supportContext.scopes.length) {
+          setSupportState({
+            status: 'error',
+            message: 'Student-support data could not be loaded. Use Refresh filters to try again.',
+          })
+          return
+        }
+        setSupportSummary(summary)
+        setSupportState({ status: 'ready', message: '' })
+      })
+      .catch((error) => {
+        if (!isCurrent) return
+        setSupportState({ status: 'error', message: getLoadFailure(error, 'Student-support data is unavailable.').message })
+      })
+
+    return () => {
+      isCurrent = false
+    }
+  }, [filters.termPeriodId, isSupportReport, pageState.status, supportContext, token])
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  const supportScopeOptions = (supportContext?.scopes ?? []).map((scope) => ({
+    value: scope.key,
+    label: `${scope.gradeLevelName || 'Grade'} | ${scope.subjectName || 'Subject'}`,
+  }))
+
+  const visibleSupportRows = (supportSummary?.rows ?? [])
+    .map((row) => ({
+      ...row,
+      visibleConcerns: (row.concerns ?? [row]).filter(
+        (concern) =>
+          !supportScopeKey || `${concern.filters.gradeLevelId}:${concern.filters.subjectId}` === supportScopeKey,
+      ),
+    }))
+    .filter((row) => row.visibleConcerns.length)
+
+  const supportTermName =
+    sourceData.termPeriods.find((term) => sameId(term.termPeriodId, filters.termPeriodId))?.termName || 'This term'
+
+  // A skill in the list opens the Learning Competency report already narrowed to that skill.
+  const openSupportConcern = (concern) => {
+    setFilters((currentFilters) => {
+      const nextFilters = { ...currentFilters }
+      for (const [key, value] of Object.entries(concern.filters)) {
+        if (key in EMPTY_FILTERS && hasId(value)) nextFilters[key] = String(value)
+      }
+      return nextFilters
+    })
+    setSelectedReportType('learning_competency')
+  }
+
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     let isCurrent = true
@@ -1530,7 +1637,19 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
               />
             ) : null}
 
-            {isSyncActivityReport || isLearningCompetencyReport ? null : effectiveRole === 'teacher' ? (
+            {isSupportReport ? (
+              <FilterSelect
+                id="reportSupportScope"
+                label="Grade and subject"
+                value={supportScopeKey}
+                options={supportScopeOptions}
+                placeholder="All grades and subjects"
+                disabled={!supportScopeOptions.length}
+                onChange={setSupportScopeKey}
+              />
+            ) : null}
+
+            {isSyncActivityReport || isLearningCompetencyReport || isSupportReport ? null : effectiveRole === 'teacher' ? (
               <FilterSelect
                 id="reportClass"
                 label="Assigned class"
@@ -1646,7 +1765,7 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
               </>
             ) : null}
 
-            {effectiveRole === 'teacher' && !isSyncActivityReport && !isLearningCompetencyReport ? (
+            {effectiveRole === 'teacher' && !isSyncActivityReport && !isLearningCompetencyReport && !isSupportReport ? (
               <FilterSelect
                 id="reportAssessment"
                 label="Assessment"
@@ -1664,7 +1783,7 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
               />
             ) : null}
 
-            {selectedReportType !== 'student_performance_profile' && !isSyncActivityReport && !isLearningCompetencyReport ? (
+            {selectedReportType !== 'student_performance_profile' && !isSyncActivityReport && !isLearningCompetencyReport && !isSupportReport ? (
               <FilterSelect
                 id="reportStudent"
                 label="Student (optional)"
@@ -2429,6 +2548,133 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
                 </tbody>
               </table>
             </div>
+          </div>
+        ) : null}
+        </>
+        ) : null}
+
+        {isSupportReport ? (
+        <>
+        {supportState.status === 'idle' ? (
+          <div className="reports-unavailable-state" role="status">
+            <LifeBuoy size={22} strokeWidth={1.8} aria-hidden="true" />
+            <strong>{supportState.message ? 'Nothing to show' : 'Select a term'}</strong>
+            <span>{supportState.message || 'Choose a term in Filters to list the learners who need support.'}</span>
+          </div>
+        ) : null}
+
+        {supportState.status === 'loading' ? (
+          <div className="reports-report-loading" role="status" aria-live="polite">
+            <span className="reports-loading-spinner" aria-hidden="true" />
+            Loading students needing support...
+          </div>
+        ) : null}
+
+        {supportState.status === 'error' ? (
+          <div className="reports-report-error" role="alert">
+            <ShieldAlert size={22} strokeWidth={1.9} aria-hidden="true" />
+            <div>
+              <strong>Students needing support unavailable</strong>
+              <span>{supportState.message}</span>
+            </div>
+          </div>
+        ) : null}
+
+        {supportState.status === 'ready' && supportSummary ? (
+          <div className="reports-assessment-results">
+            <div className="reports-report-meta">
+              <div>
+                <strong>Students needing support</strong>
+                <span>
+                  {supportTermName}: {supportSummary.failedScopes || supportSummary.incomplete ? 'at least ' : ''}
+                  {visibleSupportRows.length} learner{visibleSupportRows.length === 1 ? '' : 's'}, weakest mastery
+                  first. Select a skill to open its learning competency report.
+                </span>
+              </div>
+              <div>
+                <span
+                  className={`reports-data-status is-${supportSummary.failedScopes || supportSummary.incomplete ? 'partial' : 'available'}`}
+                >
+                  {supportSummary.failedScopes || supportSummary.incomplete ? 'Partial' : 'Available'}
+                </span>
+                <small>{supportTermName}</small>
+              </div>
+            </div>
+
+            {supportSummary.failedScopes || supportSummary.incomplete ? (
+              <div className="reports-data-notice is-partial" role="status">
+                <strong>Partial data</strong>
+                <span>Some grade and subject data could not be loaded. Showing the results that are available.</span>
+              </div>
+            ) : null}
+
+            {supportSummary.warnings.length ? (
+              <div className="reports-warning-list" aria-label="Backend report warnings">
+                {supportSummary.warnings.map((message) => (
+                  <div key={message}>
+                    <ShieldAlert size={17} aria-hidden="true" />
+                    <span>{message}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {visibleSupportRows.length ? (
+              <div className="reports-results-table-wrap">
+                <table className="reports-results-table reports-support-table">
+                  <thead>
+                    <tr>
+                      <th>Learner</th>
+                      <th>Section</th>
+                      <th>Skills needing support</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleSupportRows.map((row) => (
+                      <tr key={row.studentId}>
+                        <td>
+                          <strong>{row.fullName || 'Student name unavailable'}</strong>
+                          {row.studentLrn ? <small className="reports-support-lrn">LRN {row.studentLrn}</small> : null}
+                        </td>
+                        <td>{[row.gradeLevelName, row.sectionName].filter(Boolean).join(' - ') || 'Not available'}</td>
+                        <td>
+                          <ul className="reports-support-concerns">
+                            {row.visibleConcerns.map((concern) => (
+                              <li key={`${concern.filters.gradeLevelId}-${concern.filters.subjectId}-${concern.filters.skillId}`}>
+                                <button
+                                  type="button"
+                                  className="reports-support-skill"
+                                  onClick={() => openSupportConcern(concern)}
+                                  title="Open the learning competency report for this skill"
+                                >
+                                  <span>{concern.subjectName}</span>
+                                  {concern.competencyName}
+                                </button>
+                                <span className={`performance-pill ${getMasteryPillClass(concern.masteryStatusCode)}`}>
+                                  {formatBackendNumber(concern.masteryPercentage, '%')}
+                                </span>
+                                <span className="reports-support-suggestion">
+                                  {concern.recommendationLabel || formatStatus(concern.masteryStatusCode, 'Needs support')}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="reports-data-notice is-empty" role="status">
+                <strong>No learners flagged</strong>
+                <span>
+                  {supportSummary.availableScopes
+                    ? 'No learners need support in the finalized results for this term and scope.'
+                    : 'No finalized competency data is available for this term yet.'}
+                </span>
+              </div>
+            )}
           </div>
         ) : null}
         </>
