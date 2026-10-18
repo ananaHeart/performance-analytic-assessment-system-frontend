@@ -302,6 +302,7 @@ function renderProtectedPage(
       return (
         <AssessmentSetupPage
           token={auth.token}
+          userId={auth.user.userId ?? auth.user.id}
           initialClassAssignmentId={teacherActiveClassAssignmentId}
           initialAssessmentId={teacherActiveAssessmentId}
           onNavigate={onNavigate}

@@ -42,6 +42,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import AssessmentRulesDialog from '@/components/AssessmentRulesDialog'
+import { dismissAssessmentRules, hasDismissedAssessmentRules, isPastDateTime } from '@/utils/assessmentRules'
+
 const TEST_TYPES = [
   ['quiz', 'Quiz'],
   ['exam', 'Exam'],
@@ -1502,6 +1505,7 @@ function QuestionTypeEditor({
 
 function V2AssessmentEditorPage({
   token,
+  userId = null,
   testId = null,
   initialClassAssignmentId = null,
   onNavigate,
@@ -1542,6 +1546,9 @@ function V2AssessmentEditorPage({
   const [savedPayloadSnapshot, setSavedPayloadSnapshot] = useState(null)
   const [message, setMessage] = useState(null)
   const [openAtError, setOpenAtError] = useState('')
+  // Strict-looking warning only; a past opening time is not blocked on save.
+  const [openAtPastWarning, setOpenAtPastWarning] = useState(false)
+  const [showRules, setShowRules] = useState(() => !testId && !hasDismissedAssessmentRules(userId))
 
   const refreshAnswerSheetEligibility = useCallback(async (testAssignmentId) => {
     if (!testAssignmentId) {
@@ -2049,6 +2056,14 @@ function V2AssessmentEditorPage({
 
   return (
     <section className="smart-ui teacher-assessment-editor-page space-y-6 pb-8">
+      {showRules ? (
+        <AssessmentRulesDialog
+          onAcknowledge={(dontShowAgain) => {
+            if (dontShowAgain) dismissAssessmentRules(userId)
+            setShowRules(false)
+          }}
+        />
+      ) : null}
       <Button variant="link" onClick={handleBack}>
         <ArrowLeft />
         Back to assessments
@@ -2214,10 +2229,18 @@ function V2AssessmentEditorPage({
               <DateTimePicker
                 id="assessment-open-at"
                 value={form.openAt}
-                onChange={(value) => updateForm('openAt', value)}
+                onChange={(value) => {
+                  updateForm('openAt', value)
+                  setOpenAtPastWarning(isPastDateTime(value))
+                }}
                 placeholder="Select opening date and time"
               />
               {openAtError ? <p className="m-0 text-sm text-destructive">{openAtError}</p> : null}
+              {!openAtError && openAtPastWarning ? (
+                <p className="m-0 text-sm font-semibold text-destructive" role="alert">
+                  Opening time must be now or later. Choose the current time or a future time.
+                </p>
+              ) : null}
             </div>
 
             <div className="space-y-2">
