@@ -705,6 +705,42 @@ export function downloadLearningCompetencyExcelV3(filters, token) {
   )
 }
 
+// Students Needing Support (teacher only). termPeriodId is required; gradeLevelId and subjectId are optional.
+function buildStudentsNeedingSupportQuery(filters) {
+  const { termPeriodId, gradeLevelId, subjectId } = filters ?? {}
+
+  return buildQuery({ termPeriodId, gradeLevelId, subjectId })
+}
+
+export async function getStudentsNeedingSupportReportV3(filters, token) {
+  const payload = await requestV3(
+    `/api/v3/reports/students-needing-support${buildStudentsNeedingSupportQuery(filters)}`,
+    { token },
+  )
+
+  return extractData(payload) ?? null
+}
+
+export function downloadStudentsNeedingSupportPdfV3(filters, token) {
+  return requestV3(
+    `/api/v3/reports/students-needing-support/pdf${buildStudentsNeedingSupportQuery(filters)}`,
+    { token, responseType: 'blob', headers: { Accept: 'application/pdf' } },
+  )
+}
+
+export function downloadStudentsNeedingSupportExcelV3(filters, token) {
+  return requestV3(
+    `/api/v3/reports/students-needing-support/excel${buildStudentsNeedingSupportQuery(filters)}`,
+    {
+      token,
+      responseType: 'blob',
+      headers: {
+        Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      },
+    },
+  )
+}
+
 function normalizeNotificationUnreadCount(data) {
   const unreadCount = Number(data?.unreadCount)
   return Number.isFinite(unreadCount) && unreadCount > 0 ? Math.floor(unreadCount) : 0

@@ -26,11 +26,7 @@ import {
   UsersRound,
 } from 'lucide-react'
 import { HorizontalMasteryChart, VerticalMasteryChart } from '../components/AnalyticsCharts'
-import {
-  getStudentSupportContext,
-  loadStudentSupportReports,
-  summarizeStudentSupport,
-} from '../utils/studentSupport'
+import { getStudentSupportContext, readStudentSupportReport } from '../utils/studentSupport'
 import {
   downloadAllAssessmentResultsExcelV3,
   downloadAllAssessmentResultsPdfV3,
@@ -44,6 +40,8 @@ import {
   downloadLearningCompetencyPdfV3,
   downloadStudentPerformanceProfileExcelV3,
   downloadStudentPerformanceProfilePdfV3,
+  downloadStudentsNeedingSupportExcelV3,
+  downloadStudentsNeedingSupportPdfV3,
   downloadSyncActivityExcelV3,
   downloadSyncActivityPdfV3,
   getAssessmentResultsReportV3,
@@ -52,6 +50,7 @@ import {
   getLearningCompetencyReportV3,
   getReportReferenceDataV3,
   getStudentPerformanceProfileV3,
+  getStudentsNeedingSupportReportV3,
   getSyncActivityReportV3,
 } from '../api/apiV3Client'
 
@@ -838,7 +837,8 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
     (selectedReportType === 'principal_consolidated' && Boolean(groupByDimension)) ||
     selectedReportType === 'teacher_sync_activity' ||
     (selectedReportType === 'learning_competency' &&
-      Boolean(filters.termPeriodId && filters.gradeLevelId && filters.subjectId))
+      Boolean(filters.termPeriodId && filters.gradeLevelId && filters.subjectId)) ||
+    (selectedReportType === 'students_needing_support' && Boolean(filters.termPeriodId))
 
   const handleExportCurrentReport = async (format) => {
     if (!canExportCurrentReport || exportState.status === 'loading') return
@@ -874,6 +874,13 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
         const download = format === 'pdf' ? downloadLearningCompetencyPdfV3 : downloadLearningCompetencyExcelV3
         blob = await download(filters, token)
         filename = `learning-competency.${extension}`
+      } else if (selectedReportType === 'students_needing_support') {
+        // The optional grade-and-subject filter is stored as "gradeLevelId:subjectId".
+        const [gradeLevelId = '', subjectId = ''] = supportScopeKey ? supportScopeKey.split(':') : []
+        const download =
+          format === 'pdf' ? downloadStudentsNeedingSupportPdfV3 : downloadStudentsNeedingSupportExcelV3
+        blob = await download({ termPeriodId: filters.termPeriodId, gradeLevelId, subjectId }, token)
+        filename = `students-needing-support.${extension}`
       } else {
         const download =
           format === 'pdf' ? downloadAssessmentResultsPdfV3 : downloadAssessmentResultsExcelV3
@@ -1178,23 +1185,12 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
 
     setSupportState({ status: 'loading', message: '' })
 
-    loadStudentSupportReports(
-      supportContext.scopes,
-      filters.termPeriodId,
-      (reportFilters) => getLearningCompetencyReportV3(reportFilters, token),
-      () => isCurrent,
-    )
-      .then((results) => {
+    // The optional grade-and-subject filter is stored as "gradeLevelId:subjectId" and applied by the backend.
+    const [gradeLevelId = '', subjectId = ''] = supportScopeKey ? supportScopeKey.split(':') : []
+    getStudentsNeedingSupportReportV3({ termPeriodId: filters.termPeriodId, gradeLevelId, subjectId }, token)
+      .then((data) => {
         if (!isCurrent) return
-        const summary = summarizeStudentSupport(results)
-        if (summary.failedScopes === supportContext.scopes.length) {
-          setSupportState({
-            status: 'error',
-            message: 'Student-support data could not be loaded. Use Refresh filters to try again.',
-          })
-          return
-        }
-        setSupportSummary(summary)
+        setSupportSummary(readStudentSupportReport(data, filters.termPeriodId))
         setSupportState({ status: 'ready', message: '' })
       })
       .catch((error) => {
@@ -1205,7 +1201,7 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
     return () => {
       isCurrent = false
     }
-  }, [filters.termPeriodId, isSupportReport, pageState.status, supportContext, token])
+  }, [filters.termPeriodId, isSupportReport, pageState.status, supportContext, supportScopeKey, token])
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const supportScopeOptions = (supportContext?.scopes ?? []).map((scope) => ({
@@ -1213,18 +1209,13 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
     label: `${scope.gradeLevelName || 'Grade'} | ${scope.subjectName || 'Subject'}`,
   }))
 
-  const visibleSupportRows = (supportSummary?.rows ?? [])
-    .map((row) => ({
-      ...row,
-      visibleConcerns: (row.concerns ?? [row]).filter(
-        (concern) =>
-          !supportScopeKey || `${concern.filters.gradeLevelId}:${concern.filters.subjectId}` === supportScopeKey,
-      ),
-    }))
-    .filter((row) => row.visibleConcerns.length)
+  const visibleSupportRows = supportSummary?.rows ?? []
+  const supportHasSkillLinks = visibleSupportRows.some((row) => row.competencies.some((concern) => concern.filters))
 
   const supportTermName =
-    sourceData.termPeriods.find((term) => sameId(term.termPeriodId, filters.termPeriodId))?.termName || 'This term'
+    supportSummary?.termName ||
+    sourceData.termPeriods.find((term) => sameId(term.termPeriodId, filters.termPeriodId))?.termName ||
+    'This term'
 
   // A skill in the list opens the Learning Competency report already narrowed to that skill.
   const openSupportConcern = (concern) => {
@@ -2586,27 +2577,18 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
               <div>
                 <strong>Students needing support</strong>
                 <span>
-                  {supportTermName}: {supportSummary.failedScopes || supportSummary.incomplete ? 'at least ' : ''}
-                  {visibleSupportRows.length} learner{visibleSupportRows.length === 1 ? '' : 's'}, weakest mastery
-                  first. Select a skill to open its learning competency report.
+                  {supportTermName}: {visibleSupportRows.length} learner{visibleSupportRows.length === 1 ? '' : 's'},
+                  weakest mastery first.
+                  {supportHasSkillLinks ? ' Select a skill to open its learning competency report.' : ''}
                 </span>
               </div>
               <div>
-                <span
-                  className={`reports-data-status is-${supportSummary.failedScopes || supportSummary.incomplete ? 'partial' : 'available'}`}
-                >
-                  {supportSummary.failedScopes || supportSummary.incomplete ? 'Partial' : 'Available'}
+                <span className={`reports-data-status is-${normalizeText(supportSummary.dataStatus)}`}>
+                  {formatStatus(supportSummary.dataStatus)}
                 </span>
-                <small>{supportTermName}</small>
+                <small>Generated {formatLocalDate(supportSummary.generatedAt, 'time not available')}</small>
               </div>
             </div>
-
-            {supportSummary.failedScopes || supportSummary.incomplete ? (
-              <div className="reports-data-notice is-partial" role="status">
-                <strong>Partial data</strong>
-                <span>Some grade and subject data could not be loaded. Showing the results that are available.</span>
-              </div>
-            ) : null}
 
             {supportSummary.warnings.length ? (
               <div className="reports-warning-list" aria-label="Backend report warnings">
@@ -2639,21 +2621,28 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
                         <td>{[row.gradeLevelName, row.sectionName].filter(Boolean).join(' - ') || 'Not available'}</td>
                         <td>
                           <ul className="reports-support-concerns">
-                            {row.visibleConcerns.map((concern) => (
-                              <li key={`${concern.filters.gradeLevelId}-${concern.filters.subjectId}-${concern.filters.skillId}`}>
-                                <button
-                                  type="button"
-                                  className="reports-support-skill"
-                                  onClick={() => openSupportConcern(concern)}
-                                  title="Open the learning competency report for this skill"
-                                >
-                                  <span>{concern.subjectName}</span>
-                                  {concern.competencyName}
-                                </button>
+                            {row.competencies.map((concern, index) => (
+                              <li key={`${concern.subjectName}-${concern.competencyName}-${index}`}>
+                                {concern.filters ? (
+                                  <button
+                                    type="button"
+                                    className="reports-support-skill"
+                                    onClick={() => openSupportConcern(concern)}
+                                    title="Open the learning competency report for this skill"
+                                  >
+                                    <span>{concern.subjectName}</span>
+                                    {concern.competencyName}
+                                  </button>
+                                ) : (
+                                  <span className="reports-support-skill-text">
+                                    <span>{concern.subjectName}</span>
+                                    {concern.competencyName || 'Competency name unavailable'}
+                                  </span>
+                                )}
                                 <span className={`performance-pill ${getMasteryPillClass(concern.masteryStatusCode)}`}>
                                   {formatBackendNumber(concern.masteryPercentage, '%')}
                                 </span>
-                                <span className="reports-support-suggestion">
+                                <span className="reports-support-suggestion" title={concern.suggestion || ''}>
                                   {concern.recommendationLabel || formatStatus(concern.masteryStatusCode, 'Needs support')}
                                 </span>
                               </li>
@@ -2669,9 +2658,9 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
               <div className="reports-data-notice is-empty" role="status">
                 <strong>No learners flagged</strong>
                 <span>
-                  {supportSummary.availableScopes
-                    ? 'No learners need support in the finalized results for this term and scope.'
-                    : 'No finalized competency data is available for this term yet.'}
+                  {supportSummary.dataStatus === 'empty'
+                    ? 'No finalized competency data is available for this term yet.'
+                    : 'No learners need support in the finalized results for this term and scope.'}
                 </span>
               </div>
             )}

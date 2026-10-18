@@ -1143,6 +1143,18 @@
   text-decoration: none;
 }
 
+/* Shown when the backend sends no skill IDs, so there is nothing to link to. */
+.reports-support-skill-text {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.reports-support-skill-text > span {
+  margin-right: 6px;
+  color: var(--muted);
+  font-weight: 650;
+}
+
 .reports-support-skill:hover {
   color: var(--primary-hover);
 }

@@ -44,98 +44,48 @@ export function getStudentSupportContext(reference, teacherUserId, now = Date.no
   return { year, terms, initialTerm, scopes: [...grouped.values()] }
 }
 
-export async function loadStudentSupportReports(scopes, termPeriodId, fetchReport, isCurrent = () => true) {
-  const results = []
-  // Bound dashboard traffic when a teacher handles many grade/subject combinations.
-  for (let offset = 0; offset < scopes.length && isCurrent(); offset += 3) {
-    const batch = scopes.slice(offset, offset + 3)
-    const settled = await Promise.allSettled(batch.map(async (scope) => {
-      const data = await fetchReport({
-        termPeriodId, gradeLevelId: scope.gradeLevelId, subjectId: scope.subjectId,
-      })
-      if (!['available', 'empty', 'partial'].includes(data?.dataStatus) ||
-          !Array.isArray(data.rootCompetencies) ||
-          !data.rootCompetencies.every((root) => Array.isArray(root?.skills) &&
-            root.skills.every((skill) => Array.isArray(skill?.weakStudents))) ||
-          !sameId(data.scope?.termPeriodId, termPeriodId) ||
-          !sameId(data.scope?.academicYearId, scope.academicYearId) ||
-          !sameId(data.scope?.gradeLevelId, scope.gradeLevelId) ||
-          !sameId(data.scope?.subjectId, scope.subjectId)) {
-        throw new Error('Student-support report data is unavailable for this scope.')
-      }
-      return { scope, data }
-    }))
-    results.push(...settled)
-    if (settled.some((result) => result.status === 'rejected' && result.reason?.isAuthenticationFailure)) break
+// Reads GET /api/v3/reports/students-needing-support. The backend picks the learners (its
+// learning-competency weak-student lists), sorts them weakest first and computes every number;
+// this only checks the shape and keeps the values exactly as sent (a null mastery stays null).
+export function readStudentSupportReport(data, termPeriodId) {
+  if (
+    !data ||
+    !['available', 'empty'].includes(data.dataStatus) ||
+    !Array.isArray(data.students) ||
+    !data.students.every((student) => student && Array.isArray(student.competencies)) ||
+    (termPeriodId != null && !sameId(data.termPeriodId, termPeriodId))
+  ) {
+    throw new Error('Student-support report data is unavailable.')
   }
-  return results
+
+  const rows = data.students.map((student) => ({
+    ...student,
+    studentId: String(student.studentId),
+    competencies: student.competencies.map((competency) => ({
+      ...competency,
+      filters: getCompetencyFilters(data, competency),
+    })),
+  }))
+
+  return {
+    rows,
+    dataStatus: data.dataStatus,
+    termName: data.termName ?? null,
+    generatedAt: data.generatedAt ?? null,
+    warnings: [...new Set((data.warnings ?? []).map((warning) => warning?.message).filter(Boolean))],
+  }
 }
 
-export function summarizeStudentSupport(results) {
-  const students = new Map()
-  const warnings = new Set()
-  let failedScopes = 0
-  let emptyScopes = 0
-  let availableScopes = 0
-  let incomplete = false
-
-  for (const result of results) {
-    if (result.status === 'rejected') {
-      failedScopes += 1
-      continue
-    }
-    const { scope, data } = result.value
-    if (data.dataStatus === 'empty') emptyScopes += 1
-    else availableScopes += 1
-    if (data.dataStatus === 'partial') incomplete = true
-    for (const warning of data.warnings ?? []) {
-      if (warning.message) warnings.add(warning.message)
-    }
-    if (data.dataStatus === 'empty') continue
-    for (const root of data.rootCompetencies) {
-      for (const skill of root.skills ?? []) {
-        for (const student of skill.weakStudents ?? []) {
-          if (!scope.studentIds.has(String(student.studentId))) continue
-          const value = student.masteryPercentage
-          if (value == null || String(value).trim() === '' || typeof value === 'boolean' ||
-              !Number.isFinite(Number(value)) || !skill.skillId || !root.rootTagId) {
-            incomplete = true
-            continue
-          }
-          const concern = {
-            ...student,
-            competencyName: skill.competencyName || 'Competency name unavailable',
-            gradeLevelName: scope.gradeLevelName,
-            subjectName: scope.subjectName,
-            filters: {
-              reportType: 'learning_competency',
-              academicYearId: scope.academicYearId,
-              termPeriodId: data.scope.termPeriodId,
-              gradeLevelId: scope.gradeLevelId,
-              subjectId: scope.subjectId,
-              rootTagId: root.rootTagId,
-              skillId: skill.skillId,
-            },
-          }
-          const id = String(student.studentId)
-          if (!students.has(id)) students.set(id, { studentId: id, concerns: new Map() })
-          const concerns = students.get(id).concerns
-          const key = `${scope.key}:${skill.skillId}`
-          const existing = concerns.get(key)
-          if (!existing || Number(value) < Number(existing.masteryPercentage)) concerns.set(key, concern)
-        }
-      }
-    }
+// A competency can open the Learning Competency report only when the backend sends its IDs.
+function getCompetencyFilters(data, competency) {
+  const { gradeLevelId, subjectId, rootTagId, skillId } = competency
+  if ([gradeLevelId, subjectId, rootTagId, skillId].some((value) => value == null || value === '')) return null
+  return {
+    reportType: 'learning_competency',
+    termPeriodId: data.termPeriodId,
+    gradeLevelId,
+    subjectId,
+    rootTagId,
+    skillId,
   }
-
-  const rows = [...students.values()].map(({ studentId, concerns }) => {
-    const ordered = [...concerns.values()].sort((a, b) =>
-      Number(a.masteryPercentage) - Number(b.masteryPercentage) ||
-      a.competencyName.localeCompare(b.competencyName),
-    )
-    return { ...ordered[0], studentId, concernCount: ordered.length, concerns: ordered }
-  }).sort((a, b) => Number(a.masteryPercentage) - Number(b.masteryPercentage) ||
-    String(a.fullName ?? '').localeCompare(String(b.fullName ?? '')) || a.studentId.localeCompare(b.studentId))
-
-  return { rows, failedScopes, emptyScopes, availableScopes, incomplete, warnings: [...warnings] }
 }
