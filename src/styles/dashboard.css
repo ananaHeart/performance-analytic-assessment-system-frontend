@@ -158,8 +158,7 @@
   font-size: 0.75rem;
 }
 
-.teacher-support-scope label,
-.teacher-dashboard-new-assessment > label {
+.teacher-support-scope label {
   color: var(--ui-foreground);
   font-size: 0.75rem;
   font-weight: 700;
@@ -170,8 +169,7 @@
   margin-left: auto;
 }
 
-.teacher-support-scope select,
-.teacher-dashboard-new-assessment select {
+.teacher-support-scope select {
   width: auto;
   min-width: 0;
   max-width: 100%;
@@ -270,47 +268,6 @@
 
 .teacher-support-warnings p + p {
   margin-top: 4px;
-}
-
-.teacher-dashboard-new-assessment {
-  display: grid;
-  gap: 6px;
-}
-
-.teacher-dashboard-new-assessment > div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.teacher-dashboard-new-assessment select {
-  flex: 1 1 180px;
-  width: 100%;
-}
-
-.teacher-dashboard-new-assessment button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 6px 10px;
-  border: 1px solid var(--ui-primary);
-  border-radius: var(--radius-control);
-  background: var(--ui-primary);
-  color: var(--on-primary);
-  font-size: 0.8rem;
-  font-weight: 700;
-}
-
-.teacher-dashboard-new-assessment button:disabled {
-  border-color: var(--border);
-  background: var(--surface-sunken);
-  color: var(--text-faint);
-  box-shadow: none;
-  opacity: 1;
-  cursor: not-allowed;
-  transform: none;
 }
 
 .principal-dashboard-page .principal-recent-panel {

@@ -4,7 +4,6 @@ import {
   BookOpen,
   ClipboardCheck,
   FilePenLine,
-  Plus,
   RefreshCw,
   UsersRound,
 } from 'lucide-react'
@@ -127,7 +126,6 @@ function TeacherDashboard({ user, token, onNavigate }) {
   const [pageError, setPageError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [supportRefreshKey, setSupportRefreshKey] = useState(0)
-  const [creationAssignmentId, setCreationAssignmentId] = useState('')
 
   const teacherClassGroups = useMemo(() => {
     const groupedAssignments = new Map()
@@ -178,10 +176,6 @@ function TeacherDashboard({ user, token, onNavigate }) {
         .slice(0, 5),
     [assessments],
   )
-
-  const creationAssignment = classAssignments.find((assignment) =>
-    String(assignment.classAssignmentId) === creationAssignmentId,
-  ) ?? (classAssignments.length === 1 ? classAssignments[0] : null)
 
   const loadDashboardData = useCallback(async () => {
     setIsLoading(true)
@@ -379,29 +373,6 @@ function TeacherDashboard({ user, token, onNavigate }) {
         <div className="teacher-dashboard-side-column">
           <TeacherStudentSupport token={token} teacherUserId={user?.userId ?? user?.id}
             refreshKey={supportRefreshKey} onNavigate={onNavigate} />
-          <div className="teacher-dashboard-new-assessment">
-            <label htmlFor="dashboardCreationAssignment">Class / subject</label>
-            <div>
-              <select id="dashboardCreationAssignment" value={creationAssignment?.classAssignmentId ?? ''}
-                disabled={isLoading || !classAssignments.length}
-                onChange={(event) => setCreationAssignmentId(event.target.value)}>
-                <option value="">{isLoading ? 'Loading classes...' : classAssignments.length ? 'Select class / subject' : 'No assigned classes'}</option>
-                {classAssignments.map((assignment) => <option key={assignment.classAssignmentId} value={assignment.classAssignmentId}>
-                  {formatClassName(assignment)} | {assignment.subjectName || 'Subject'}
-                </option>)}
-              </select>
-              <button type="button" disabled={isLoading || !creationAssignment} onClick={() => {
-                if (!creationAssignment) return
-                onNavigate('assessment-setup', {
-                  classId: creationAssignment.classId,
-                  classAssignmentId: creationAssignment.classAssignmentId,
-                  assessmentId: null,
-                })
-              }}>
-                <Plus size={16} aria-hidden="true" /> New assessment
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>

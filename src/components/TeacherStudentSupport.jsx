@@ -3,6 +3,9 @@ import { ArrowRight, RefreshCw } from 'lucide-react'
 import { getLearningCompetencyReportV3, getReportReferenceDataV3 } from '../api/apiV3Client'
 import { getStudentSupportContext, loadStudentSupportReports, summarizeStudentSupport } from '../utils/studentSupport'
 
+// The dashboard card is a short preview; the full list lives in Reports > Students Needing Support.
+const PREVIEW_COUNT = 4
+
 const statusLabel = (value) => String(value ?? '').replaceAll('_', ' ').replace(/^./, (letter) => letter.toUpperCase())
 
 export default function TeacherStudentSupport({ token, teacherUserId, refreshKey, onNavigate }) {
@@ -10,13 +13,11 @@ export default function TeacherStudentSupport({ token, teacherUserId, refreshKey
   const [termId, setTermId] = useState('')
   const [report, setReport] = useState({ status: 'loading' })
   const [retry, setRetry] = useState(0)
-  const [showAll, setShowAll] = useState(false)
 
   useEffect(() => {
     let current = true
     async function load() {
       setFoundation({ status: 'loading' })
-      setShowAll(false)
       try {
         const reference = await getReportReferenceDataV3(token)
         if (!current) return
@@ -55,7 +56,7 @@ export default function TeacherStudentSupport({ token, teacherUserId, refreshKey
   const failed = foundation.status === 'error' || (ready && report.failedScopes === foundation.scopes.length)
   const rows = ready ? report.rows : []
   const partial = ready && (report.failedScopes > 0 || report.incomplete)
-  const visibleRows = showAll ? rows : rows.slice(0, 5)
+  const visibleRows = rows.slice(0, PREVIEW_COUNT)
 
   let emptyMessage = 'No students flagged for support in the available finalized results.'
   if (foundation.status === 'ready' && !foundation.year) emptyMessage = 'No active academic year.'
@@ -68,20 +69,17 @@ export default function TeacherStudentSupport({ token, teacherUserId, refreshKey
     <section className="teacher-dashboard-panel teacher-support-panel" aria-labelledby="studentSupportHeading" aria-busy={loading}>
       <div className="teacher-dashboard-panel-heading">
         <h2 id="studentSupportHeading">Students needing support</h2>
-        {rows.length > 5 && (
-          <button type="button" className="teacher-dashboard-text-action" aria-expanded={showAll}
-            aria-controls="studentSupportList" onClick={() => setShowAll((value) => !value)}>
-            {showAll ? 'Show less' : 'View all'}
+        {rows.length > 0 && (
+          <button type="button" className="teacher-dashboard-text-action"
+            onClick={() => onNavigate('reports', { reportType: 'students_needing_support', termPeriodId: termId })}>
+            View all
           </button>
         )}
       </div>
       {foundation.status === 'ready' && foundation.terms.length > 0 && (
         <div className="teacher-support-scope">
           <label htmlFor="studentSupportTerm">Term</label>
-          <select id="studentSupportTerm" value={termId} onChange={(event) => {
-            setTermId(event.target.value)
-            setShowAll(false)
-          }}>
+          <select id="studentSupportTerm" value={termId} onChange={(event) => setTermId(event.target.value)}>
             {foundation.terms.map((term) => <option key={term.termPeriodId} value={term.termPeriodId}>{term.termName}</option>)}
           </select>
           {ready && !failed && report.availableScopes > 0 && <span>{partial ? 'At least ' : ''}{rows.length} {rows.length === 1 ? 'student' : 'students'}</span>}
