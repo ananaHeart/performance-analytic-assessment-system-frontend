@@ -29,6 +29,7 @@ const FAQ = [
   ['"Scanned page does not match the selected assignment."', "You're scanning a sheet from a different assessment. Open the right one first."],
   ["My results aren't on the web yet.", "Open the app while you're online and send your saved results."],
   ['Can I change a result after sending?', 'Not on the phone. Check each sheet before you send it.'],
+  ['Do I lose saved results if I log out?', "No. Results you saved stay on your phone until you send them. Don't uninstall the app, though, because that deletes them."],
   ['Does an absent learner block the assessment?', 'No. They stay "Not checked". The assessment just won\'t show as complete.'],
 ]
 
@@ -216,6 +217,7 @@ function GuidePage({ onNavigate, scrollTarget, isSignedIn }) {
                   one you already took.
                   <ul>
                     <li>For sheets with more than one page, the app asks for each page in turn, for example &quot;Scan page 1 of 2&quot;.</li>
+                    <li>While the app checks the photo, it shows &quot;Reading the answer sheet&quot;. This takes a moment.</li>
                   </ul>
                 </li>
               </ol>
@@ -236,8 +238,9 @@ function GuidePage({ onNavigate, scrollTarget, isSignedIn }) {
                   </ul>
                 </li>
                 <li>
-                  Tap <strong>Accept and Save Result</strong>. It appears once every page is scanned and every written
-                  answer is scored. The result is now saved on your phone.
+                  Tap <strong>Accept and Save Result</strong>. The button turns on once every page is scanned and every
+                  written answer is scored, and the line above it shows how many are left. Your result is then saved on
+                  your phone.
                 </li>
                 <li>
                   Tap <strong>Next Student</strong> and repeat.

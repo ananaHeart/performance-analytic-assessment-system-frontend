@@ -50,7 +50,7 @@ Each card has an icon, a title and one line.
   3. Install the app, log in with the same account, and scan
   4. Send your results, then see the reports here
 - Buttons: **Download APK** (primary), **How to install** (secondary, goes to `#get-app`)
-- Meta line: Android only · {appRelease.minAndroid} · {appRelease.size}. Don't show a version number: every build so far has the same one.
+- Meta line: Android only · {appRelease.minAndroid} · {appRelease.size}. Show "Version {appRelease.version}" when it's set. Version 1.2 (2026-10-18) is the first build with a real version number.
 - QR caption: On a laptop? Scan this with your phone to download the app.
 - Small note: For teachers. Principals use Marka on a computer.
 
@@ -220,13 +220,14 @@ Callout (warning): Print the answer sheet on the paper size it was made for, and
 3. Under **Select test student**, tap a learner. You can search by name.
 4. Tap **Open Camera** to take a photo of the page, or **Choose Photo** to use one you already took.
    - For sheets with more than one page, the app asks for each page in turn, for example "Scan page 1 of 2".
+   - While the app checks the photo, it shows "Reading the answer sheet". This takes a moment.
 
 **Review and save**
 5. On **Review & Verify**:
    - Check the **Objective answers**. Blank and multiple marks are flagged. If an answer was misread, choose **Discard All and Rescan**.
    - Under **Written-response evidence**, score each written answer as right or wrong, with partial points, or with the rubric.
    - The banner shows a preliminary score as you go.
-6. Tap **Accept and Save Result**. It appears once every page is scanned and every written answer is scored. The result is now saved on your phone.
+6. Tap **Accept and Save Result**. The button turns on once every page is scanned and every written answer is scored, and the line above it shows how many are left. Your result is then saved on your phone.
 7. Tap **Next Student** and repeat.
    - Learners who were absent stay "Not checked".
 
@@ -285,6 +286,7 @@ Sign-in sessions end after 8 hours, so you'll need to log in again after that.
 - **"Scanned page does not match the selected assignment."** You're scanning a sheet from a different assessment. Open the right one first.
 - **My results aren't on the web yet.** Open the app while you're online and send your saved results.
 - **Can I change a result after sending?** Not on the phone. Check each sheet before you send it.
+- **Do I lose saved results if I log out?** No. Results you saved stay on your phone until you send them. Don't uninstall the app, though, because that deletes them.
 - **Does an absent learner block the assessment?** No. They stay "Not checked". The assessment just won't show as complete.
 
 ---
