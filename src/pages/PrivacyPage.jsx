@@ -72,8 +72,9 @@ function PrivacyPage({ onNavigate, scrollTarget, isSignedIn }) {
             <li><strong>TiDB Cloud</strong> stores the database, in Singapore.</li>
             <li><strong>Brevo</strong> delivers verification emails. It receives your email address and the code.</li>
             <li>
-              <strong>PhilSMS</strong>, a Philippine SMS gateway, sends SMS verification codes, only if phone
-              verification is turned on. It receives your mobile number and the code.
+              <strong>SMS Gateway for Android</strong> (through the sms-gate.app relay) and the school&apos;s own
+              mobile phone and SIM send SMS verification codes, only for teachers who choose SMS. They receive your
+              mobile number and the one-time code.
             </li>
             <li>
               On teachers&apos; phones, downloaded class data and unsent results are stored in the app, and the
@@ -83,7 +84,7 @@ function PrivacyPage({ onNavigate, scrollTarget, isSignedIn }) {
 
           <h2>How long it&apos;s kept</h2>
           <ul>
-            <li>Teacher sign-ups that are never verified are deleted after 30 days.</li>
+            <li>Teacher sign-ups that aren&apos;t verified by email or SMS are deleted after 30 days.</li>
             <li>Sign-in sessions end after 8 hours.</li>
             <li>
               Other records are kept for the duration of the study. Accounts, classes, and assessments can be

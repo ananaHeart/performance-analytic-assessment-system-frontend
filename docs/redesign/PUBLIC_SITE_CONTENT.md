@@ -87,7 +87,7 @@ Each card has an icon, a title and one line.
 
 ### Security band (one row of small items)
 - Principal approval for every teacher account
-- Email verification
+- Email or SMS verification
 - Optional authenticator app with recovery codes
 - Sign-ins on the phone kept encrypted on the device
 
@@ -168,7 +168,7 @@ Marka has two roles:
 
 **Creating a teacher account:**
 1. Select **Sign up** and fill in your teacher profile.
-2. Verify your email with the code Marka sends you. If your school has turned on phone verification, you'll also get a code by SMS.
+2. At the last step, choose to verify by email or by SMS. Then enter the 6-digit code Marka sends you. If the SMS doesn't arrive, you can resend it or switch to email.
 3. Wait for your principal to approve your account. You'll be able to log in after that.
 
 Callout (info): Sign-ups that aren't verified are removed after 30 days.
@@ -279,7 +279,7 @@ Sign-in sessions end after 8 hours, so you'll need to log in again after that.
 - **My account is still pending.** Your principal needs to approve it first.
 - **The app says "Account not active yet."** Your principal hasn't approved your account yet.
 - **The app says "Teacher accounts only."** You're logging in with a principal account. Use Marka on a computer instead.
-- **I didn't get the verification email.** Check your spam folder. If it still isn't there, ask your principal for help.
+- **I didn't get my verification code.** If you chose SMS, resend the code or switch to email. If you chose email, check your spam folder. If it still doesn't arrive, ask your principal for help.
 - **The app doesn't show my assessment.** Make sure it's activated on the web, then tap the refresh icon in **Classes** while you're online.
 - **"Four registration markers were not found."** Keep the whole page in the photo, flat, with all four corners visible.
 - **"Scanned page does not match the selected assignment."** You're scanning a sheet from a different assessment. Open the right one first.
@@ -377,11 +377,11 @@ To check assessments, compute scores, produce reports for teachers and the princ
 - **Render** hosts Marka's server and website.
 - **TiDB Cloud** stores the database, in Singapore.
 - **Brevo** delivers verification emails. It receives your email address and the code.
-- **PhilSMS**, a Philippine SMS gateway, sends SMS verification codes, only if phone verification is turned on. It receives your mobile number and the code.
+- **SMS Gateway for Android** (through the sms-gate.app relay) and the school's own mobile phone and SIM send SMS verification codes, only for teachers who choose SMS. They receive your mobile number and the one-time code.
 - On teachers' phones, downloaded class data and unsent results are stored in the app, and the sign-in session is kept encrypted.
 
 ### How long it's kept
-- Teacher sign-ups that are never verified are deleted after 30 days.
+- Teacher sign-ups that aren't verified by email or SMS are deleted after 30 days.
 - Sign-in sessions end after 8 hours.
 - Other records are kept for the duration of the study. Accounts, classes, and assessments can be archived or rejected, but aren't permanently deleted from inside the app. To ask for deletion, email us (see Your rights below).
 - The database has a daily backup that's kept for one day.

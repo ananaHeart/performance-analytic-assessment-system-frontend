@@ -23,7 +23,7 @@ const FAQ = [
   ['My account is still pending.', 'Your principal needs to approve it first.'],
   ['The app says "Account not active yet."', "Your principal hasn't approved your account yet."],
   ['The app says "Teacher accounts only."', "You're logging in with a principal account. Use Marka on a computer instead."],
-  ["I didn't get the verification email.", "Check your spam folder. If it still isn't there, ask your principal for help."],
+  ["I didn't get my verification code.", "If you chose SMS, resend the code or switch to email. If you chose email, check your spam folder. If it still doesn't arrive, ask your principal for help."],
   ["The app doesn't show my assessment.", "Make sure it's activated on the web, then tap the refresh icon in Classes while you're online."],
   ['"Four registration markers were not found."', 'Keep the whole page in the photo, flat, with all four corners visible.'],
   ['"Scanned page does not match the selected assignment."', "You're scanning a sheet from a different assessment. Open the right one first."],
@@ -105,8 +105,8 @@ function GuidePage({ onNavigate, scrollTarget, isSignedIn }) {
               <ol>
                 <li>Select <strong>Sign up</strong> and fill in your teacher profile.</li>
                 <li>
-                  Verify your email with the code Marka sends you. If your school has turned on phone verification,
-                  you&apos;ll also get a code by SMS.
+                  At the last step, choose to verify by email or by SMS. Then enter the 6-digit code Marka sends you.
+                  If the SMS doesn&apos;t arrive, you can resend it or switch to email.
                 </li>
                 <li>Wait for your principal to approve your account. You&apos;ll be able to log in after that.</li>
               </ol>

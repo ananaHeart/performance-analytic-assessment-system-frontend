@@ -7,7 +7,6 @@ const PUBLIC_AUTH_PATHS = new Set([
   '/api/v3/auth/register-teacher',
   '/api/v3/auth/verify-teacher-email',
   '/api/v3/auth/resend-teacher-verification',
-  '/api/v3/auth/resend-teacher-contact-verification',
   '/api/v3/auth/login',
   '/api/v3/auth/mfa/login/verify',
 ])
@@ -337,14 +336,6 @@ export async function resendTeacherVerificationV3(verification) {
   const payload = await requestV3('/api/v3/auth/resend-teacher-verification', {
     method: 'POST',
     body: JSON.stringify(verification),
-  })
-  return extractData(payload) ?? null
-}
-
-export async function resendTeacherContactVerificationV3(challengeUuid) {
-  const payload = await requestV3('/api/v3/auth/resend-teacher-contact-verification', {
-    method: 'POST',
-    body: JSON.stringify({ challengeUuid }),
   })
   return extractData(payload) ?? null
 }

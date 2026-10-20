@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react'
-import { ArrowRight, CheckCircle2, MailCheck, MessageCircle, RefreshCw, ShieldCheck } from 'lucide-react'
 import {
-  resendTeacherContactVerificationV3,
-  resendTeacherVerificationV3,
-  verifyTeacherEmailV3,
-} from '../api/apiV3Client'
+  ArrowRight,
+  CheckCircle2,
+  Mail,
+  MailCheck,
+  MessageCircle,
+  RefreshCw,
+  ShieldCheck,
+} from 'lucide-react'
+import { resendTeacherVerificationV3, verifyTeacherEmailV3 } from '../api/apiV3Client'
 import PublicAuthShell from '../components/PublicAuthShell'
 import {
   clearTeacherVerificationSession,
@@ -16,8 +20,8 @@ import {
 const RESEND_COOLDOWN_SECONDS = TEACHER_VERIFICATION_RESEND_COOLDOWN_MS / 1000
 
 const VERIFICATION_ERROR_MESSAGES = {
-  INVALID_VERIFICATION_CODE: 'The verification code is incorrect. Check the email and try again.',
-  VERIFICATION_CODE_EXPIRED: 'The verification code has expired. Request a new code.',
+  INVALID_VERIFICATION_CODE: 'The code is incorrect. Check it and try again.',
+  VERIFICATION_CODE_EXPIRED: 'The code has expired. Request a new code.',
   VERIFICATION_ATTEMPTS_EXCEEDED:
     'Too many incorrect verification attempts. Request a new code before trying again.',
   VERIFICATION_CHALLENGE_LOCKED:
@@ -26,17 +30,14 @@ const VERIFICATION_ERROR_MESSAGES = {
     'This verification request is no longer valid. Return to registration or log in again.',
   VERIFICATION_RESEND_COOLDOWN: 'Please wait one minute before requesting another code.',
   VERIFICATION_DAILY_LIMIT_REACHED:
-    'The daily verification email limit has been reached. Please try again later.',
+    'The daily limit for verification codes has been reached. Please try again later.',
   REGISTRATION_EXPIRED: 'This registration has expired. Please register again.',
-  EMAIL_DELIVERY_FAILED:
-    'The verification email could not be delivered. Please contact the school administrator.',
-  CONTACT_CODE_REQUIRED: 'Enter the code sent to your phone too.',
-  INVALID_CONTACT_CODE: 'The SMS code is incorrect.',
-  CONTACT_CHALLENGE_LOCKED: 'Too many incorrect SMS codes. Tap Resend SMS code.',
-  CONTACT_CODE_EXPIRED: 'The SMS code expired. Tap Resend SMS code.',
-  SMS_RATE_LIMITED: 'Too many SMS codes were requested. Wait a minute, then tap Resend SMS code.',
-  SMS_NOT_AVAILABLE: 'SMS verification is currently unavailable.',
-  CONTACT_ALREADY_VERIFIED: 'Your phone number is already verified.',
+  EMAIL_DELIVERY_FAILED: 'The verification email could not be sent. Tap Resend code to try again.',
+  SMS_DELIVERY_FAILED:
+    'The SMS code could not be sent. Resend it, or send the code by email instead.',
+  SMS_RATE_LIMITED:
+    'Too many SMS codes were requested. Wait a minute and resend, or send the code by email.',
+  SMS_NOT_AVAILABLE: 'SMS verification is not available. Use email instead.',
 }
 
 function getErrorMessage(error, fallback) {
@@ -53,6 +54,9 @@ function getCooldownSeconds(session) {
 }
 
 function getInitialCooldownSeconds(session) {
+  // The backend skips the resend cooldown when the last send failed.
+  if (session?.deliveryStatus === 'failed') return 0
+
   const serverCooldown = getCooldownSeconds(session)
   if (serverCooldown !== null) return serverCooldown
   return session?.challengeUuid
@@ -60,43 +64,39 @@ function getInitialCooldownSeconds(session) {
     : 0
 }
 
-function getContactCooldownSeconds(contactVerification) {
-  if (!contactVerification?.resendAvailableAt) return null
+// Keep the teacher's own email and the new challenge, and drop the other channel's
+// masked destination so the screen never shows a stale address or number.
+function mergeChallenge(session, challenge) {
+  const bySms = challenge?.verificationMethod === 'sms'
 
-  const millisecondsRemaining =
-    new Date(contactVerification.resendAvailableAt).getTime() - Date.now()
-  return Number.isFinite(millisecondsRemaining)
-    ? Math.max(0, Math.ceil(millisecondsRemaining / 1000))
-    : null
-}
-
-function getInitialContactCooldownSeconds(contactVerification) {
-  return getContactCooldownSeconds(contactVerification) ?? 0
+  return storeTeacherVerificationSession({
+    ...session,
+    ...challenge,
+    email: session?.email ?? '',
+    emailMasked: bySms ? '' : challenge?.emailMasked || session?.emailMasked || '',
+    contactMasked: bySms ? challenge?.contactMasked || session?.contactMasked || '' : '',
+  })
 }
 
 function TeacherEmailVerificationPage({ onNavigate }) {
   const [verificationSession, setVerificationSession] = useState(() =>
     readTeacherVerificationSession(),
   )
-  const email = verificationSession?.email ?? ''
   const challengeUuid = verificationSession?.challengeUuid ?? ''
-  const contactVerification = verificationSession?.contactVerification ?? null
-  const showSmsField = Boolean(contactVerification?.required)
+  const isSms = verificationSession?.verificationMethod === 'sms'
+  const destination = isSms
+    ? verificationSession?.contactMasked || 'your mobile number'
+    : verificationSession?.email || verificationSession?.emailMasked || 'your email'
+  const deliveryFailed = verificationSession?.deliveryStatus === 'failed'
   const [otp, setOtp] = useState('')
-  const [smsCode, setSmsCode] = useState('')
-  const [contactAlreadyVerified, setContactAlreadyVerified] = useState(false)
   const [cooldownSeconds, setCooldownSeconds] = useState(
     () => getInitialCooldownSeconds(verificationSession),
-  )
-  const [smsCooldownSeconds, setSmsCooldownSeconds] = useState(
-    () => getInitialContactCooldownSeconds(contactVerification),
   )
   const [verified, setVerified] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [statusMessage, setStatusMessage] = useState('')
   const [isVerifying, setIsVerifying] = useState(false)
-  const [isResending, setIsResending] = useState(false)
-  const [isResendingSms, setIsResendingSms] = useState(false)
+  const [resendingMethod, setResendingMethod] = useState('')
 
   useEffect(() => {
     if (verified || !challengeUuid || cooldownSeconds <= 0) return undefined
@@ -108,22 +108,10 @@ function TeacherEmailVerificationPage({ onNavigate }) {
     return () => window.clearInterval(timer)
   }, [challengeUuid, cooldownSeconds, verified])
 
-  useEffect(() => {
-    if (verified || !showSmsField || smsCooldownSeconds <= 0) return undefined
-
-    const timer = window.setInterval(
-      () => setSmsCooldownSeconds((current) => Math.max(0, current - 1)),
-      1000,
-    )
-    return () => window.clearInterval(timer)
-  }, [showSmsField, smsCooldownSeconds, verified])
-
   const markVerified = () => {
     setVerified(true)
     setErrorMessage('')
-    setStatusMessage(
-      'Email verified successfully. Your account is pending Principal approval.',
-    )
+    setStatusMessage('')
     clearTeacherVerificationSession()
   }
 
@@ -131,11 +119,7 @@ function TeacherEmailVerificationPage({ onNavigate }) {
     event.preventDefault()
 
     if (!/^\d{6}$/.test(otp)) {
-      setErrorMessage('Enter the complete six-digit verification code.')
-      return
-    }
-    if (showSmsField && !/^\d{6}$/.test(smsCode)) {
-      setErrorMessage('Enter the complete six-digit SMS code.')
+      setErrorMessage('Enter the complete 6-digit code.')
       return
     }
 
@@ -144,9 +128,7 @@ function TeacherEmailVerificationPage({ onNavigate }) {
     setStatusMessage('')
 
     try {
-      await verifyTeacherEmailV3(
-        showSmsField ? { challengeUuid, otp, smsCode } : { challengeUuid, otp },
-      )
+      await verifyTeacherEmailV3({ challengeUuid, otp })
       markVerified()
     } catch (error) {
       if (error.code === 'EMAIL_ALREADY_VERIFIED') {
@@ -158,120 +140,100 @@ function TeacherEmailVerificationPage({ onNavigate }) {
         ) {
           setOtp('')
         }
-        if (
-          error.code === 'INVALID_CONTACT_CODE' ||
-          error.code === 'CONTACT_CHALLENGE_LOCKED' ||
-          error.code === 'CONTACT_CODE_EXPIRED'
-        ) {
-          setSmsCode('')
-        }
-        setErrorMessage(getErrorMessage(error, 'Unable to verify the email address.'))
+        setErrorMessage(getErrorMessage(error, 'Unable to verify the code.'))
       }
     } finally {
       setIsVerifying(false)
     }
   }
 
-  const handleResend = async () => {
-    if (cooldownSeconds > 0 || isResending) return
+  // Leaving method empty resends on the same channel; 'email' switches an SMS
+  // registration to email. Every resend returns a new challengeUuid.
+  const handleResend = async (method = '') => {
+    if (cooldownSeconds > 0 || resendingMethod) return
 
-    setIsResending(true)
+    setResendingMethod(method || 'same')
     setErrorMessage('')
     setStatusMessage('')
 
     try {
-      const nextChallenge = await resendTeacherVerificationV3({ challengeUuid })
-      const nextSession = storeTeacherVerificationSession({
-        ...verificationSession,
-        ...nextChallenge,
-        email,
-      })
+      const nextChallenge = await resendTeacherVerificationV3(
+        method ? { challengeUuid, verificationMethod: method } : { challengeUuid },
+      )
+      const nextSession = mergeChallenge(verificationSession, nextChallenge)
       setVerificationSession(nextSession)
       setCooldownSeconds(getInitialCooldownSeconds(nextSession))
       setOtp('')
-      setStatusMessage(`A new six-digit verification code was sent to ${email}.`)
+      setStatusMessage(
+        nextSession?.verificationMethod === 'sms'
+          ? `A new 6-digit code was sent to ${nextSession.contactMasked || 'your mobile number'}.`
+          : `A new 6-digit code was sent to ${
+              nextSession?.email || nextSession?.emailMasked || 'your email'
+            }.`,
+      )
     } catch (error) {
       if (error.code === 'EMAIL_ALREADY_VERIFIED') {
         markVerified()
-      } else {
-        if (error.code === 'VERIFICATION_RESEND_COOLDOWN') {
-          setCooldownSeconds(
-            getCooldownSeconds(verificationSession) ?? RESEND_COOLDOWN_SECONDS,
-          )
-        }
-
-        setErrorMessage(getErrorMessage(error, 'Unable to resend the verification code.'))
+        return
       }
-    } finally {
-      setIsResending(false)
-    }
-  }
 
-  const handleResendSms = async () => {
-    if (smsCooldownSeconds > 0 || isResendingSms) return
-
-    setIsResendingSms(true)
-    setErrorMessage('')
-    setStatusMessage('')
-
-    try {
-      const nextContact = await resendTeacherContactVerificationV3(challengeUuid)
-      const nextSession = storeTeacherVerificationSession({
-        ...verificationSession,
-        contactVerification: nextContact,
-      })
-      setVerificationSession(nextSession)
-      setSmsCooldownSeconds(getInitialContactCooldownSeconds(nextSession?.contactVerification))
-      setSmsCode('')
-      setStatusMessage('A new SMS code was requested.')
-    } catch (error) {
-      if (error.code === 'SMS_NOT_AVAILABLE') {
-        setVerificationSession(
-          storeTeacherVerificationSession({
-            ...verificationSession,
-            contactVerification: { ...contactVerification, required: false },
-          }),
+      if (error.errors?.challengeUuid) {
+        // The send failed after a new challenge was created; keep it so the teacher
+        // can resend or switch to email without the old, cancelled challenge.
+        const nextSession = mergeChallenge(verificationSession, error.errors)
+        setVerificationSession(nextSession)
+        setCooldownSeconds(getInitialCooldownSeconds(nextSession))
+        setOtp('')
+      } else if (error.code === 'VERIFICATION_RESEND_COOLDOWN') {
+        setCooldownSeconds(
+          getCooldownSeconds(error.errors) ??
+            getCooldownSeconds(verificationSession) ??
+            RESEND_COOLDOWN_SECONDS,
         )
-      } else if (error.code === 'CONTACT_ALREADY_VERIFIED') {
-        setContactAlreadyVerified(true)
-      } else if (
-        error.code === 'SMS_RATE_LIMITED' ||
-        error.code === 'VERIFICATION_RESEND_COOLDOWN'
-      ) {
-        setSmsCooldownSeconds(getContactCooldownSeconds(contactVerification) ?? RESEND_COOLDOWN_SECONDS)
       }
 
-      setErrorMessage(getErrorMessage(error, 'Unable to resend the SMS code.'))
+      setErrorMessage(getErrorMessage(error, 'Unable to resend the code.'))
     } finally {
-      setIsResendingSms(false)
+      setResendingMethod('')
     }
   }
+
+  const resendLabel = (label) =>
+    cooldownSeconds > 0 ? `${label} in ${cooldownSeconds}s` : label
 
   return (
     <PublicAuthShell
       variant="verification"
-      eyebrow="Teacher email verification"
-      title="Verify your email."
-      description="Confirm the registered email before the school reviews the teacher account."
+      eyebrow="Teacher verification"
+      title={isSms ? 'Verify your number.' : 'Verify your email.'}
+      description="Enter the code Marka sent before the school reviews the teacher account."
       trustMessage="Verification does not sign you in. Principal approval is still required."
       onNavigate={onNavigate}
     >
       <div className="public-auth-form-content teacher-email-verification-content">
         <div className="public-auth-form-heading teacher-email-verification-heading">
-          <p>Email verification</p>
-          <h1>{verified ? 'Email confirmed' : 'Check your inbox'}</h1>
+          <p>{isSms ? 'SMS verification' : 'Email verification'}</p>
+          <h1>
+            {verified
+              ? isSms
+                ? 'Number confirmed'
+                : 'Email confirmed'
+              : isSms
+                ? 'Check your messages'
+                : 'Check your inbox'}
+          </h1>
           <span>
             {verified
-              ? 'Your email is verified. The school must approve the account before you can log in.'
-              : 'Enter the six-digit code sent after teacher registration.'}
+              ? 'The school must approve the account before you can log in.'
+              : 'Enter the 6-digit code to finish your registration.'}
           </span>
         </div>
 
-        {!email || !challengeUuid ? (
+        {!challengeUuid ? (
           <div className="teacher-email-verification-card">
             <p className="public-auth-message is-error" role="alert">
-              No active email verification request is available. Please complete registration
-              again or log in to resume verification.
+              No active verification request is available. Please complete registration again or
+              log in to resume verification.
             </p>
             <button
               type="button"
@@ -293,11 +255,11 @@ function TeacherEmailVerificationPage({ onNavigate }) {
               <CheckCircle2 size={28} strokeWidth={2.2} />
             </span>
             <div>
-              <strong>Email verified</strong>
-              <span>{email}</span>
+              <strong>{isSms ? 'Number verified' : 'Email verified'}</strong>
+              <span>{destination}</span>
             </div>
             <p className="public-auth-message is-success" role="status">
-              Email verified successfully.
+              {isSms ? 'Number verified successfully.' : 'Email verified successfully.'}
               <br />
               Your account is pending Principal approval.
             </p>
@@ -313,16 +275,22 @@ function TeacherEmailVerificationPage({ onNavigate }) {
           <form className="teacher-email-verification-card" onSubmit={handleVerify}>
             <div className="teacher-email-verification-address">
               <span aria-hidden="true">
-                <MailCheck size={20} strokeWidth={2.2} />
+                {isSms ? (
+                  <MessageCircle size={20} strokeWidth={2.2} />
+                ) : (
+                  <MailCheck size={20} strokeWidth={2.2} />
+                )}
               </span>
               <div>
-                <small>Verification code sent to</small>
-                <strong>{email}</strong>
+                <small>
+                  {deliveryFailed ? "We couldn't send the code to" : 'We sent a 6-digit code to'}
+                </small>
+                <strong>{destination}</strong>
               </div>
             </div>
 
             <label className="public-auth-field teacher-email-otp-field" htmlFor="teacher-email-otp">
-              <span>Six-digit verification code</span>
+              <span>6-digit code</span>
               <input
                 id="teacher-email-otp"
                 type="text"
@@ -341,34 +309,11 @@ function TeacherEmailVerificationPage({ onNavigate }) {
               />
             </label>
 
-            {showSmsField ? (
-              <label className="public-auth-field teacher-email-otp-field" htmlFor="teacher-email-sms">
-                <span>We also sent a code to {contactVerification?.contactMasked || 'your phone'}</span>
-                <input
-                  id="teacher-email-sms"
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  pattern="[0-9]{6}"
-                  maxLength="6"
-                  value={smsCode}
-                  onChange={(event) => {
-                    setSmsCode(event.target.value.replace(/\D/g, '').slice(0, 6))
-                    setErrorMessage('')
-                  }}
-                  placeholder="000000"
-                  aria-invalid={Boolean(errorMessage)}
-                />
-              </label>
-            ) : null}
-            {!showSmsField && contactVerification?.deliveryStatus === 'failed' ? (
+            {deliveryFailed && !errorMessage ? (
               <p className="public-auth-account-note">
-                SMS couldn't be sent; your email code is enough.
-              </p>
-            ) : null}
-            {showSmsField && contactVerification?.deliveryStatus === 'rate_limited' ? (
-              <p className="public-auth-account-note">
-                The SMS couldn&apos;t be sent right now. Wait a minute, then tap Resend SMS code.
+                {isSms
+                  ? "The SMS code couldn't be sent. Resend it, or send the code by email instead."
+                  : "The verification email couldn't be sent. Tap Resend code to try again."}
               </p>
             ) : null}
 
@@ -386,42 +331,36 @@ function TeacherEmailVerificationPage({ onNavigate }) {
             <button
               type="submit"
               className="public-auth-submit"
-              disabled={isVerifying || otp.length !== 6 || (showSmsField && smsCode.length !== 6)}
+              disabled={isVerifying || otp.length !== 6}
             >
               <ShieldCheck size={18} strokeWidth={2.2} aria-hidden="true" />
-              {isVerifying ? 'Verifying...' : 'Verify email'}
+              {isVerifying ? 'Verifying...' : 'Verify'}
             </button>
 
             <div className="teacher-email-verification-resend">
               <span>Did not receive the code?</span>
               <button
                 type="button"
-                onClick={handleResend}
-                disabled={cooldownSeconds > 0 || isResending}
+                onClick={() => handleResend()}
+                disabled={cooldownSeconds > 0 || Boolean(resendingMethod)}
               >
                 <RefreshCw size={15} strokeWidth={2.2} aria-hidden="true" />
-                {isResending
-                  ? 'Sending...'
-                  : cooldownSeconds > 0
-                    ? `Resend in ${cooldownSeconds}s`
-                    : 'Resend code'}
+                {resendingMethod === 'same' ? 'Sending...' : resendLabel('Resend code')}
               </button>
             </div>
 
-            {showSmsField && !contactAlreadyVerified ? (
+            {isSms ? (
               <div className="teacher-email-verification-resend">
-                <span>Did not receive the SMS?</span>
+                <span>No SMS?</span>
                 <button
                   type="button"
-                  onClick={handleResendSms}
-                  disabled={smsCooldownSeconds > 0 || isResendingSms}
+                  onClick={() => handleResend('email')}
+                  disabled={cooldownSeconds > 0 || Boolean(resendingMethod)}
                 >
-                  <MessageCircle size={15} strokeWidth={2.2} aria-hidden="true" />
-                  {isResendingSms
+                  <Mail size={15} strokeWidth={2.2} aria-hidden="true" />
+                  {resendingMethod === 'email'
                     ? 'Sending...'
-                    : smsCooldownSeconds > 0
-                      ? `Resend in ${smsCooldownSeconds}s`
-                      : 'Resend SMS code'}
+                    : resendLabel('Send code by email instead')}
                 </button>
               </div>
             ) : null}

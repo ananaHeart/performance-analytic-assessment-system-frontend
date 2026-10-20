@@ -2,18 +2,6 @@ const TEACHER_VERIFICATION_SESSION_KEY = 'teacher-email-verification'
 
 export const TEACHER_VERIFICATION_RESEND_COOLDOWN_MS = 60_000
 
-function normalizeContactVerification(value) {
-  if (!value || typeof value !== 'object') return null
-
-  return {
-    required: Boolean(value.required),
-    contactMasked: typeof value.contactMasked === 'string' ? value.contactMasked : '',
-    deliveryStatus: typeof value.deliveryStatus === 'string' ? value.deliveryStatus : '',
-    codeExpiresAt: typeof value.codeExpiresAt === 'string' ? value.codeExpiresAt : '',
-    resendAvailableAt: typeof value.resendAvailableAt === 'string' ? value.resendAvailableAt : '',
-  }
-}
-
 function normalizeVerificationSession(value) {
   if (!value || typeof value !== 'object') return null
 
@@ -26,9 +14,9 @@ function normalizeVerificationSession(value) {
   return {
     email,
     emailMasked: typeof value.emailMasked === 'string' ? value.emailMasked : '',
+    contactMasked: typeof value.contactMasked === 'string' ? value.contactMasked : '',
     challengeUuid,
-    verificationMethod:
-      typeof value.verificationMethod === 'string' ? value.verificationMethod : 'email',
+    verificationMethod: value.verificationMethod === 'sms' ? 'sms' : 'email',
     deliveryStatus: typeof value.deliveryStatus === 'string' ? value.deliveryStatus : '',
     otpExpiresAt: typeof value.otpExpiresAt === 'string' ? value.otpExpiresAt : '',
     resendAvailableAt:
@@ -37,7 +25,6 @@ function normalizeVerificationSession(value) {
       typeof value.registrationExpiresAt === 'string' ? value.registrationExpiresAt : '',
     resendCooldownSeconds: Number(value.resendCooldownSeconds) || 60,
     maximumAttempts: Number(value.maximumAttempts) || 5,
-    contactVerification: normalizeContactVerification(value.contactVerification),
   }
 }
 

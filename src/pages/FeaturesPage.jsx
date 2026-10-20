@@ -66,7 +66,7 @@ const PRINCIPAL_FEATURES = [
 
 const SECURITY_ITEMS = [
   { icon: UserRoundCheck, label: 'Principal approval for every teacher account' },
-  { icon: MailCheck, label: 'Email verification' },
+  { icon: MailCheck, label: 'Email or SMS verification' },
   { icon: KeyRound, label: 'Optional authenticator app with recovery codes' },
   { icon: Lock, label: 'Sign-ins on the phone kept encrypted on the device' },
 ]

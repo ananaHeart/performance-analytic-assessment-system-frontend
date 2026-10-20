@@ -830,8 +830,7 @@ function TeacherSignUpPage({ onNavigate }) {
     setRequestError('')
     setSuccessMessage('')
 
-    try {
-      const verification = await registerTeacherV3(payload)
+    const continueToVerification = (verification) => {
       storeTeacherVerificationSession({
         email: payload.email,
         ...verification,
@@ -840,7 +839,32 @@ function TeacherSignUpPage({ onNavigate }) {
         maximumAttempts: referenceData.verificationPolicy?.maximumAttempts ?? 5,
       })
       onNavigate('verify-email')
+    }
+
+    try {
+      continueToVerification(await registerTeacherV3(payload))
     } catch (error) {
+      // The account exists even when the code could not be sent, so continue to the
+      // verify screen, where the teacher can resend or switch to email.
+      if (error.errors?.accountCreated === true && error.errors?.challengeUuid) {
+        continueToVerification(error.errors)
+        return
+      }
+
+      if (
+        payload.verificationMethod === 'sms' &&
+        typeof error.errors?.verificationMethod === 'string'
+      ) {
+        const unavailableReason = error.errors.verificationMethod
+        setReferenceData((current) => ({
+          ...current,
+          verificationMethods: current.verificationMethods.map((method) =>
+            method.method === 'sms' ? { ...method, available: false, unavailableReason } : method,
+          ),
+        }))
+        setForm((current) => ({ ...current, verificationMethod: '' }))
+      }
+
       const backendFieldErrors = normalizeRegistrationConflict(
         error,
         normalizeBackendFieldErrors(error),
@@ -1492,6 +1516,9 @@ function TeacherSignUpPage({ onNavigate }) {
                           <span className="teacher-verification-method-copy">
                             <strong>{method.label || method.displayName || methodName}</strong>
                             {methodName === 'email' ? <small>{form.email}</small> : null}
+                            {methodName === 'sms' && isAvailable ? (
+                              <small>{form.contactNumber}</small>
+                            ) : null}
                             {!isAvailable ? (
                               <small className="is-unavailable-reason">
                                 {method.unavailableReason || 'This method is not available.'}
