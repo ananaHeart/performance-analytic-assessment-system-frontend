@@ -34,7 +34,7 @@ const VERIFICATION_ERROR_MESSAGES = {
   INVALID_CONTACT_CODE: 'The SMS code is incorrect.',
   CONTACT_CHALLENGE_LOCKED: 'Too many incorrect SMS codes. Tap Resend SMS code.',
   CONTACT_CODE_EXPIRED: 'The SMS code expired. Tap Resend SMS code.',
-  SMS_RATE_LIMITED: 'Too many SMS codes requested. Use the last code or try again in 10 minutes.',
+  SMS_RATE_LIMITED: 'Too many SMS codes were requested. Wait a minute, then tap Resend SMS code.',
   SMS_NOT_AVAILABLE: 'SMS verification is currently unavailable.',
   CONTACT_ALREADY_VERIFIED: 'Your phone number is already verified.',
 }
@@ -367,7 +367,9 @@ function TeacherEmailVerificationPage({ onNavigate }) {
               </p>
             ) : null}
             {showSmsField && contactVerification?.deliveryStatus === 'rate_limited' ? (
-              <p className="public-auth-account-note">Use the last SMS code you received.</p>
+              <p className="public-auth-account-note">
+                The SMS couldn&apos;t be sent right now. Wait a minute, then tap Resend SMS code.
+              </p>
             ) : null}
 
             {errorMessage ? (

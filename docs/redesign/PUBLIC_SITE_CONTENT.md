@@ -337,7 +337,7 @@ We thank the principal and teachers of San Roque National High School for their 
 Note for Heart: the facts below were checked against the backend code on 2026-10-17. Have your adviser review this page before it goes live. It isn't legal advice.
 
 - Heading: Privacy notice
-- Last updated: October 17, 2026
+- Last updated: October 20, 2026
 
 ### Intro
 Marka is a research system developed for a capstone study at Holy Trinity College of General Santos City. This notice explains what personal data Marka handles, why, and how it's protected, in line with the Data Privacy Act of 2012 (Republic Act No. 10173).
@@ -377,7 +377,7 @@ To check assessments, compute scores, produce reports for teachers and the princ
 - **Render** hosts Marka's server and website.
 - **TiDB Cloud** stores the database, in Singapore.
 - **Brevo** delivers verification emails. It receives your email address and the code.
-- **Twilio** sends SMS verification codes, only if phone verification is turned on. It receives your mobile number.
+- **PhilSMS**, a Philippine SMS gateway, sends SMS verification codes, only if phone verification is turned on. It receives your mobile number and the code.
 - On teachers' phones, downloaded class data and unsent results are stored in the app, and the sign-in session is kept encrypted.
 
 ### How long it's kept

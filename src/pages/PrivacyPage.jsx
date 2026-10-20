@@ -7,7 +7,7 @@ function PrivacyPage({ onNavigate, scrollTarget, isSignedIn }) {
       <div className="public-content">
         <article className="site-card public-privacy">
           <h1>Privacy notice</h1>
-          <p className="public-updated">Last updated: October 17, 2026</p>
+          <p className="public-updated">Last updated: October 20, 2026</p>
 
           <p>
             Marka is a research system developed for a capstone study at {SCHOOL_NAME}. This notice explains what
@@ -72,8 +72,8 @@ function PrivacyPage({ onNavigate, scrollTarget, isSignedIn }) {
             <li><strong>TiDB Cloud</strong> stores the database, in Singapore.</li>
             <li><strong>Brevo</strong> delivers verification emails. It receives your email address and the code.</li>
             <li>
-              <strong>Twilio</strong> sends SMS verification codes, only if phone verification is turned on. It
-              receives your mobile number.
+              <strong>PhilSMS</strong>, a Philippine SMS gateway, sends SMS verification codes, only if phone
+              verification is turned on. It receives your mobile number and the code.
             </li>
             <li>
               On teachers&apos; phones, downloaded class data and unsent results are stored in the app, and the
