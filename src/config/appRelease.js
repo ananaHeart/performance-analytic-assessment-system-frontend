@@ -3,7 +3,7 @@ export const APP_RELEASE = {
   // Google Drive share link (Heart, 2026-10-18: Marka-2026-10-18-v1.2-redesign-only.apk).
   // It may change after today's rebuild; then update this line or set VITE_APK_URL.
   url: import.meta.env.VITE_APK_URL ||
-    'https://drive.google.com/file/d/12E6-3wK3FA9KDm3FufymM0rWNOdcKRJ2/view?usp=sharing',
+    'https://drive.google.com/file/d/1NifvJXIJPngq1p7xTB5S4HrFfF0LwM_A/view?usp=sharing',
   version: '1.2', // v1.2 (versionCode 3) is the first build with a real versionName; shown as "Version 1.2"
   size: 'about 33 MB', // Drive shows 33M for the 2026-10-18 build; update after each rebuild
   minAndroid: 'Android 7.0 or later', // minSdk 24
