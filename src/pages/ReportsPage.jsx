@@ -540,7 +540,9 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const scopedAssignments = useMemo(() => {
-    if (effectiveRole === 'principal') return sourceData.classAssignments
+    if (effectiveRole === 'principal') {
+      return sourceData.classAssignments.filter(isActiveClassAssignment)
+    }
     if (effectiveRole !== 'teacher' || !hasId(currentTeacherUserId)) return []
 
     return sourceData.classAssignments.filter(

@@ -11,14 +11,55 @@ import {
   X,
 } from 'lucide-react'
 import MfaSecurityPanel from '../components/MfaSecurityPanel'
+import AccountProfilePanel from '../components/AccountProfilePanel'
+import AccountPasswordPanel from '../components/AccountPasswordPanel'
+import AccountVerificationPanel from '../components/AccountVerificationPanel'
+import AccountContactChangePanel from '../components/AccountContactChangePanel'
 import { formatAcademicYearDate, formatTermDate, isThreeTermCalendar } from '../utils/academicCalendar'
 import {
+  archiveAcademicYearV3,
   getClassAssignmentsV3,
   getAcademicYearsV3,
+  getAcademicYearArchiveEligibilityV3,
   getSchoolProfileV3,
   reactivateClassAssignmentV3,
   updateSchoolProfileV3,
+  updateTermPeriodDatesV3,
 } from '../api/apiV3Client'
+
+const ADDRESS_API_BASE_URL = 'https://psgc.gitlab.io/api'
+
+async function fetchAddressOptions(path) {
+  const response = await fetch(`${ADDRESS_API_BASE_URL}${path}`)
+  if (!response.ok) throw new Error('Unable to load Philippine address options.')
+  const records = await response.json()
+  return Array.isArray(records)
+    ? records.map((record) => ({ code: record.code ?? '', name: record.name ?? '' }))
+    : []
+}
+
+function toManilaDateTimeInput(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date)
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+  return `${values.year}-${values.month}-${values.day}T${values.hour}:${values.minute}`
+}
+
+function manilaDateTimeToIso(value) {
+  if (!value) return ''
+  const date = new Date(`${value}:00+08:00`)
+  return Number.isNaN(date.getTime()) ? '' : date.toISOString()
+}
 
 function isArchivedAssignment(assignment) {
   return String(assignment?.status ?? '').trim().toLowerCase() === 'archived'
@@ -59,12 +100,20 @@ function createSchoolProfileDraft(profile = {}) {
     schoolName: profile.schoolName ?? '',
     contactNumber: profile.contactNumber ?? '',
     email: profile.email ?? '',
+    regionCode: profile.address?.regionCode ?? '',
+    regionName: profile.address?.regionName ?? '',
+    provinceCode: profile.address?.provinceCode ?? '',
+    provinceName: profile.address?.provinceName ?? '',
+    cityMunicipalityCode: profile.address?.cityMunicipalityCode ?? '',
+    cityMunicipalityName: profile.address?.cityMunicipalityName ?? '',
+    barangayCode: profile.address?.barangayCode ?? '',
+    barangayName: profile.address?.barangayName ?? '',
     addressLine: profile.address?.addressLine ?? '',
     postalCode: profile.address?.postalCode ?? '',
   }
 }
 
-function PrincipalSettingsPage({ user, token, scrollTarget = null }) {
+function PrincipalSettingsPage({ user, token, scrollTarget = null, onAccountUpdated }) {
   const displayName =
     user.name || [user.firstName, user.middleName, user.lastName].filter(Boolean).join(' ')
   const [archivedAssignments, setArchivedAssignments] = useState([])
@@ -73,12 +122,31 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null }) {
     createSchoolProfileDraft(),
   )
   const [schoolProfileError, setSchoolProfileError] = useState('')
+  const [schoolProfileFieldErrors, setSchoolProfileFieldErrors] = useState({})
   const [schoolProfileSuccess, setSchoolProfileSuccess] = useState('')
   const [isEditingSchoolProfile, setIsEditingSchoolProfile] = useState(false)
   const [isSavingSchoolProfile, setIsSavingSchoolProfile] = useState(false)
+  const [schoolAddressOptions, setSchoolAddressOptions] = useState({
+    regions: [], provinces: [], cities: [], barangays: [],
+  })
+  const [schoolAddressLoading, setSchoolAddressLoading] = useState('')
+  const [schoolAddressError, setSchoolAddressError] = useState('')
   const [academicYears, setAcademicYears] = useState([])
+  const [academicCalendarView, setAcademicCalendarView] = useState('current')
   const [academicCalendarError, setAcademicCalendarError] = useState('')
   const [isLoadingAcademicCalendar, setIsLoadingAcademicCalendar] = useState(true)
+  const [editingTerm, setEditingTerm] = useState(null)
+  const [termDraft, setTermDraft] = useState({ startAt: '', endAt: '', reason: '' })
+  const [termEditError, setTermEditError] = useState('')
+  const [termEditSuccess, setTermEditSuccess] = useState('')
+  const [isSavingTerm, setIsSavingTerm] = useState(false)
+  const [archiveEligibility, setArchiveEligibility] = useState({})
+  const [checkingArchiveYearId, setCheckingArchiveYearId] = useState('')
+  const [archiveYearPending, setArchiveYearPending] = useState(null)
+  const [archiveYearReason, setArchiveYearReason] = useState('')
+  const [archiveYearError, setArchiveYearError] = useState('')
+  const [archiveYearSuccess, setArchiveYearSuccess] = useState('')
+  const [isArchivingYear, setIsArchivingYear] = useState(false)
   const [selectedArchiveYearId, setSelectedArchiveYearId] = useState('')
   const [isLoadingArchive, setIsLoadingArchive] = useState(true)
   const [archiveError, setArchiveError] = useState('')
@@ -115,7 +183,7 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null }) {
     setArchiveError('')
 
     try {
-      const assignments = await getClassAssignmentsV3(token)
+      const assignments = await getClassAssignmentsV3(token, '', 'archived')
       setArchivedAssignments(assignments.filter(isArchivedAssignment))
     } catch (loadError) {
       setArchivedAssignments([])
@@ -149,7 +217,7 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null }) {
     setAcademicCalendarError('')
 
     try {
-      const records = await getAcademicYearsV3(token)
+      const records = await getAcademicYearsV3(token, academicCalendarView)
       setAcademicYears(records)
     } catch (loadError) {
       setAcademicYears([])
@@ -162,18 +230,273 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null }) {
     } finally {
       setIsLoadingAcademicCalendar(false)
     }
-  }, [token])
+  }, [academicCalendarView, token])
+
+  const checkAcademicYearArchive = async (academicYear) => {
+    const academicYearId = academicYear.academicYearId ?? academicYear.yearId
+    if (!academicYearId) return
+
+    setCheckingArchiveYearId(String(academicYearId))
+    setArchiveEligibility((current) => ({
+      ...current,
+      [academicYearId]: null,
+    }))
+
+    try {
+      const eligibility = await getAcademicYearArchiveEligibilityV3(academicYearId, token)
+      setArchiveEligibility((current) => ({
+        ...current,
+        [academicYearId]: eligibility,
+      }))
+    } catch (checkError) {
+      if (!checkError.isAuthenticationFailure) {
+        setArchiveEligibility((current) => ({
+          ...current,
+          [academicYearId]: {
+            canArchive: false,
+            reasons: [checkError.message || 'Unable to check archive readiness.'],
+            checkFailed: true,
+          },
+        }))
+      }
+    } finally {
+      setCheckingArchiveYearId('')
+    }
+  }
+
+  const openAcademicYearArchive = (academicYear, eligibility) => {
+    if (!eligibility?.canArchive) return
+    setArchiveYearPending(academicYear)
+    setArchiveYearReason('')
+    setArchiveYearError('')
+  }
+
+  const closeAcademicYearArchive = () => {
+    if (isArchivingYear) return
+    setArchiveYearPending(null)
+    setArchiveYearReason('')
+    setArchiveYearError('')
+  }
+
+  const confirmAcademicYearArchive = async (event) => {
+    event.preventDefault()
+    const academicYearId = archiveYearPending?.academicYearId ?? archiveYearPending?.yearId
+    const reason = archiveYearReason.trim()
+    if (!academicYearId || reason.length < 5 || reason.length > 255) {
+      setArchiveYearError('Enter a reason between 5 and 255 characters.')
+      return
+    }
+
+    setIsArchivingYear(true)
+    setArchiveYearError('')
+    try {
+      await archiveAcademicYearV3(academicYearId, reason, token)
+      const yearName = archiveYearPending.yearName || 'School year'
+      setArchiveYearPending(null)
+      setArchiveYearReason('')
+      setArchiveEligibility({})
+      setArchiveYearSuccess(`${yearName} archived successfully. It is now read-only.`)
+      setAcademicCalendarView('archived')
+    } catch (archiveRequestError) {
+      setArchiveYearError(
+        archiveRequestError.message || 'Unable to archive this school year.',
+      )
+    } finally {
+      setIsArchivingYear(false)
+    }
+  }
 
   const handleSchoolProfileChange = (field, value) => {
     setSchoolProfileDraft((current) => ({ ...current, [field]: value }))
+    setSchoolProfileFieldErrors((current) => {
+      if (!current[field]) return current
+      const next = { ...current }
+      delete next[field]
+      return next
+    })
     setSchoolProfileError('')
     setSchoolProfileSuccess('')
+  }
+
+  const handleSchoolAddressChange = (level, code) => {
+    const optionKey = level === 'cityMunicipality' ? 'cities' : `${level}s`
+    const selected = schoolAddressOptions[optionKey].find((option) => option.code === code)
+    setSchoolAddressLoading(
+      code
+        ? level === 'region'
+          ? 'provinces'
+          : level === 'province'
+            ? 'cities'
+            : level === 'cityMunicipality'
+              ? 'barangays'
+              : ''
+        : '',
+    )
+    setSchoolProfileDraft((current) => {
+      const next = {
+        ...current,
+        [`${level}Code`]: code,
+        [`${level}Name`]: selected?.name ?? '',
+      }
+      if (level === 'region') {
+        Object.assign(next, { provinceCode: '', provinceName: '', cityMunicipalityCode: '', cityMunicipalityName: '', barangayCode: '', barangayName: '' })
+      } else if (level === 'province') {
+        Object.assign(next, { cityMunicipalityCode: '', cityMunicipalityName: '', barangayCode: '', barangayName: '' })
+      } else if (level === 'cityMunicipality') {
+        Object.assign(next, { barangayCode: '', barangayName: '' })
+      }
+      return next
+    })
+    setSchoolAddressOptions((current) => {
+      if (level === 'region') {
+        return { ...current, provinces: [], cities: [], barangays: [] }
+      }
+      if (level === 'province') {
+        return { ...current, cities: [], barangays: [] }
+      }
+      if (level === 'cityMunicipality') {
+        return { ...current, barangays: [] }
+      }
+      return current
+    })
+    setSchoolProfileError('')
+    setSchoolAddressError('')
+  }
+
+  useEffect(() => {
+    if (!isEditingSchoolProfile) return undefined
+    let active = true
+    fetchAddressOptions('/regions/')
+      .then((regions) => active && setSchoolAddressOptions((current) => ({ ...current, regions })))
+      .catch((error) => active && setSchoolAddressError(error.message))
+      .finally(() => active && setSchoolAddressLoading(''))
+    return () => { active = false }
+  }, [isEditingSchoolProfile])
+
+  useEffect(() => {
+    if (!isEditingSchoolProfile || !schoolProfileDraft.regionCode) return undefined
+    let active = true
+    Promise.all([
+      fetchAddressOptions(`/regions/${schoolProfileDraft.regionCode}/provinces/`).catch(() => []),
+      fetchAddressOptions(`/regions/${schoolProfileDraft.regionCode}/cities-municipalities/`).catch(() => []),
+    ]).then(([provinces, cities]) => {
+      if (active) {
+        setSchoolAddressOptions((current) => ({
+          ...current,
+          provinces,
+          cities: provinces.length ? [] : cities,
+          barangays: [],
+        }))
+      }
+    }).catch((error) => active && setSchoolAddressError(error.message))
+      .finally(() => active && setSchoolAddressLoading(''))
+    return () => { active = false }
+  }, [isEditingSchoolProfile, schoolProfileDraft.regionCode])
+
+  useEffect(() => {
+    if (!isEditingSchoolProfile || !schoolProfileDraft.provinceCode) return undefined
+    let active = true
+    fetchAddressOptions(`/provinces/${schoolProfileDraft.provinceCode}/cities-municipalities/`)
+      .then((cities) => active && setSchoolAddressOptions((current) => ({ ...current, cities })))
+      .catch((error) => active && setSchoolAddressError(error.message))
+      .finally(() => active && setSchoolAddressLoading(''))
+    return () => { active = false }
+  }, [isEditingSchoolProfile, schoolProfileDraft.provinceCode])
+
+  useEffect(() => {
+    if (!isEditingSchoolProfile || !schoolProfileDraft.cityMunicipalityCode) return undefined
+    let active = true
+    fetchAddressOptions(`/cities-municipalities/${schoolProfileDraft.cityMunicipalityCode}/barangays/`)
+      .then((barangays) => active && setSchoolAddressOptions((current) => ({ ...current, barangays })))
+      .catch((error) => active && setSchoolAddressError(error.message))
+      .finally(() => active && setSchoolAddressLoading(''))
+    return () => { active = false }
+  }, [isEditingSchoolProfile, schoolProfileDraft.cityMunicipalityCode])
+
+  const openTermEditor = (academicYear, term) => {
+    setEditingTerm({
+      academicYearId: academicYear.academicYearId ?? academicYear.yearId,
+      termPeriodId: term.termPeriodId ?? term.id,
+      termName: term.termName,
+    })
+    setTermDraft({
+      startAt: toManilaDateTimeInput(term.startAt),
+      endAt: toManilaDateTimeInput(term.endAt),
+      reason: '',
+    })
+    setTermEditError('')
+    setTermEditSuccess('')
+  }
+
+  const cancelTermEditor = () => {
+    if (isSavingTerm) return
+    setEditingTerm(null)
+    setTermEditError('')
+  }
+
+  const saveTermDates = async (event) => {
+    event.preventDefault()
+    const startAt = manilaDateTimeToIso(termDraft.startAt)
+    const endAt = manilaDateTimeToIso(termDraft.endAt)
+    const reason = termDraft.reason.trim()
+
+    if (!startAt || !endAt) {
+      setTermEditError('Enter complete start and end dates.')
+      return
+    }
+    if (new Date(startAt) >= new Date(endAt)) {
+      setTermEditError('The end date must be after the start date.')
+      return
+    }
+    if (reason.length < 5 || reason.length > 255) {
+      setTermEditError('Enter a reason between 5 and 255 characters.')
+      return
+    }
+
+    setIsSavingTerm(true)
+    setTermEditError('')
+    setTermEditSuccess('')
+    try {
+      await updateTermPeriodDatesV3(
+        editingTerm.academicYearId,
+        editingTerm.termPeriodId,
+        { startAt, endAt, reason },
+        token,
+      )
+      const updatedTermName = editingTerm.termName
+      setEditingTerm(null)
+      setTermEditSuccess(`${updatedTermName} dates updated successfully.`)
+      await loadAcademicCalendar()
+    } catch (saveError) {
+      const editCount = Number(saveError.errors?.editCount)
+      const maxEdits = Number(saveError.errors?.maxEdits)
+      const editLimitMessage = Number.isFinite(editCount) && Number.isFinite(maxEdits)
+        ? `This term has used ${editCount} of ${maxEdits} allowed date edits. No edits remain.`
+        : 'This term has reached its date-edit limit.'
+      const messages = {
+        TERM_EDIT_LIMIT_REACHED: editLimitMessage,
+        TERM_HAS_ASSESSMENTS_OUTSIDE:
+          'The new dates would leave existing assessments outside the term.',
+        TERM_PERIOD_LOCKED: 'This term period is locked and cannot be edited.',
+        ACADEMIC_YEAR_LOCKED: 'This academic year is locked and cannot be edited.',
+      }
+      const fieldError =
+        saveError.errors?.endAt ||
+        saveError.errors?.startAt ||
+        saveError.errors?.reason
+      setTermEditError(
+        fieldError || messages[saveError.code] || saveError.message || 'Unable to update term dates.',
+      )
+    } finally {
+      setIsSavingTerm(false)
+    }
   }
 
   const cancelSchoolProfileEdit = () => {
     if (isSavingSchoolProfile) return
     setSchoolProfileDraft(createSchoolProfileDraft(schoolProfile))
     setSchoolProfileError('')
+    setSchoolProfileFieldErrors({})
     setIsEditingSchoolProfile(false)
   }
 
@@ -185,18 +508,21 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null }) {
     const email = schoolProfileDraft.email.trim()
     const addressLine = schoolProfileDraft.addressLine.trim()
 
-    if (!schoolName || !addressLine) {
-      setSchoolProfileError('School name and address line are required.')
-      return
-    }
+    const fieldErrors = {}
+    if (!schoolName) fieldErrors.schoolName = 'School name is required.'
+    if (!addressLine) fieldErrors.addressLine = 'Building and street address is required.'
 
     if (contactNumber && !/^(09\d{9}|\+639\d{9})$/.test(contactNumber)) {
-      setSchoolProfileError('Use 09XXXXXXXXX or +639XXXXXXXXX for the contact number.')
-      return
+      fieldErrors.contactNumber = 'Use 09XXXXXXXXX or +639XXXXXXXXX.'
     }
 
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setSchoolProfileError('Enter a complete school email address.')
+      fieldErrors.email = 'Enter a complete school email address.'
+    }
+
+    if (Object.keys(fieldErrors).length) {
+      setSchoolProfileFieldErrors(fieldErrors)
+      setSchoolProfileError('Review the highlighted school profile fields.')
       return
     }
 
@@ -206,14 +532,14 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null }) {
       contactNumber: contactNumber || null,
       email: email || null,
       address: {
-        regionCode: currentAddress.regionCode || null,
-        regionName: currentAddress.regionName || null,
-        provinceCode: currentAddress.provinceCode || null,
-        provinceName: currentAddress.provinceName || null,
-        cityMunicipalityCode: currentAddress.cityMunicipalityCode || null,
-        cityMunicipalityName: currentAddress.cityMunicipalityName || null,
-        barangayCode: currentAddress.barangayCode || null,
-        barangayName: currentAddress.barangayName || null,
+        regionCode: schoolProfileDraft.regionCode || null,
+        regionName: schoolProfileDraft.regionName || null,
+        provinceCode: schoolProfileDraft.provinceCode || null,
+        provinceName: schoolProfileDraft.provinceName || null,
+        cityMunicipalityCode: schoolProfileDraft.cityMunicipalityCode || null,
+        cityMunicipalityName: schoolProfileDraft.cityMunicipalityName || null,
+        barangayCode: schoolProfileDraft.barangayCode || null,
+        barangayName: schoolProfileDraft.barangayName || null,
         addressLine,
         postalCode: schoolProfileDraft.postalCode.trim() || null,
         addressSource: currentAddress.addressSource || 'manual',
@@ -222,6 +548,7 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null }) {
 
     setIsSavingSchoolProfile(true)
     setSchoolProfileError('')
+    setSchoolProfileFieldErrors({})
     setSchoolProfileSuccess('')
 
     try {
@@ -231,19 +558,37 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null }) {
       setIsEditingSchoolProfile(false)
       setSchoolProfileSuccess('School profile updated successfully.')
     } catch (saveError) {
-      setSchoolProfileError(saveError.message || 'Unable to update the school profile.')
+      const fieldAliases = {
+        schoolName: 'schoolName',
+        contactNumber: 'contactNumber',
+        email: 'email',
+        'address.addressLine': 'addressLine',
+        'address.postalCode': 'postalCode',
+      }
+      const backendFieldErrors = Object.entries(saveError.errors ?? {}).reduce(
+        (errors, [key, message]) => {
+          const field = fieldAliases[key]
+          if (field && typeof message === 'string') errors[field] = message
+          return errors
+        },
+        {},
+      )
+      setSchoolProfileFieldErrors(backendFieldErrors)
+      setSchoolProfileError(
+        Object.keys(backendFieldErrors).length
+          ? 'Review the highlighted school profile fields.'
+          : saveError.message || 'Unable to update the school profile.',
+      )
     } finally {
       setIsSavingSchoolProfile(false)
     }
   }
 
-  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     loadArchivedAssignments()
     loadSchoolProfile()
     loadAcademicCalendar()
   }, [loadAcademicCalendar, loadArchivedAssignments, loadSchoolProfile])
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (scrollTarget !== 'academic-calendar') return
@@ -322,6 +667,11 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null }) {
         </div>
       </section>
 
+      <AccountProfilePanel token={token} onAccountUpdated={onAccountUpdated} />
+      <AccountPasswordPanel token={token} />
+      <AccountVerificationPanel token={token} onAccountUpdated={onAccountUpdated} />
+      <AccountContactChangePanel token={token} onAccountUpdated={onAccountUpdated} />
+
       <MfaSecurityPanel token={token} />
 
       <section
@@ -343,7 +693,10 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null }) {
               onClick={() => {
                 setSchoolProfileDraft(createSchoolProfileDraft(schoolProfile))
                 setSchoolProfileError('')
+                setSchoolProfileFieldErrors({})
                 setSchoolProfileSuccess('')
+                setSchoolAddressLoading('regions')
+                setSchoolAddressError('')
                 setIsEditingSchoolProfile(true)
               }}
               disabled={!schoolProfile}
@@ -375,6 +728,7 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null }) {
                 onChange={(event) => handleSchoolProfileChange('schoolName', event.target.value)}
                 required
               />
+              {schoolProfileFieldErrors.schoolName ? <small className="principal-school-profile-field-error">{schoolProfileFieldErrors.schoolName}</small> : null}
             </label>
             <label>
               <span>Contact number</span>
@@ -386,6 +740,7 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null }) {
                   handleSchoolProfileChange('contactNumber', event.target.value)
                 }
               />
+              {schoolProfileFieldErrors.contactNumber ? <small className="principal-school-profile-field-error">{schoolProfileFieldErrors.contactNumber}</small> : null}
             </label>
             <label>
               <span>School email</span>
@@ -395,6 +750,51 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null }) {
                 maxLength="120"
                 onChange={(event) => handleSchoolProfileChange('email', event.target.value)}
               />
+              {schoolProfileFieldErrors.email ? <small className="principal-school-profile-field-error">{schoolProfileFieldErrors.email}</small> : null}
+            </label>
+            <label>
+              <span>Region</span>
+              <select
+                value={schoolProfileDraft.regionCode}
+                onChange={(event) => handleSchoolAddressChange('region', event.target.value)}
+                disabled={schoolAddressLoading === 'regions'}
+              >
+                <option value="">Select region</option>
+                {schoolAddressOptions.regions.map((option) => <option key={option.code} value={option.code}>{option.name}</option>)}
+              </select>
+            </label>
+            <label>
+              <span>Province</span>
+              <select
+                value={schoolProfileDraft.provinceCode}
+                onChange={(event) => handleSchoolAddressChange('province', event.target.value)}
+                disabled={!schoolProfileDraft.regionCode || schoolAddressLoading === 'provinces'}
+              >
+                <option value="">{schoolAddressOptions.provinces.length ? 'Select province' : 'Not applicable'}</option>
+                {schoolAddressOptions.provinces.map((option) => <option key={option.code} value={option.code}>{option.name}</option>)}
+              </select>
+            </label>
+            <label>
+              <span>City / municipality</span>
+              <select
+                value={schoolProfileDraft.cityMunicipalityCode}
+                onChange={(event) => handleSchoolAddressChange('cityMunicipality', event.target.value)}
+                disabled={!schoolProfileDraft.regionCode || schoolAddressLoading === 'cities'}
+              >
+                <option value="">Select city or municipality</option>
+                {schoolAddressOptions.cities.map((option) => <option key={option.code} value={option.code}>{option.name}</option>)}
+              </select>
+            </label>
+            <label>
+              <span>Barangay</span>
+              <select
+                value={schoolProfileDraft.barangayCode}
+                onChange={(event) => handleSchoolAddressChange('barangay', event.target.value)}
+                disabled={!schoolProfileDraft.cityMunicipalityCode || schoolAddressLoading === 'barangays'}
+              >
+                <option value="">Select barangay</option>
+                {schoolAddressOptions.barangays.map((option) => <option key={option.code} value={option.code}>{option.name}</option>)}
+              </select>
             </label>
             <label>
               <span>Postal code</span>
@@ -403,6 +803,7 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null }) {
                 maxLength="10"
                 onChange={(event) => handleSchoolProfileChange('postalCode', event.target.value)}
               />
+              {schoolProfileFieldErrors.postalCode ? <small className="principal-school-profile-field-error">{schoolProfileFieldErrors.postalCode}</small> : null}
             </label>
             <label className="principal-school-profile-address-line">
               <span>Building and street address</span>
@@ -412,17 +813,9 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null }) {
                 onChange={(event) => handleSchoolProfileChange('addressLine', event.target.value)}
                 required
               />
+              {schoolProfileFieldErrors.addressLine ? <small className="principal-school-profile-field-error">{schoolProfileFieldErrors.addressLine}</small> : null}
             </label>
-            <p className="principal-school-profile-location">
-              {[
-                schoolProfile?.address?.barangayName,
-                schoolProfile?.address?.cityMunicipalityName,
-                schoolProfile?.address?.provinceName,
-                schoolProfile?.address?.regionName,
-              ]
-                .filter(Boolean)
-                .join(', ') || 'No saved locality'}
-            </p>
+            {schoolAddressError ? <p className="form-message form-message-error principal-school-profile-location" role="alert">{schoolAddressError}</p> : null}
             <div className="principal-school-profile-actions">
               <button
                 type="button"
@@ -473,20 +866,52 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null }) {
             <p className="content-card-tag">Academic Calendar</p>
             <h3 id="academicCalendarTitle">School year and term periods</h3>
           </div>
-          <button
-            type="button"
-            className="principal-archive-refresh"
-            onClick={loadAcademicCalendar}
-            disabled={isLoadingAcademicCalendar}
-          >
-            <RefreshCw size={16} strokeWidth={2.2} aria-hidden="true" />
-            <span>Refresh</span>
-          </button>
+          <div className="principal-academic-calendar-actions">
+            <div className="principal-academic-calendar-tabs" aria-label="Academic year view">
+              <button
+                type="button"
+                className={academicCalendarView === 'current' ? 'is-active' : ''}
+                aria-pressed={academicCalendarView === 'current'}
+                onClick={() => setAcademicCalendarView('current')}
+              >
+                Current
+              </button>
+              <button
+                type="button"
+                className={academicCalendarView === 'archived' ? 'is-active' : ''}
+                aria-pressed={academicCalendarView === 'archived'}
+                onClick={() => setAcademicCalendarView('archived')}
+              >
+                Archived
+              </button>
+            </div>
+            <button
+              type="button"
+              className="principal-archive-refresh"
+              onClick={loadAcademicCalendar}
+              disabled={isLoadingAcademicCalendar}
+            >
+              <RefreshCw size={16} strokeWidth={2.2} aria-hidden="true" />
+              <span>Refresh</span>
+            </button>
+          </div>
         </header>
 
         {academicCalendarError ? (
           <p className="form-message form-message-error" role="alert">
             {academicCalendarError}
+          </p>
+        ) : null}
+
+        {termEditSuccess ? (
+          <p className="form-message form-message-success" role="status">
+            {termEditSuccess}
+          </p>
+        ) : null}
+
+        {archiveYearSuccess ? (
+          <p className="form-message form-message-success" role="status">
+            {archiveYearSuccess}
           </p>
         ) : null}
 
@@ -499,6 +924,10 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null }) {
                 (left, right) => Number(left.termOrder ?? 0) - Number(right.termOrder ?? 0),
               )
               const threeTermCalendar = isThreeTermCalendar(termPeriods)
+              const academicYearId = academicYear.academicYearId ?? academicYear.yearId
+              const eligibility = archiveEligibility[academicYearId]
+              const isCheckingEligibility =
+                String(checkingArchiveYearId) === String(academicYearId)
 
               return (
                 <article
@@ -520,34 +949,202 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null }) {
                     <span className={`status-pill status-${academicYear.status || 'inactive'}`}>
                       {academicYear.status || 'Status unavailable'}
                     </span>
+                    {academicYear.status === 'completed' ? (
+                      <button
+                        type="button"
+                        className="principal-archive-refresh"
+                        onClick={() => checkAcademicYearArchive(academicYear)}
+                        disabled={isCheckingEligibility}
+                      >
+                        <Archive size={15} aria-hidden="true" />
+                        {isCheckingEligibility ? 'Checking...' : 'Check archive readiness'}
+                      </button>
+                    ) : null}
                   </div>
+
+                  {eligibility ? (
+                    <div
+                      className={`form-message ${
+                        eligibility.canArchive
+                          ? 'form-message-success'
+                          : 'form-message-error'
+                      }`}
+                      role="status"
+                    >
+                      <strong>
+                        {eligibility.canArchive
+                          ? 'Ready to archive.'
+                          : eligibility.checkFailed
+                            ? 'Readiness check failed.'
+                            : 'Not ready to archive.'}
+                      </strong>
+                      {!eligibility.canArchive && eligibility.reasons.length ? (
+                        <span> {eligibility.reasons.join(' ')}</span>
+                      ) : null}
+                      {!eligibility.checkFailed ? (
+                        <dl className="principal-archive-eligibility-details">
+                          <div>
+                            <dt>Ready date</dt>
+                            <dd>{formatAcademicYearDate(eligibility.readyToArchiveOn)}</dd>
+                          </div>
+                          <div>
+                            <dt>Incomplete terms</dt>
+                            <dd>{eligibility.incompleteTermCount}</dd>
+                          </div>
+                          <div>
+                            <dt>Open assessments</dt>
+                            <dd>{eligibility.openAssessmentCount}</dd>
+                          </div>
+                          <div>
+                            <dt>Pending syncs</dt>
+                            <dd>{eligibility.pendingSyncCount}</dd>
+                          </div>
+                          <div>
+                            <dt>Unfinalized results</dt>
+                            <dd>{eligibility.unfinalizedResultCount}</dd>
+                          </div>
+                        </dl>
+                      ) : null}
+                      {eligibility.canArchive ? (
+                        <button
+                          type="button"
+                          className="assignment-delete-confirm"
+                          onClick={() => openAcademicYearArchive(academicYear, eligibility)}
+                        >
+                          <Archive size={15} aria-hidden="true" />
+                          Archive school year
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
 
                   <div
                     className="principal-term-grid"
                     style={{ '--term-count': Math.max(1, termPeriods.length) }}
                   >
-                    {termPeriods.map((term) => (
-                      <div className="principal-term-row" key={term.termPeriodId}>
-                        <span>{term.termOrder}</span>
-                        <div>
-                          <strong>{term.termName}</strong>
-                          <small>
-                            {formatTermDate(term.startAt, { threeTermCalendar })} -{' '}
-                            {formatTermDate(term.endAt, { threeTermCalendar, exclusiveEnd: true })}
-                          </small>
+                    {termPeriods.map((term) => {
+                      const termId = term.termPeriodId ?? term.id
+                      const isEditing =
+                        String(editingTerm?.termPeriodId) === String(termId) &&
+                        String(editingTerm?.academicYearId) === String(academicYearId)
+
+                      return (
+                        <div className="principal-term-item" key={termId}>
+                          <div className="principal-term-row">
+                            <span>{term.termOrder}</span>
+                            <div>
+                              <strong>{term.termName}</strong>
+                              <small>
+                                {formatTermDate(term.startAt, { threeTermCalendar })} -{' '}
+                                {formatTermDate(term.endAt, {
+                                  threeTermCalendar,
+                                  exclusiveEnd: true,
+                                })}
+                              </small>
+                            </div>
+                            <span className={`status-pill status-${term.status || 'inactive'}`}>
+                              {term.status || 'Status unavailable'}
+                            </span>
+                            <button
+                              type="button"
+                              className="principal-term-edit"
+                              onClick={() => openTermEditor(academicYear, term)}
+                              disabled={Boolean(editingTerm) || ['completed', 'archived'].includes(academicYear.status)}
+                              title={`Edit ${term.termName} dates`}
+                              aria-label={`Edit ${term.termName} dates`}
+                            >
+                              <Pencil size={15} aria-hidden="true" />
+                            </button>
+                          </div>
+
+                          {isEditing ? (
+                            <form className="principal-term-edit-form" onSubmit={saveTermDates}>
+                              <label>
+                                <span>Starts (Philippine time)</span>
+                                <input
+                                  type="datetime-local"
+                                  value={termDraft.startAt}
+                                  onChange={(event) => {
+                                    setTermDraft((current) => ({
+                                      ...current,
+                                      startAt: event.target.value,
+                                    }))
+                                    setTermEditError('')
+                                  }}
+                                  required
+                                />
+                              </label>
+                              <label>
+                                <span>Ends (Philippine time)</span>
+                                <input
+                                  type="datetime-local"
+                                  value={termDraft.endAt}
+                                  onChange={(event) => {
+                                    setTermDraft((current) => ({
+                                      ...current,
+                                      endAt: event.target.value,
+                                    }))
+                                    setTermEditError('')
+                                  }}
+                                  required
+                                />
+                              </label>
+                              <label className="principal-term-edit-reason">
+                                <span>Reason</span>
+                                <input
+                                  value={termDraft.reason}
+                                  maxLength={255}
+                                  onChange={(event) => {
+                                    setTermDraft((current) => ({
+                                      ...current,
+                                      reason: event.target.value,
+                                    }))
+                                    setTermEditError('')
+                                  }}
+                                  placeholder="Reason for changing the term dates"
+                                  required
+                                />
+                              </label>
+                              {termEditError ? (
+                                <p className="form-message form-message-error" role="alert">
+                                  {termEditError}
+                                </p>
+                              ) : null}
+                              <div className="principal-term-edit-actions">
+                                <button
+                                  type="button"
+                                  className="secondary-button"
+                                  onClick={cancelTermEditor}
+                                  disabled={isSavingTerm}
+                                >
+                                  <X size={15} aria-hidden="true" />
+                                  Cancel
+                                </button>
+                                <button
+                                  type="submit"
+                                  className="primary-button"
+                                  disabled={isSavingTerm}
+                                >
+                                  <Save size={15} aria-hidden="true" />
+                                  {isSavingTerm ? 'Saving...' : 'Save dates'}
+                                </button>
+                              </div>
+                            </form>
+                          ) : null}
                         </div>
-                        <span className={`status-pill status-${term.status || 'inactive'}`}>
-                          {term.status || 'Status unavailable'}
-                        </span>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </article>
               )
             })}
           </div>
         ) : (
-          <div className="principal-archive-empty">No academic calendar is available.</div>
+          <div className="principal-archive-empty">
+            {academicCalendarView === 'archived'
+              ? 'No archived school years.'
+              : 'No current academic calendar is available.'}
+          </div>
         )}
       </section>
 
@@ -686,6 +1283,98 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null }) {
           <div className="principal-archive-empty">No archived class assignments.</div>
         )}
       </section>
+
+      {archiveYearPending ? (
+        <div
+          className="assignment-delete-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeAcademicYearArchive()
+          }}
+        >
+          <section
+            className="assignment-delete-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="archiveAcademicYearTitle"
+          >
+            <header className="assignment-delete-header">
+              <span className="assignment-delete-warning" aria-hidden="true">
+                <Archive size={21} />
+              </span>
+              <div>
+                <p>Final school-year archive</p>
+                <h3 id="archiveAcademicYearTitle">
+                  Archive {archiveYearPending.yearName || 'this school year'}?
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="assignment-delete-close"
+                onClick={closeAcademicYearArchive}
+                disabled={isArchivingYear}
+                aria-label="Close school-year archive dialog"
+              >
+                <X size={18} aria-hidden="true" />
+              </button>
+            </header>
+            <div className="assignment-delete-body">
+              <p className="assignment-delete-instruction">
+                This action is final. The school year and its records remain available in reports
+                and the Archived tab, but the school year cannot be restored.
+              </p>
+              <form onSubmit={confirmAcademicYearArchive}>
+                <label htmlFor="archiveAcademicYearReason">Reason for archiving</label>
+                <textarea
+                  id="archiveAcademicYearReason"
+                  className="assignment-restore-reason"
+                  value={archiveYearReason}
+                  onChange={(event) => {
+                    setArchiveYearReason(event.target.value)
+                    setArchiveYearError('')
+                  }}
+                  minLength="5"
+                  maxLength="255"
+                  rows="3"
+                  required
+                  disabled={isArchivingYear}
+                  autoFocus
+                />
+                <span className="assignment-restore-reason-count">
+                  {archiveYearReason.length}/255
+                </span>
+                {archiveYearError ? (
+                  <p className="form-message form-message-error" role="alert">
+                    {archiveYearError}
+                  </p>
+                ) : null}
+                <div className="assignment-delete-actions">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={closeAcademicYearArchive}
+                    disabled={isArchivingYear}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="assignment-delete-confirm"
+                    disabled={
+                      isArchivingYear ||
+                      archiveYearReason.trim().length < 5 ||
+                      archiveYearReason.trim().length > 255
+                    }
+                  >
+                    <Archive size={16} aria-hidden="true" />
+                    {isArchivingYear ? 'Archiving...' : 'Archive permanently'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </section>
+        </div>
+      ) : null}
 
       {restorePending ? (
         <div

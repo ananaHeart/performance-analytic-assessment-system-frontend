@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import AppLayout from './components/AppLayout'
 import MarkaMark from './components/MarkaMark'
 import ProtectedRoute from './components/ProtectedRoute'
+import SessionTimeoutGuard from './components/SessionTimeoutGuard'
 import LandingPage from './pages/LandingPage'
 import TechStackPage from './pages/TechStackPage'
 import FeaturesPage from './pages/FeaturesPage'
@@ -13,6 +14,7 @@ import NotFoundPage from './pages/NotFoundPage'
 import LoginPage from './pages/LoginPage'
 import TeacherSignUpPage from './pages/TeacherSignUpPage'
 import TeacherEmailVerificationPage from './pages/TeacherEmailVerificationPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import PrincipalDashboard from './pages/PrincipalDashboard'
 import ClassRecordsPage from './pages/ClassRecordsPage'
 import TeacherDashboard from './pages/TeacherDashboard'
@@ -34,7 +36,7 @@ const TOKEN_STORAGE_KEY = 'assessment-token'
 const AUTH_STORAGE_KEY = 'assessment-auth-session'
 const TEACHER_WORKSPACE_CONTEXT_KEY = 'teacher-workspace-context'
 const DEFAULT_PUBLIC_PAGE = 'home'
-const PUBLIC_AUTH_ENTRY_PAGES = new Set(['login', 'register', 'verify-email'])
+const PUBLIC_AUTH_ENTRY_PAGES = new Set(['login', 'register', 'verify-email', 'forgot-password'])
 const PUBLIC_SITE_PAGES = {
   home: LandingPage,
   features: FeaturesPage,
@@ -94,7 +96,11 @@ function readStoredAuth() {
       const normalizedToken = normalizeAccessToken(parsedSession?.token)
 
       if (parsedSession?.user && normalizedToken) {
-        return { user: parsedSession.user, token: normalizedToken }
+        return {
+          user: parsedSession.user,
+          token: normalizedToken,
+          sessionIdleTimeoutSeconds: parsedSession.sessionIdleTimeoutSeconds ?? null,
+        }
       }
     } catch {
       // Fall through to the legacy keys so existing sessions can still migrate.
@@ -130,7 +136,12 @@ function storeAuth(auth) {
     return null
   }
 
-  const normalizedAuth = { user: auth.user, token: normalizedToken }
+  const normalizedAuth = {
+    user: auth.user,
+    token: normalizedToken,
+    sessionIdleTimeoutSeconds:
+      auth.sessionIdleTimeoutSeconds ?? auth.user.sessionIdleTimeoutSeconds ?? null,
+  }
 
   localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(normalizedAuth))
   localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(auth.user))
@@ -275,8 +286,16 @@ function renderProtectedPage(
   teacherActiveClassTab,
   reportsInitialFilters,
   settingsScrollTarget,
+  onAccountUpdated,
 ) {
-  const sharedProps = { user: auth.user, role: auth.user.role, token: auth.token, onNavigate, onLogout }
+  const sharedProps = {
+    user: auth.user,
+    role: auth.user.role,
+    token: auth.token,
+    onNavigate,
+    onLogout,
+    onAccountUpdated,
+  }
 
   switch (page) {
     case 'principal-dashboard':
@@ -359,6 +378,7 @@ function App() {
   const [reportsInitialFilters, setReportsInitialFilters] = useState(null)
   const [settingsScrollTarget, setSettingsScrollTarget] = useState(null)
   const [publicScrollTarget, setPublicScrollTarget] = useState(null)
+  const [authNotice, setAuthNotice] = useState('')
 
   useEffect(() => {
     let isMounted = true
@@ -398,6 +418,11 @@ function App() {
       clearAuth()
 
       setAuth(null)
+      setAuthNotice(
+        event?.detail?.code === 'SESSION_IDLE_EXPIRED'
+          ? 'You were signed out after 5 minutes of inactivity. Please sign in again.'
+          : '',
+      )
       setCurrentPage('login')
       setIsAuthReady(true)
       replaceHashPage('login')
@@ -429,7 +454,11 @@ function App() {
           return
         }
 
-        const storedValidatedAuth = storeAuth({ token: tokenBeingValidated, user: currentUser })
+        const storedValidatedAuth = storeAuth({
+          token: tokenBeingValidated,
+          user: currentUser,
+          sessionIdleTimeoutSeconds: currentUser.sessionIdleTimeoutSeconds,
+        })
         setAuth(storedValidatedAuth)
         setCurrentPage(normalizeCurrentLocation(storedValidatedAuth))
         setIsAuthReady(true)
@@ -510,6 +539,7 @@ function App() {
   }, [auth?.token, auth?.user?.role])
 
   const handleLoginSuccess = (nextAuth) => {
+    setAuthNotice('')
     const storedAuth = storeAuth(nextAuth)
 
     if (!storedAuth) {
@@ -528,11 +558,35 @@ function App() {
   }
 
   const handleAuthenticationFailure = () => {
+    setAuthNotice('')
     clearAuth()
     setAuth(null)
     setIsAuthReady(true)
     setCurrentPage('login')
     replaceHashPage('login')
+  }
+
+  const handleIdleSessionExpired = () => {
+    clearAuth()
+    setAuth(null)
+    setAuthNotice('You were signed out after 5 minutes of inactivity. Please sign in again.')
+    setIsAuthReady(true)
+    setCurrentPage('login')
+    replaceHashPage('login')
+  }
+
+  const handleAccountUpdated = (updatedAccount) => {
+    setAuth((currentAuth) => {
+      if (!currentAuth) return currentAuth
+      return storeAuth({
+        ...currentAuth,
+        user: {
+          ...currentAuth.user,
+          ...updatedAccount,
+          role: updatedAccount.role || currentAuth.user.role,
+        },
+      })
+    })
   }
 
   const handleLogout = async () => {
@@ -623,6 +677,7 @@ function App() {
           onLoginSuccess={handleLoginSuccess}
           onAuthenticationFailure={handleAuthenticationFailure}
           onNavigate={handleNavigate}
+          initialMessage={authNotice}
         />
       )
     }
@@ -633,6 +688,10 @@ function App() {
 
     if (currentPage === 'verify-email') {
       return <TeacherEmailVerificationPage onNavigate={handleNavigate} />
+    }
+
+    if (currentPage === 'forgot-password') {
+      return <ForgotPasswordPage onNavigate={handleNavigate} />
     }
 
     if (currentPage === NOT_FOUND_PAGE) {
@@ -660,6 +719,7 @@ function App() {
     teacherActiveClassTab,
     reportsInitialFilters,
     settingsScrollTarget,
+    handleAccountUpdated,
   )
   const isTeacherWorkspaceLayout = auth.user.role === 'teacher'
 
@@ -699,6 +759,11 @@ function App() {
       >
         {protectedPage}
       </AppLayout>
+      <SessionTimeoutGuard
+        token={auth.token}
+        timeoutSeconds={auth.sessionIdleTimeoutSeconds ?? auth.user.sessionIdleTimeoutSeconds}
+        onExpired={handleIdleSessionExpired}
+      />
     </ProtectedRoute>
   )
 }

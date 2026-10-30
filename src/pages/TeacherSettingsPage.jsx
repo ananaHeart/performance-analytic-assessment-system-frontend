@@ -1,13 +1,88 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { LogOut } from 'lucide-react'
 import ArchivedAssessmentsPanel from '../components/ArchivedAssessmentsPanel'
+import AccountProfilePanel from '../components/AccountProfilePanel'
+import AccountPasswordPanel from '../components/AccountPasswordPanel'
+import AccountVerificationPanel from '../components/AccountVerificationPanel'
+import AccountContactChangePanel from '../components/AccountContactChangePanel'
 import MfaSecurityPanel from '../components/MfaSecurityPanel'
+import {
+  getTeacherRegistrationReferenceDataV3,
+  getTeacherSubjectsV3,
+  updateTeacherSubjectsV3,
+} from '../api/apiV3Client'
 
-function TeacherSettingsPage({ user, token, onLogout }) {
+function TeacherSettingsPage({ user, token, onLogout, onAccountUpdated }) {
   const [confirmingLogout, setConfirmingLogout] = useState(false)
+  const [subjectOptions, setSubjectOptions] = useState([])
+  const [additionalMajorSubjectIds, setAdditionalMajorSubjectIds] = useState([])
+  const [taughtSubjectIds, setTaughtSubjectIds] = useState([])
+  const [mainMajorId, setMainMajorId] = useState(user.majorId ?? null)
+  const [subjectsLoading, setSubjectsLoading] = useState(true)
+  const [subjectsSaving, setSubjectsSaving] = useState(false)
+  const [subjectsError, setSubjectsError] = useState('')
+  const [subjectsSuccess, setSubjectsSuccess] = useState('')
   const displayName =
     user.name || [user.firstName, user.middleName, user.lastName].filter(Boolean).join(' ')
   const initial = (displayName || user.email || 'T').slice(0, 1).toUpperCase()
+  const additionalMajorOptions = useMemo(
+    () => subjectOptions.filter((subject) => String(subject.majorId) !== String(mainMajorId)),
+    [mainMajorId, subjectOptions],
+  )
+
+  useEffect(() => {
+    let active = true
+    Promise.all([getTeacherRegistrationReferenceDataV3(), getTeacherSubjectsV3(token)])
+      .then(([references, subjects]) => {
+        if (!active) return
+        setSubjectOptions(references.subjects)
+        const matchedMajor = references.majors.find(
+          (major) => String(major.majorName ?? major.name) === String(user.majorName ?? ''),
+        )
+        setMainMajorId(user.majorId ?? matchedMajor?.majorId ?? matchedMajor?.id ?? null)
+        setAdditionalMajorSubjectIds(subjects.additionalMajors.map((subject) => String(subject.subjectId)))
+        setTaughtSubjectIds(subjects.subjectsTaughtBefore.map((subject) => String(subject.subjectId)))
+      })
+      .catch((error) => {
+        if (active) setSubjectsError(error.message || 'Unable to load subject experience.')
+      })
+      .finally(() => {
+        if (active) setSubjectsLoading(false)
+      })
+    return () => { active = false }
+  }, [token, user.majorId, user.majorName])
+
+  const toggleSubject = (setter, values, subjectId) => {
+    const normalizedId = String(subjectId)
+    setter(
+      values.includes(normalizedId)
+        ? values.filter((value) => value !== normalizedId)
+        : values.length < 10
+          ? [...values, normalizedId]
+          : values,
+    )
+    setSubjectsError('')
+    setSubjectsSuccess('')
+  }
+
+  const saveSubjects = async () => {
+    setSubjectsSaving(true)
+    setSubjectsError('')
+    setSubjectsSuccess('')
+    try {
+      const result = await updateTeacherSubjectsV3({
+        additionalMajorSubjectIds: additionalMajorSubjectIds.map(Number),
+        taughtSubjectIds: taughtSubjectIds.map(Number),
+      }, token)
+      setAdditionalMajorSubjectIds(result.additionalMajors.map((subject) => String(subject.subjectId)))
+      setTaughtSubjectIds(result.subjectsTaughtBefore.map((subject) => String(subject.subjectId)))
+      setSubjectsSuccess('Subject experience updated successfully.')
+    } catch (error) {
+      setSubjectsError(error.message || 'Unable to update subject experience.')
+    } finally {
+      setSubjectsSaving(false)
+    }
+  }
 
   return (
     <div className="teacher-settings-page smart-ui">
@@ -33,6 +108,46 @@ function TeacherSettingsPage({ user, token, onLogout }) {
         </aside>
 
         <div className="teacher-account-security">
+          <AccountProfilePanel token={token} onAccountUpdated={onAccountUpdated} />
+          <AccountPasswordPanel token={token} />
+          <AccountVerificationPanel token={token} onAccountUpdated={onAccountUpdated} />
+          <AccountContactChangePanel token={token} onAccountUpdated={onAccountUpdated} />
+          <section className="content-card teacher-subject-settings">
+            <header>
+              <div>
+                <p className="content-card-tag">Teaching profile</p>
+                <h2>Subject experience</h2>
+              </div>
+              <button type="button" onClick={saveSubjects} disabled={subjectsLoading || subjectsSaving}>
+                {subjectsSaving ? 'Saving...' : 'Save'}
+              </button>
+            </header>
+
+            {subjectsError ? <p className="form-message form-message-error" role="alert">{subjectsError}</p> : null}
+            {subjectsSuccess ? <p className="form-message form-message-success" role="status">{subjectsSuccess}</p> : null}
+            {subjectsLoading ? <p className="supporting-text">Loading subject experience...</p> : (
+              <div className="teacher-subject-settings-groups">
+                <fieldset className="teacher-subject-picker">
+                  <legend>Additional majors <small>Up to 10</small></legend>
+                  <div className="teacher-subject-options">
+                    {additionalMajorOptions.map((subject) => {
+                      const id = String(subject.subjectId)
+                      return <label key={`settings-major-${id}`}><input type="checkbox" checked={additionalMajorSubjectIds.includes(id)} onChange={() => toggleSubject(setAdditionalMajorSubjectIds, additionalMajorSubjectIds, id)} disabled={!additionalMajorSubjectIds.includes(id) && additionalMajorSubjectIds.length >= 10} /><span>{subject.subjectName}</span></label>
+                    })}
+                  </div>
+                </fieldset>
+                <fieldset className="teacher-subject-picker">
+                  <legend>Subjects taught before <small>Up to 10</small></legend>
+                  <div className="teacher-subject-options">
+                    {subjectOptions.map((subject) => {
+                      const id = String(subject.subjectId)
+                      return <label key={`settings-taught-${id}`}><input type="checkbox" checked={taughtSubjectIds.includes(id)} onChange={() => toggleSubject(setTaughtSubjectIds, taughtSubjectIds, id)} disabled={!taughtSubjectIds.includes(id) && taughtSubjectIds.length >= 10} /><span>{subject.subjectName}</span></label>
+                    })}
+                  </div>
+                </fieldset>
+              </div>
+            )}
+          </section>
           <MfaSecurityPanel token={token} />
           <ArchivedAssessmentsPanel token={token} />
         </div>

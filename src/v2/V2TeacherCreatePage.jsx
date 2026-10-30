@@ -144,7 +144,17 @@ function V2TeacherCreatePage({ token }) {
     if (stepIndex === 0) {
       if (!form.firstName.trim()) errors.firstName = 'First name is required.'
       if (!form.lastName.trim()) errors.lastName = 'Last name is required.'
-      if (!form.birthDate) errors.birthDate = 'Birth date is required.'
+      if (!form.birthDate) {
+        errors.birthDate = 'Birth date is required.'
+      } else {
+        const birthDate = new Date(`${form.birthDate}T00:00:00`)
+        const minimumBirthDate = new Date()
+        minimumBirthDate.setHours(0, 0, 0, 0)
+        minimumBirthDate.setFullYear(minimumBirthDate.getFullYear() - 18)
+        if (birthDate > minimumBirthDate) {
+          errors.birthDate = 'Teacher must be at least 18 years old.'
+        }
+      }
       if (!form.genderId) errors.genderId = 'Select a gender.'
     }
 
@@ -164,6 +174,11 @@ function V2TeacherCreatePage({ token }) {
         errors.cityMunicipalityName = 'City or municipality is required.'
       }
       if (!form.barangayName.trim()) errors.barangayName = 'Barangay is required.'
+      if (!form.postalCode.trim()) {
+        errors.postalCode = 'Postal code is required.'
+      } else if (!/^\d{4}$/.test(form.postalCode.trim())) {
+        errors.postalCode = 'Postal code must be 4 digits.'
+      }
     }
 
     if (stepIndex === 3) {
@@ -202,7 +217,7 @@ function V2TeacherCreatePage({ token }) {
       const firstErrorStep = [
         ['firstName', 'lastName', 'birthDate', 'genderId'],
         ['teachingStartDate', 'email', 'contactNumber', 'majorId', 'educationalAttainmentId'],
-        ['addressLine', 'cityMunicipalityName', 'barangayName'],
+        ['addressLine', 'cityMunicipalityName', 'barangayName', 'postalCode'],
         ['temporaryPassword', 'confirmPassword'],
       ].findIndex((fields) => fields.some((field) => allErrors[field]))
       if (firstErrorStep >= 0) setStep(firstErrorStep)
@@ -217,7 +232,7 @@ function V2TeacherCreatePage({ token }) {
       addressLine: form.addressLine.trim(),
       ...(optionalValue(form.regionName) ? { regionName: form.regionName.trim() } : {}),
       ...(optionalValue(form.provinceName) ? { provinceName: form.provinceName.trim() } : {}),
-      ...(optionalValue(form.postalCode) ? { postalCode: form.postalCode.trim() } : {}),
+      postalCode: form.postalCode.trim(),
     }
 
     const payload = {
@@ -435,8 +450,16 @@ function V2TeacherCreatePage({ token }) {
                   <ErrorText message={fieldErrors.barangayName} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="teacher-postal-code">Postal code <span className="font-normal text-muted-foreground">(optional)</span></Label>
-                  <Input id="teacher-postal-code" value={form.postalCode} onChange={(event) => updateField('postalCode', event.target.value)} autoComplete="postal-code" />
+                  <Label htmlFor="teacher-postal-code">Postal code</Label>
+                  <Input
+                    id="teacher-postal-code"
+                    value={form.postalCode}
+                    onChange={(event) => updateField('postalCode', event.target.value.replace(/\D/g, '').slice(0, 4))}
+                    autoComplete="postal-code"
+                    inputMode="numeric"
+                    maxLength="4"
+                  />
+                  <ErrorText message={fieldErrors.postalCode} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="teacher-country">Country</Label>

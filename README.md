@@ -12,13 +12,13 @@ This repository contains the React + Vite web dashboard for the Performance Anal
 The deployed Spring Boot backend is hosted on Render:
 
 ```text
-https://performance-analytics-assessment-system.onrender.com
+https://smart-backend-v3.onrender.com
 ```
 
 The frontend reads the backend base URL from a Vite environment variable:
 
 ```env
-VITE_API_URL=https://performance-analytics-assessment-system.onrender.com
+VITE_API_URL=https://smart-backend-v3.onrender.com
 ```
 
 For local development, use:
@@ -58,7 +58,7 @@ Use these settings when deploying the Vite frontend as a Render Static Site:
 - Build command: `npm run build`
 - Publish directory: `dist`
 - Environment variable: `VITE_API_URL`
-- Production value: `https://performance-analytics-assessment-system.onrender.com`
+- Production value: `https://smart-backend-v3.onrender.com`
 
 The backend must allow the deployed frontend URL through CORS.
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   ArrowRight,
+  ArrowUpDown,
   Archive,
   AlertTriangle,
   BookOpen,
@@ -19,16 +20,23 @@ import {
   archiveClassAssignmentV3,
   createClassAssignmentV3,
   createClassV3,
+  deleteAssessmentV3,
+  deleteClassAssignmentV3,
+  getClassAssignmentDeleteEligibilityV3,
   getClassAssignmentsV3,
   getClassesV3,
   getAssessmentReferenceDataV3,
+  getAssessmentEditEligibilityV3,
   getAssessmentsV3,
   enrollStudentV3,
   getPrincipalClassStudentsV3,
   getSchoolSetupReferenceDataV3,
   getTeacherClassStudentsV3,
+  getTeacherOptionsV3,
   updateStudentEnrollmentStatusV3,
   updateStudentProfileV3,
+  updateClassAssignmentV3,
+  updateClassAssignmentStatusV3,
 } from '../api/apiV3Client'
 import V3Sf1ImportPanel from '../components/V3Sf1ImportPanel'
 
@@ -36,6 +44,7 @@ const initialAssignmentForm = {
   classId: '',
   subjectId: '',
   teacherId: '',
+  assignmentRole: 'primary',
 }
 
 const MAX_BIRTH_DATE = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
@@ -62,6 +71,14 @@ const initialStudentProfileForm = {
 }
 
 const ENROLLMENT_STATUSES = ['enrolled', 'transferred', 'dropped', 'completed']
+
+const ASSIGNMENT_SORT_OPTIONS = [
+  { value: 'grade', label: 'Grade' },
+  { value: 'subject', label: 'Subject' },
+  { value: 'teacher', label: 'Teacher' },
+  { value: 'newest', label: 'Newest' },
+  { value: 'oldest', label: 'Oldest' },
+]
 
 const initialClassForm = {
   gradeLevelId: '',
@@ -104,6 +121,21 @@ function valuesMatch(leftValue, rightValue) {
   const right = normalizeMatchText(rightValue)
 
   return Boolean(left && right && left === right)
+}
+
+function formatTeacherRosterName(assignment, teachers) {
+  const teacher = teachers.find(
+    (record) => String(record.userId ?? record.id) === String(assignment.teacherId),
+  )
+  if (!teacher?.lastName || !teacher?.firstName) {
+    return assignment.teacherName || teacher?.name || 'Not assigned'
+  }
+
+  const middleInitial = teacher.middleName?.trim()?.[0]
+  const suffix = teacher.suffixName || teacher.suffix || ''
+  return `${teacher.lastName}, ${teacher.firstName}${middleInitial ? ` ${middleInitial}.` : ''}${
+    suffix ? ` ${suffix}` : ''
+  }`
 }
 
 function findReferenceIdByName(records, value, idKey, nameKey) {
@@ -309,23 +341,6 @@ function normalizeAvailableClassOption(classRecord = {}) {
   }
 }
 
-function sectionMatchesGrade(section, gradeLevel) {
-  if (!section || !gradeLevel) {
-    return false
-  }
-
-  if (
-    section.gradeLevelId !== null &&
-    section.gradeLevelId !== undefined &&
-    gradeLevel.id !== null &&
-    gradeLevel.id !== undefined
-  ) {
-    return String(section.gradeLevelId) === String(gradeLevel.id)
-  }
-
-  return valuesMatch(section.gradeLevelName, gradeLevel.name)
-}
-
 function getClassSectionKey(assignment) {
   if (!assignment) {
     return 'unassigned'
@@ -510,12 +525,18 @@ function ClassRecordsPage({
   const [classAssignments, setClassAssignments] = useState([])
   const [students, setStudents] = useState([])
   const [schoolTeachers, setSchoolTeachers] = useState([])
+  const [teacherOptionGroups, setTeacherOptionGroups] = useState([])
+  const [editTeacherOptionGroups, setEditTeacherOptionGroups] = useState([])
+  const [teacherOptionsLoading, setTeacherOptionsLoading] = useState(false)
+  const [teacherOptionsError, setTeacherOptionsError] = useState('')
   const [subjects, setSubjects] = useState([])
   const [schoolGradeLevels, setSchoolGradeLevels] = useState([])
   const [academicYears, setAcademicYears] = useState([])
   const [selectedAcademicYearId, setSelectedAcademicYearId] = useState('')
+  const [assignmentSortOrder, setAssignmentSortOrder] = useState('grade')
   const [sections, setSections] = useState([])
   const [assessments, setAssessments] = useState([])
+  const [assessmentTypeFilter, setAssessmentTypeFilter] = useState('quiz')
   const [selectedClassAssignment, setSelectedClassAssignment] = useState(null)
   const [assignmentForm, setAssignmentForm] = useState(initialAssignmentForm)
   const [manualStudentForm, setManualStudentForm] = useState(initialManualStudentForm)
@@ -546,12 +567,18 @@ function ClassRecordsPage({
   const [assignmentCreateError, setAssignmentCreateError] = useState('')
   const [assignmentPendingEdit, setAssignmentPendingEdit] = useState(null)
   const [assignmentEditForm, setAssignmentEditForm] = useState(initialAssignmentForm)
-  const [assignmentEditSections, setAssignmentEditSections] = useState([])
   const [assignmentEditError, setAssignmentEditError] = useState('')
   const [assignmentPendingDeletion, setAssignmentPendingDeletion] = useState(null)
   const [assignmentDeleteConfirmation, setAssignmentDeleteConfirmation] = useState('')
   const [assignmentArchiveReason, setAssignmentArchiveReason] = useState('')
   const [assignmentDeleteError, setAssignmentDeleteError] = useState('')
+  const [assignmentDeleteEligibility, setAssignmentDeleteEligibility] = useState(null)
+  const [isAssignmentDeleteChecking, setIsAssignmentDeleteChecking] = useState(false)
+  const [canArchiveAfterDelete, setCanArchiveAfterDelete] = useState(false)
+  const [assignmentPendingStatus, setAssignmentPendingStatus] = useState(null)
+  const [assignmentStatusReason, setAssignmentStatusReason] = useState('')
+  const [assignmentStatusError, setAssignmentStatusError] = useState('')
+  const [isAssignmentStatusSaving, setIsAssignmentStatusSaving] = useState(false)
   const [classForm, setClassForm] = useState(initialClassForm)
   const [isClassDialogOpen, setIsClassDialogOpen] = useState(false)
   const [classCreateError, setClassCreateError] = useState('')
@@ -559,23 +586,56 @@ function ClassRecordsPage({
   const [manualMessage, setManualMessage] = useState({ error: '', success: '' })
   const [isStudentsLoading, setIsStudentsLoading] = useState(true)
   const [isAssessmentsLoading, setIsAssessmentsLoading] = useState(true)
-  const [archivingAssessmentId, setArchivingAssessmentId] = useState(null)
+  const [removingAssessmentId, setRemovingAssessmentId] = useState(null)
   const [isSectionsLoading, setIsSectionsLoading] = useState(true)
   const [isAssignmentSubmitting, setIsAssignmentSubmitting] = useState(false)
-  const isAssignmentUpdating = false
-  const [isAssignmentEditSectionsLoading, setIsAssignmentEditSectionsLoading] = useState(false)
+  const [isAssignmentUpdating, setIsAssignmentUpdating] = useState(false)
   const [isAssignmentDeleting, setIsAssignmentDeleting] = useState(false)
   const [isManualSubmitting, setIsManualSubmitting] = useState(false)
   const activeClassAssignments = useMemo(
     () => classAssignments.filter(isActiveClassAssignment),
     [classAssignments],
   )
+  const currentClassAssignments = useMemo(
+    () => classAssignments.filter(
+      (assignment) => String(assignment.status ?? 'active').toLowerCase() !== 'archived',
+    ),
+    [classAssignments],
+  )
+  const sortedClassAssignments = useMemo(() => {
+    const records = [...currentClassAssignments]
+
+    return records.sort((left, right) => {
+      if (assignmentSortOrder === 'newest' || assignmentSortOrder === 'oldest') {
+        const leftDate = new Date(left.assignedAt || left.createdAt || 0).getTime()
+        const rightDate = new Date(right.assignedAt || right.createdAt || 0).getTime()
+        return assignmentSortOrder === 'oldest' ? leftDate - rightDate : rightDate - leftDate
+      }
+
+      if (assignmentSortOrder === 'subject') {
+        return String(left.subjectName || '').localeCompare(String(right.subjectName || ''), 'en')
+      }
+
+      if (assignmentSortOrder === 'teacher') {
+        return formatTeacherRosterName(left, schoolTeachers).localeCompare(
+          formatTeacherRosterName(right, schoolTeachers),
+          'en',
+        )
+      }
+
+      const leftGrade = Number(String(left.gradeLevelName || '').match(/\d+/)?.[0] || 0)
+      const rightGrade = Number(String(right.gradeLevelName || '').match(/\d+/)?.[0] || 0)
+      return leftGrade - rightGrade || String(left.sectionName || '').localeCompare(String(right.sectionName || ''), 'en')
+    })
+  }, [assignmentSortOrder, currentClassAssignments, schoolTeachers])
   const hasInitialTeacherClassSelection = Boolean(initialClassAssignmentId || initialClassId)
   const assignmentDeletePhrase = assignmentPendingDeletion
     ? getAssignmentDeletePhrase(assignmentPendingDeletion)
     : ''
   const canDeleteAssignment =
     Boolean(assignmentDeletePhrase) &&
+    Boolean(assignmentDeleteEligibility) &&
+    (assignmentDeleteEligibility.canHardDelete || assignmentDeleteEligibility.canArchive) &&
     assignmentDeleteConfirmation === assignmentDeletePhrase &&
     assignmentArchiveReason.trim().length >= 5 &&
     assignmentArchiveReason.trim().length <= 255
@@ -672,26 +732,6 @@ function ClassRecordsPage({
       selectedAcademicYear,
       'No academic year selected',
     )
-  const selectedAssignmentEditGradeLevel = useMemo(
-    () =>
-      assignmentGradeOptions.find(
-        (gradeLevel) => String(gradeLevel.id) === String(assignmentEditForm.gradeLevelId),
-      ) ?? null,
-    [assignmentEditForm.gradeLevelId, assignmentGradeOptions],
-  )
-  const assignmentEditSectionOptions = useMemo(() => {
-    if (!selectedAssignmentEditGradeLevel) return []
-
-    return assignmentEditSections.filter((section) => {
-      const hasGradeMetadata =
-        (section.gradeLevelId !== null && section.gradeLevelId !== undefined) ||
-        Boolean(section.gradeLevelName)
-
-      return hasGradeMetadata
-        ? sectionMatchesGrade(section, selectedAssignmentEditGradeLevel)
-        : true
-    })
-  }, [assignmentEditSections, selectedAssignmentEditGradeLevel])
   const duplicateEditedAssignment = useMemo(() => {
     if (
       !assignmentPendingEdit ||
@@ -717,7 +757,7 @@ function ClassRecordsPage({
     assignmentPendingEdit &&
       (String(assignmentEditForm.teacherId) !== String(assignmentPendingEdit.teacherId) ||
         String(assignmentEditForm.subjectId) !== String(assignmentPendingEdit.subjectId) ||
-        String(assignmentEditForm.classId) !== String(assignmentPendingEdit.classId)),
+        String(assignmentEditForm.assignmentRole) !== String(assignmentPendingEdit.assignmentRole)),
   )
   const principalRosterClassOptions = useMemo(
     () =>
@@ -823,6 +863,27 @@ function ClassRecordsPage({
           !isArchivedAssessment(assessment),
       ),
     [assessments, selectedClassAssignment?.classAssignmentId],
+  )
+  const assessmentTypeCounts = useMemo(
+    () => selectedClassAssessments.reduce(
+      (counts, assessment) => {
+        const type = String(assessment.testType || '').toLowerCase()
+        const key = type === 'quiz' || type === 'exam' ? type : 'other'
+        counts[key] += 1
+        return counts
+      },
+      { quiz: 0, exam: 0, other: 0 },
+    ),
+    [selectedClassAssessments],
+  )
+  const visibleClassAssessments = useMemo(
+    () => selectedClassAssessments.filter((assessment) => {
+      const type = String(assessment.testType || '').toLowerCase()
+      return assessmentTypeFilter === 'other'
+        ? type !== 'quiz' && type !== 'exam'
+        : type === assessmentTypeFilter
+    }),
+    [assessmentTypeFilter, selectedClassAssessments],
   )
   const selectedClassLabel = selectedClassAssignment
     ? getClassDisplayLabel(selectedClassAssignment)
@@ -1092,12 +1153,14 @@ function ClassRecordsPage({
     }
 
     try {
-      const assignments = (await getClassAssignmentsV3(token, selectedAcademicYearId)).filter(
-        isActiveClassAssignment,
-      )
+      const assignments = await getClassAssignmentsV3(token, selectedAcademicYearId)
       const nextTeacherAssignments =
         role === 'teacher'
-          ? assignments.filter((assignment) => Number(assignment.teacherId) === Number(teacherId))
+          ? assignments.filter(
+              (assignment) =>
+                isActiveClassAssignment(assignment) &&
+                Number(assignment.teacherId) === Number(teacherId),
+            )
           : assignments
       setClassAssignments(nextTeacherAssignments)
       setSelectedClassAssignment((currentAssignment) =>
@@ -1155,27 +1218,43 @@ function ClassRecordsPage({
     }
   }
 
-  const handleArchiveAssessment = async (event, assessment) => {
+  const handleRemoveAssessment = async (event, assessment) => {
     event.stopPropagation()
 
-    if (!assessment?.id || archivingAssessmentId) return
+    if (!assessment?.id || removingAssessmentId) return
 
-    const confirmed = window.confirm(
-      `Archive "${assessment.testName || 'this assessment'}"? It will be hidden from this class's ` +
-        'assessment list and moved to Archived Assessments in your profile, where you can restore it.',
-    )
-    if (!confirmed) return
-
-    setArchivingAssessmentId(assessment.id)
+    setRemovingAssessmentId(assessment.id)
     setAssessmentsError('')
 
     try {
-      await archiveAssessmentV3(assessment.id, token)
+      const eligibility = await getAssessmentEditEligibilityV3(assessment.id, token)
+      const assessmentName = assessment.testName || 'this assessment'
+
+      if (!eligibility.canHardDelete && !eligibility.canArchive) {
+        setAssessmentsError(
+          eligibility.reason || 'This assessment cannot be removed in its current state.',
+        )
+        return
+      }
+
+      const removePermanently = eligibility.canHardDelete
+      const confirmed = window.confirm(
+        removePermanently
+          ? `Permanently delete "${assessmentName}"? It has no captured results and cannot be restored after deletion.`
+          : `Archive "${assessmentName}"? Its ${eligibility.resultCount} captured result${eligibility.resultCount === 1 ? '' : 's'} will remain available in reports.`,
+      )
+      if (!confirmed) return
+
+      if (removePermanently) {
+        await deleteAssessmentV3(assessment.id, token)
+      } else {
+        await archiveAssessmentV3(assessment.id, token)
+      }
       await loadTeacherAssessments()
-    } catch (archiveError) {
-      setAssessmentsError(archiveError.message || 'Unable to archive this assessment.')
+    } catch (removeError) {
+      setAssessmentsError(removeError.message || 'Unable to remove this assessment.')
     } finally {
-      setArchivingAssessmentId(null)
+      setRemovingAssessmentId(null)
     }
   }
 
@@ -1277,6 +1356,11 @@ function ClassRecordsPage({
   const handleAssignmentFormChange = (event) => {
     const { name, value } = event.target
     setAssignmentMessage({ error: '', success: '' })
+    if (name === 'classId' || name === 'subjectId') {
+      setTeacherOptionGroups([])
+      setTeacherOptionsError('')
+      setTeacherOptionsLoading(false)
+    }
     setAssignmentForm((currentForm) => ({
       ...currentForm,
       [name]: value,
@@ -1284,6 +1368,50 @@ function ClassRecordsPage({
       ...(name === 'subjectId' ? { teacherId: '' } : {}),
     }))
   }
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    let active = true
+    if (!assignmentForm.subjectId || !assignmentForm.classId || !token) {
+      return () => { active = false }
+    }
+
+    setTeacherOptionsLoading(true)
+    setTeacherOptionsError('')
+    getTeacherOptionsV3(assignmentForm.subjectId, assignmentForm.classId, token)
+      .then((result) => {
+        if (active) setTeacherOptionGroups(result.groups)
+      })
+      .catch((error) => {
+        if (active) {
+          setTeacherOptionGroups([])
+          setTeacherOptionsError(error.message || 'Unable to load recommended teachers.')
+        }
+      })
+      .finally(() => {
+        if (active) setTeacherOptionsLoading(false)
+      })
+
+    return () => { active = false }
+  }, [assignmentForm.classId, assignmentForm.subjectId, token])
+
+  useEffect(() => {
+    let active = true
+    if (!assignmentPendingEdit || !assignmentEditForm.subjectId || !assignmentEditForm.classId || !token) {
+      return () => { active = false }
+    }
+
+    getTeacherOptionsV3(assignmentEditForm.subjectId, assignmentEditForm.classId, token)
+      .then((result) => {
+        if (active) setEditTeacherOptionGroups(result.groups)
+      })
+      .catch(() => {
+        if (active) setEditTeacherOptionGroups([])
+      })
+
+    return () => { active = false }
+  }, [assignmentEditForm.classId, assignmentEditForm.subjectId, assignmentPendingEdit, token])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const handleAssignmentSubmit = (event) => {
     event.preventDefault()
@@ -1310,9 +1438,9 @@ function ClassRecordsPage({
       return
     }
 
-    const selectedTeacher = schoolTeachers.find(
-      (teacher) => String(teacher.userId ?? teacher.id) === String(assignmentForm.teacherId),
-    )
+    const selectedTeacher = teacherOptionGroups
+      .flatMap((group) => group.teachers)
+      .find((teacher) => String(teacher.teacherUserId) === String(assignmentForm.teacherId))
     const selectedSubject = subjects.find(
       (subject) => String(subject.id) === String(assignmentForm.subjectId),
     )
@@ -1325,7 +1453,7 @@ function ClassRecordsPage({
         subjectId: Number(assignmentForm.subjectId),
         assignmentRole: 'primary',
       },
-      teacherName: selectedTeacher?.name || 'Selected teacher',
+      teacherName: selectedTeacher?.displayName || 'Selected teacher',
       subjectName: selectedSubject?.name || 'Selected subject',
       gradeLevelName: selectedAssignmentClass?.gradeLevelName || 'Selected grade level',
       sectionName: selectedAssignmentClass?.sectionName || 'Selected section',
@@ -1419,116 +1547,94 @@ function ClassRecordsPage({
     }
   }
 
-  const loadAssignmentEditSections = async (assignment, subjectId, gradeLevelId) => {
-    setAssignmentEditSections([])
-
-    if (!assignment || !subjectId || !gradeLevelId) return
-
-    setIsAssignmentEditSectionsLoading(true)
-    try {
-      const classRecords = await getClassesV3(
-        {
-          academicYearId: assignment.academicYearId ?? selectedAcademicYearId,
-          gradeLevelId,
-        },
-        token,
-      )
-      const nextSections = classRecords
-        .map(normalizeAvailableClassOption)
-        .filter((classRecord) => classRecord.classId !== null && classRecord.classId !== undefined)
-
-      const editingSameSubjectAndGrade =
-        String(subjectId) === String(assignment.subjectId) &&
-        String(gradeLevelId) === String(assignment.gradeLevelId)
-      if (
-        editingSameSubjectAndGrade &&
-        !nextSections.some((section) => String(section.classId) === String(assignment.classId))
-      ) {
-        nextSections.push(
-          normalizeAvailableClassOption({
-            classId: assignment.classId,
-            sectionId: assignment.sectionId,
-            sectionName: assignment.sectionName,
-            gradeLevelId: assignment.gradeLevelId,
-            gradeLevelName: assignment.gradeLevelName,
-            subjectId: assignment.subjectId,
-          }),
-        )
-      }
-
-      setAssignmentEditSections(nextSections)
-    } catch (loadError) {
-      setAssignmentEditError(loadError.message || 'Unable to load available classes for editing.')
-    } finally {
-      setIsAssignmentEditSectionsLoading(false)
-    }
-  }
-
   const openAssignmentEditDialog = (assignment) => {
     const nextForm = {
       teacherId: String(assignment.teacherId ?? ''),
       subjectId: String(assignment.subjectId ?? ''),
       gradeLevelId: String(assignment.gradeLevelId ?? ''),
       classId: String(assignment.classId ?? ''),
+      assignmentRole: String(assignment.assignmentRole ?? 'primary'),
     }
 
     setAssignmentPendingEdit(assignment)
     setAssignmentEditForm(nextForm)
     setAssignmentEditError('')
     setAssignmentMessage({ error: '', success: '' })
-    loadAssignmentEditSections(assignment, nextForm.subjectId, nextForm.gradeLevelId)
   }
 
-  const closeAssignmentEditDialog = () => {
-    if (isAssignmentUpdating) return
+  const closeAssignmentEditDialog = (force = false) => {
+    if (isAssignmentUpdating && !force) return
 
     setAssignmentPendingEdit(null)
     setAssignmentEditForm(initialAssignmentForm)
-    setAssignmentEditSections([])
     setAssignmentEditError('')
   }
 
   const handleAssignmentEditFormChange = (event) => {
     const { name, value } = event.target
     setAssignmentEditError('')
-
-    if (name === 'subjectId') {
-      setAssignmentEditForm((currentForm) => ({
-        ...currentForm,
-        subjectId: value,
-        gradeLevelId: '',
-        classId: '',
-      }))
-      setAssignmentEditSections([])
-      return
-    }
-
-    if (name === 'gradeLevelId') {
-      setAssignmentEditForm((currentForm) => ({
-        ...currentForm,
-        gradeLevelId: value,
-        classId: '',
-      }))
-      loadAssignmentEditSections(assignmentPendingEdit, assignmentEditForm.subjectId, value)
-      return
-    }
+    if (name === 'subjectId' || name === 'classId') setEditTeacherOptionGroups([])
 
     setAssignmentEditForm((currentForm) => ({ ...currentForm, [name]: value }))
   }
 
   const handleAssignmentUpdate = async (event) => {
     event.preventDefault()
-    setAssignmentEditError(
-      'Active assignments cannot be edited. Archive it with a reason, then create the corrected assignment.',
-    )
+    const classAssignmentId = assignmentPendingEdit?.classAssignmentId ?? assignmentPendingEdit?.id
+    if (!classAssignmentId || !hasAssignmentEditChanges || duplicateEditedAssignment) return
+
+    setIsAssignmentUpdating(true)
+    setAssignmentEditError('')
+    setAssignmentMessage({ error: '', success: '' })
+
+    try {
+      await updateClassAssignmentV3(
+        classAssignmentId,
+        {
+          teacherUserId: Number(assignmentEditForm.teacherId),
+          subjectId: Number(assignmentEditForm.subjectId),
+          assignmentRole: assignmentEditForm.assignmentRole,
+        },
+        token,
+      )
+      closeAssignmentEditDialog(true)
+      setAssignmentMessage({ error: '', success: 'Class assignment updated successfully.' })
+      await loadTeacherClasses()
+    } catch (updateError) {
+      setAssignmentEditError(updateError.message || 'Unable to update this class assignment.')
+    } finally {
+      setIsAssignmentUpdating(false)
+    }
   }
 
-  const openAssignmentDeleteDialog = (assignment) => {
+  const openAssignmentDeleteDialog = async (assignment) => {
     setAssignmentPendingDeletion(assignment)
     setAssignmentDeleteConfirmation('')
     setAssignmentArchiveReason('')
     setAssignmentDeleteError('')
+    setAssignmentDeleteEligibility(null)
+    setIsAssignmentDeleteChecking(true)
+    setCanArchiveAfterDelete(false)
     setAssignmentMessage({ error: '', success: '' })
+
+    const classAssignmentId = assignment.classAssignmentId ?? assignment.id
+    try {
+      const eligibility = await getClassAssignmentDeleteEligibilityV3(classAssignmentId, token)
+      setAssignmentDeleteEligibility(eligibility)
+      setCanArchiveAfterDelete(!eligibility.canHardDelete && eligibility.canArchive)
+
+      if (!eligibility.canHardDelete && !eligibility.canArchive) {
+        setAssignmentDeleteError(
+          eligibility.reason || 'This assignment cannot be deleted or archived in its current state.',
+        )
+      }
+    } catch (eligibilityError) {
+      setAssignmentDeleteError(
+        eligibilityError.message || 'Unable to check whether this assignment can be removed.',
+      )
+    } finally {
+      setIsAssignmentDeleteChecking(false)
+    }
   }
 
   const closeAssignmentDeleteDialog = () => {
@@ -1538,6 +1644,9 @@ function ClassRecordsPage({
     setAssignmentDeleteConfirmation('')
     setAssignmentArchiveReason('')
     setAssignmentDeleteError('')
+    setAssignmentDeleteEligibility(null)
+    setIsAssignmentDeleteChecking(false)
+    setCanArchiveAfterDelete(false)
   }
 
   const handleAssignmentDelete = async (event) => {
@@ -1553,26 +1662,77 @@ function ClassRecordsPage({
     setAssignmentMessage({ error: '', success: '' })
 
     try {
-      await archiveClassAssignmentV3(
-        classAssignmentId,
-        assignmentArchiveReason.trim(),
-        token,
-      )
+      if (canArchiveAfterDelete) {
+        await archiveClassAssignmentV3(classAssignmentId, assignmentArchiveReason.trim(), token)
+      } else {
+        await deleteClassAssignmentV3(classAssignmentId, assignmentArchiveReason.trim(), token)
+      }
       setAssignmentPendingDeletion(null)
       setAssignmentDeleteConfirmation('')
       setAssignmentArchiveReason('')
       setAssignmentDeleteError('')
       setAssignmentMessage({
         error: '',
-        success: 'Class assignment archived successfully.',
+        success: canArchiveAfterDelete
+          ? 'Class assignment archived successfully.'
+          : 'Class assignment permanently deleted successfully.',
       })
       await loadTeacherClasses()
     } catch (deleteError) {
+      if (deleteError.code === 'CLASS_ASSIGNMENT_HAS_ASSESSMENTS') {
+        const canArchive = deleteError.errors?.canArchive !== false
+        setCanArchiveAfterDelete(canArchive)
+        setAssignmentDeleteError(
+          canArchive
+            ? 'This assignment has assessments and cannot be permanently deleted. Archive it instead to preserve its records.'
+            : 'This assignment has assessments and cannot be deleted or archived in its current state.',
+        )
+        return
+      }
       setAssignmentDeleteError(
-        deleteError.message || 'Unable to archive this class assignment.',
+        deleteError.message || 'Unable to remove this class assignment.',
       )
     } finally {
       setIsAssignmentDeleting(false)
+    }
+  }
+
+  const openAssignmentStatusDialog = (assignment) => {
+    setAssignmentPendingStatus(assignment)
+    setAssignmentStatusReason('')
+    setAssignmentStatusError('')
+  }
+
+  const closeAssignmentStatusDialog = () => {
+    if (isAssignmentStatusSaving) return
+    setAssignmentPendingStatus(null)
+    setAssignmentStatusReason('')
+    setAssignmentStatusError('')
+  }
+
+  const handleAssignmentStatusUpdate = async (event) => {
+    event.preventDefault()
+    const reason = assignmentStatusReason.trim()
+    const assignmentId = assignmentPendingStatus?.classAssignmentId ?? assignmentPendingStatus?.id
+    if (!assignmentId || reason.length < 5 || reason.length > 255) {
+      setAssignmentStatusError('Enter a reason between 5 and 255 characters.')
+      return
+    }
+    const nextStatus = String(assignmentPendingStatus.status).toLowerCase() === 'inactive'
+      ? 'active'
+      : 'inactive'
+    setIsAssignmentStatusSaving(true)
+    setAssignmentStatusError('')
+    try {
+      await updateClassAssignmentStatusV3(assignmentId, nextStatus, reason, token)
+      setAssignmentPendingStatus(null)
+      setAssignmentStatusReason('')
+      setAssignmentMessage({ error: '', success: `Class assignment marked ${nextStatus}.` })
+      await loadTeacherClasses()
+    } catch (statusError) {
+      setAssignmentStatusError(statusError.message || 'Unable to change assignment status.')
+    } finally {
+      setIsAssignmentStatusSaving(false)
     }
   }
 
@@ -1660,6 +1820,7 @@ function ClassRecordsPage({
   const handleTeacherSubjectChange = (event) => {
     const nextClassAssignmentId = Number(event.target.value)
 
+    setAssessmentTypeFilter('quiz')
     setSelectedClassAssignment(
       classAssignments.find(
         (assignment) => Number(assignment.classAssignmentId) === nextClassAssignmentId,
@@ -1670,6 +1831,7 @@ function ClassRecordsPage({
   const handleTeacherClassSelect = (assignment) => {
     if (!assignment) return
 
+    setAssessmentTypeFilter('quiz')
     setSelectedClassAssignment(assignment)
     onNavigate('class-records', {
       classId: assignment.classId,
@@ -1969,7 +2131,24 @@ function ClassRecordsPage({
                 <article className="teacher-assessment-panel">
                   <div className="teacher-assessment-panel-header">
                     <h3>Assessments</h3>
-                    <small>{selectedClassAssessments.length} total</small>
+                    <div className="teacher-assessment-type-tabs" role="tablist" aria-label="Assessment type">
+                      {[
+                        ['quiz', 'Quizzes'],
+                        ['exam', 'Exams'],
+                        ...(assessmentTypeCounts.other ? [['other', 'Other']] : []),
+                      ].map(([type, label]) => (
+                        <button
+                          key={type}
+                          type="button"
+                          role="tab"
+                          aria-selected={assessmentTypeFilter === type}
+                          className={assessmentTypeFilter === type ? 'is-active' : ''}
+                          onClick={() => setAssessmentTypeFilter(type)}
+                        >
+                          {label} <span>{assessmentTypeCounts[type]}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <div className="teacher-assessment-list">
@@ -1992,8 +2171,17 @@ function ClassRecordsPage({
                       </div>
                     ) : null}
 
+                    {selectedClassAssignment &&
+                    !isAssessmentsLoading &&
+                    selectedClassAssessments.length > 0 &&
+                    !visibleClassAssessments.length ? (
+                      <div className="teacher-assessment-empty">
+                        <strong>No {assessmentTypeFilter === 'quiz' ? 'quizzes' : assessmentTypeFilter === 'exam' ? 'exams' : 'other assessments'} yet</strong>
+                      </div>
+                    ) : null}
+
                     {selectedClassAssignment && !isAssessmentsLoading
-                      ? selectedClassAssessments.map((assessment, index) => (
+                      ? visibleClassAssessments.map((assessment, index) => (
                           <div
                             role="button"
                             tabIndex={0}
@@ -2025,7 +2213,10 @@ function ClassRecordsPage({
                             </span>
                             <div className="teacher-assessment-copy">
                               <strong>{assessment.testName || 'Untitled assessment'}</strong>
-                              <small>Assigned date: {formatDate(assessment.testDate)}</small>
+                              <small>
+                                {String(assessment.testType || 'Assessment').replace(/_/g, ' ')} ·{' '}
+                                {formatDate(assessment.testDate)}
+                              </small>
                             </div>
                             <div className="teacher-assessment-row-actions">
                               <span
@@ -2038,12 +2229,12 @@ function ClassRecordsPage({
                               <button
                                 type="button"
                                 className="teacher-assessment-archive-button"
-                                title="Archive this assessment"
-                                aria-label={`Archive ${assessment.testName || 'assessment'}`}
-                                disabled={archivingAssessmentId === assessment.id}
-                                onClick={(event) => handleArchiveAssessment(event, assessment)}
+                                title="Remove this assessment"
+                                aria-label={`Remove ${assessment.testName || 'assessment'}`}
+                                disabled={removingAssessmentId === assessment.id}
+                                onClick={(event) => handleRemoveAssessment(event, assessment)}
                               >
-                                <Archive size={15} strokeWidth={2.2} aria-hidden="true" />
+                                <Trash2 size={15} strokeWidth={2.2} aria-hidden="true" />
                               </button>
                             </div>
                           </div>
@@ -2208,11 +2399,6 @@ function ClassRecordsPage({
               <Plus size={17} strokeWidth={2.4} aria-hidden="true" />
               Create Class
             </button>
-
-            <button type="button" className="secondary-button" onClick={handlePrincipalRefresh}>
-              <RefreshCw size={16} aria-hidden="true" />
-              Refresh
-            </button>
           </div>
         </div>
 
@@ -2287,13 +2473,25 @@ function ClassRecordsPage({
               onChange={handleAssignmentFormChange}
               disabled={!assignmentForm.subjectId}
             >
-              <option value="">Select teacher</option>
-              {schoolTeachers.map((teacher) => (
-                <option key={teacher.userId ?? teacher.id} value={teacher.userId ?? teacher.id}>
-                  {teacher.name}
-                </option>
+              <option value="">
+                {teacherOptionsLoading ? 'Loading recommended teachers...' : 'Select teacher'}
+              </option>
+              {teacherOptionGroups.map((group) => (
+                <optgroup key={group.key} label={group.label}>
+                  {group.teachers.map((teacher) => (
+                    <option
+                      key={teacher.teacherUserId}
+                      value={teacher.teacherUserId}
+                      disabled={teacher.alreadyAssignedToClass}
+                    >
+                      {teacher.displayName}
+                      {teacher.alreadyAssignedToClass ? ' (Already assigned to this class)' : ''}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
+            {teacherOptionsError ? <small className="field-error">{teacherOptionsError}</small> : null}
           </label>
 
           <div className="principal-assignment-readonly-field" aria-label="Academic Year">
@@ -2314,7 +2512,22 @@ function ClassRecordsPage({
       <section className="principal-assignment-card" aria-labelledby="classAssignmentsHeading">
         <div className="principal-assignment-table-header">
           <h2 id="classAssignmentsHeading">Assignments</h2>
-          <span>{activeClassAssignments.length} assignment(s)</span>
+          <div className="principal-assignment-table-tools">
+            <span>{currentClassAssignments.length} assignment(s)</span>
+            <label htmlFor="assignmentSortOrder">
+              <ArrowUpDown size={15} aria-hidden="true" />
+              <select
+                id="assignmentSortOrder"
+                value={assignmentSortOrder}
+                onChange={(event) => setAssignmentSortOrder(event.target.value)}
+                aria-label="Sort class assignments"
+              >
+                {ASSIGNMENT_SORT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
         </div>
 
         <div className="approval-table-wrap">
@@ -2324,28 +2537,26 @@ function ClassRecordsPage({
                 <th>Teacher</th>
                 <th>Subject</th>
                 <th>Section</th>
-                 <th>Academic Year</th>
                  <th>Status</th>
                  <th aria-label="Actions">Actions</th>
                </tr>
              </thead>
              <tbody>
-               {!activeClassAssignments.length ? (
+               {!currentClassAssignments.length ? (
                  <tr>
-                   <td className="approval-empty" colSpan="6">
+                   <td className="approval-empty" colSpan="5">
                      No class assignments found.
                    </td>
                 </tr>
               ) : (
-                 activeClassAssignments.map((assignment, index) => (
+                 sortedClassAssignments.map((assignment, index) => (
                   <tr key={assignment.id ?? `${assignment.teacherName}-${assignment.sectionName}-${index}`}>
-                    <td>{assignment.teacherName || 'Not assigned'}</td>
+                    <td>{formatTeacherRosterName(assignment, schoolTeachers)}</td>
                     <td>{assignment.subjectName || 'Not assigned'}</td>
                     <td>
                       {assignment.gradeLevelName || 'Grade level'} -{' '}
                       {assignment.sectionName || 'Section'}
                     </td>
-                    <td>{formatAcademicYear(assignment, 'Not assigned')}</td>
                      <td>
                        <span className="status-pill status-active">
                          {formatStatus(assignment.status || 'active')}
@@ -2353,13 +2564,23 @@ function ClassRecordsPage({
                      </td>
                      <td className="principal-assignment-action-cell">
                        <div className="principal-assignment-row-actions">
+                         {['active', 'inactive'].includes(String(assignment.status || 'active').toLowerCase()) ? (
+                           <button
+                             type="button"
+                             className="principal-assignment-edit-button"
+                             onClick={() => openAssignmentStatusDialog(assignment)}
+                             aria-label={`${String(assignment.status).toLowerCase() === 'inactive' ? 'Activate' : 'Deactivate'} ${assignment.teacherName || 'teacher'} class assignment`}
+                             title={String(assignment.status).toLowerCase() === 'inactive' ? 'Activate assignment' : 'Deactivate assignment'}
+                           >
+                             <RefreshCw size={16} aria-hidden="true" />
+                           </button>
+                         ) : null}
                          <button
                            type="button"
                          className="principal-assignment-edit-button"
                            onClick={() => openAssignmentEditDialog(assignment)}
-                           disabled
                            aria-label={`Edit ${assignment.teacherName || 'teacher'} class assignment`}
-                           title="Active assignment editing is not available in the current backend contract"
+                           title="Edit class assignment"
                          >
                            <Pencil size={16} aria-hidden="true" />
                          </button>
@@ -2630,10 +2851,25 @@ function ClassRecordsPage({
                      disabled={isAssignmentUpdating}
                    >
                      <option value="">Select teacher</option>
-                     {schoolTeachers.map((teacher) => (
-                       <option key={teacher.userId ?? teacher.id} value={teacher.userId ?? teacher.id}>
-                         {teacher.name}
-                       </option>
+                     {editTeacherOptionGroups.map((group) => (
+                       <optgroup key={group.key} label={group.label}>
+                         {group.teachers.map((teacher) => {
+                           const isCurrentTeacher =
+                             String(teacher.teacherUserId) === String(assignmentEditForm.teacherId)
+                           return (
+                             <option
+                               key={teacher.teacherUserId}
+                               value={teacher.teacherUserId}
+                               disabled={teacher.alreadyAssignedToClass && !isCurrentTeacher}
+                             >
+                               {teacher.displayName}
+                               {teacher.alreadyAssignedToClass && !isCurrentTeacher
+                                 ? ' (Already assigned to this class)'
+                                 : ''}
+                             </option>
+                           )
+                         })}
+                       </optgroup>
                      ))}
                    </select>
                  </label>
@@ -2656,47 +2892,26 @@ function ClassRecordsPage({
                    </select>
                  </label>
 
-                 <label htmlFor="editAssignmentGradeLevelId">
-                   <span>Grade level</span>
+                 <label htmlFor="editAssignmentRole">
+                   <span>Role</span>
                    <select
-                     id="editAssignmentGradeLevelId"
-                     name="gradeLevelId"
-                     value={assignmentEditForm.gradeLevelId}
+                     id="editAssignmentRole"
+                     name="assignmentRole"
+                     value={assignmentEditForm.assignmentRole}
                      onChange={handleAssignmentEditFormChange}
-                     disabled={isAssignmentUpdating || !assignmentEditForm.subjectId}
+                     disabled={isAssignmentUpdating}
                    >
-                     <option value="">Select grade level</option>
-                     {assignmentGradeOptions.map((gradeLevel) => (
-                       <option key={gradeLevel.id} value={gradeLevel.id}>
-                         {gradeLevel.name}
-                       </option>
-                     ))}
+                     <option value="primary">Primary teacher</option>
+                     <option value="co_teacher">Co-teacher</option>
                    </select>
                  </label>
 
-                 <label htmlFor="editAssignmentClassId">
-                   <span>Section</span>
-                   <select
-                     id="editAssignmentClassId"
-                     name="classId"
-                     value={assignmentEditForm.classId}
-                     onChange={handleAssignmentEditFormChange}
-                     disabled={
-                       isAssignmentUpdating ||
-                       isAssignmentEditSectionsLoading ||
-                       !assignmentEditForm.gradeLevelId
-                     }
-                   >
-                     <option value="">
-                       {isAssignmentEditSectionsLoading ? 'Loading sections...' : 'Select section'}
-                     </option>
-                     {assignmentEditSectionOptions.map((section) => (
-                       <option key={section.classId} value={section.classId}>
-                         {section.sectionName || section.name}
-                       </option>
-                     ))}
-                   </select>
-                 </label>
+                 <div className="principal-assignment-readonly-field">
+                   <span>Class</span>
+                   <strong>
+                     {assignmentPendingEdit.gradeLevelName} - {assignmentPendingEdit.sectionName}
+                   </strong>
+                 </div>
 
                  <div className="principal-assignment-readonly-field assignment-edit-year">
                    <span>Academic year</span>
@@ -2730,8 +2945,7 @@ function ClassRecordsPage({
                        isAssignmentUpdating ||
                        !assignmentEditForm.teacherId ||
                        !assignmentEditForm.subjectId ||
-                       !assignmentEditForm.gradeLevelId ||
-                       !assignmentEditForm.classId ||
+                       !assignmentEditForm.assignmentRole ||
                        !hasAssignmentEditChanges ||
                        Boolean(duplicateEditedAssignment)
                      }
@@ -2796,8 +3010,28 @@ function ClassRecordsPage({
                </dl>
 
                <p className="assignment-delete-instruction">
-                 Type the exact phrase below and provide a reason to archive this assignment:
+                 {isAssignmentDeleteChecking
+                   ? 'Checking whether this assignment can be permanently deleted or archived...'
+                   : !assignmentDeleteEligibility
+                     ? 'Removal options are unavailable until the eligibility check succeeds.'
+                     : canArchiveAfterDelete
+                     ? 'This assignment has saved records. Archive it to preserve its assessments and results.'
+                     : assignmentDeleteEligibility.canHardDelete
+                       ? 'This assignment has no saved assessment records and can be permanently deleted.'
+                       : 'This assignment cannot be removed in its current state.'}
                </p>
+               {assignmentDeleteEligibility ? (
+                 <dl className="assignment-delete-summary">
+                   <div>
+                     <dt>Assessments</dt>
+                     <dd>{assignmentDeleteEligibility.assessmentCount}</dd>
+                   </div>
+                   <div>
+                     <dt>Results</dt>
+                     <dd>{assignmentDeleteEligibility.resultCount}</dd>
+                   </div>
+                 </dl>
+               ) : null}
                <code className="assignment-delete-phrase">{assignmentDeletePhrase}</code>
 
                {assignmentDeleteError ? (
@@ -2814,11 +3048,11 @@ function ClassRecordsPage({
                    onChange={(event) => setAssignmentDeleteConfirmation(event.target.value)}
                    autoComplete="off"
                    spellCheck="false"
-                   disabled={isAssignmentDeleting}
+                   disabled={isAssignmentDeleting || isAssignmentDeleteChecking || !assignmentDeleteEligibility}
                    autoFocus
                  />
 
-                 <label htmlFor="assignmentArchiveReason">Reason for archiving</label>
+                 <label htmlFor="assignmentArchiveReason">Reason for removal</label>
                  <textarea
                    id="assignmentArchiveReason"
                    className="assignment-restore-reason"
@@ -2828,7 +3062,7 @@ function ClassRecordsPage({
                    maxLength="255"
                    rows="3"
                    required
-                   disabled={isAssignmentDeleting}
+                   disabled={isAssignmentDeleting || isAssignmentDeleteChecking || !assignmentDeleteEligibility}
                  />
                  <span className="assignment-restore-reason-count">
                    {assignmentArchiveReason.length}/255
@@ -2846,10 +3080,65 @@ function ClassRecordsPage({
                    <button
                      type="submit"
                      className="assignment-delete-confirm"
-                     disabled={!canDeleteAssignment || isAssignmentDeleting}
+                     disabled={!canDeleteAssignment || isAssignmentDeleting || isAssignmentDeleteChecking}
                    >
-                     <Trash2 size={16} aria-hidden="true" />
-                     {isAssignmentDeleting ? 'Archiving...' : 'Archive assignment'}
+                     {canArchiveAfterDelete
+                       ? <Archive size={16} aria-hidden="true" />
+                       : <Trash2 size={16} aria-hidden="true" />}
+                     {isAssignmentDeleting
+                       ? canArchiveAfterDelete ? 'Archiving...' : 'Deleting...'
+                       : isAssignmentDeleteChecking
+                         ? 'Checking...'
+                         : canArchiveAfterDelete ? 'Archive assignment' : 'Delete assignment'}
+                   </button>
+                 </div>
+               </form>
+             </div>
+           </section>
+         </div>
+       ) : null}
+
+       {assignmentPendingStatus ? (
+         <div className="assignment-delete-backdrop" role="presentation">
+           <section className="assignment-delete-dialog" role="dialog" aria-modal="true" aria-labelledby="assignmentStatusTitle">
+             <header className="assignment-delete-header assignment-confirm-header">
+               <span className="assignment-delete-warning assignment-confirm-icon" aria-hidden="true">
+                 <RefreshCw size={21} />
+               </span>
+               <div>
+                 <p>Assignment status</p>
+                 <h3 id="assignmentStatusTitle">
+                   {String(assignmentPendingStatus.status).toLowerCase() === 'inactive'
+                     ? 'Activate this assignment?'
+                     : 'Deactivate this assignment?'}
+                 </h3>
+               </div>
+               <button type="button" className="assignment-delete-close" onClick={closeAssignmentStatusDialog} disabled={isAssignmentStatusSaving} aria-label="Close assignment status dialog">
+                 <X size={18} aria-hidden="true" />
+               </button>
+             </header>
+             <div className="assignment-delete-body">
+               <p className="assignment-confirm-instruction">
+                 Inactive assignments remain in historical records but are not available for new phone downloads.
+               </p>
+               <form onSubmit={handleAssignmentStatusUpdate}>
+                 <label htmlFor="assignmentStatusReason">Reason</label>
+                 <textarea
+                   id="assignmentStatusReason"
+                   className="assignment-restore-reason"
+                   value={assignmentStatusReason}
+                   onChange={(event) => setAssignmentStatusReason(event.target.value)}
+                   minLength="5"
+                   maxLength="255"
+                   rows="3"
+                   required
+                   disabled={isAssignmentStatusSaving}
+                 />
+                 {assignmentStatusError ? <p className="form-message form-message-error" role="alert">{assignmentStatusError}</p> : null}
+                 <div className="assignment-delete-actions">
+                   <button type="button" className="secondary-button" onClick={closeAssignmentStatusDialog} disabled={isAssignmentStatusSaving}>Cancel</button>
+                   <button type="submit" className="assignment-confirm-submit" disabled={isAssignmentStatusSaving || assignmentStatusReason.trim().length < 5}>
+                     {isAssignmentStatusSaving ? 'Saving...' : 'Confirm status'}
                    </button>
                  </div>
                </form>

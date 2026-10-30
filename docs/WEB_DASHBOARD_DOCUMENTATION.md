@@ -12,7 +12,7 @@ The web dashboard is the browser-based frontend of the Performance Analytics Ass
 The dashboard is connected to the Spring Boot backend through REST API calls. The current production backend is deployed on Render:
 
 ```text
-https://performance-analytics-assessment-system.onrender.com
+https://smart-backend-v3.onrender.com
 ```
 
 The frontend does not hardcode the backend host. It uses the Vite environment variable `VITE_API_URL`. The legacy `VITE_API_BASE_URL` variable is still supported as a fallback.
@@ -52,7 +52,7 @@ VITE_API_URL=http://localhost:8080
 Production example:
 
 ```env
-VITE_API_URL=https://performance-analytics-assessment-system.onrender.com
+VITE_API_URL=https://smart-backend-v3.onrender.com
 ```
 
 Supporting files:
@@ -305,7 +305,7 @@ Render frontend settings:
 - Build command: `npm run build`
 - Publish directory: `dist`
 - Environment variable: `VITE_API_URL`
-- Production value: `https://performance-analytics-assessment-system.onrender.com`
+- Production value: `https://smart-backend-v3.onrender.com`
 
 The backend must allow the deployed frontend domain through CORS.
 

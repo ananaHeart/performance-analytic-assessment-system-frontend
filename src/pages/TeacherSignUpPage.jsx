@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowRight,
   BriefcaseBusiness,
@@ -9,11 +9,13 @@ import {
   Mail,
   MapPin,
   MessageSquareText,
+  Pencil,
   RefreshCw,
   ShieldCheck,
   UserRound,
 } from 'lucide-react'
 import {
+  checkTeacherRegistrationAvailabilityV3,
   getTeacherRegistrationReferenceDataV3,
   registerTeacherV3,
 } from '../api/apiV3Client'
@@ -24,7 +26,8 @@ const STEPS = [
   { label: 'Personal', description: 'Identity', icon: UserRound },
   { label: 'Professional', description: 'Teaching and contact', icon: BriefcaseBusiness },
   { label: 'Address', description: 'Philippine address', icon: MapPin },
-  { label: 'Account', description: 'Password and review', icon: KeyRound },
+  { label: 'Password', description: 'Secure your account', icon: KeyRound },
+  { label: 'Review', description: 'Confirm your details', icon: ShieldCheck },
   { label: 'Verification', description: 'Code delivery', icon: Mail },
 ]
 
@@ -41,6 +44,7 @@ const REGISTRATION_STEP_FIELDS = [
     'postalCode',
   ],
   ['password', 'confirmPassword'],
+  [],
   ['verificationMethod'],
 ]
 
@@ -93,6 +97,8 @@ const INITIAL_FORM = {
   verificationMethod: '',
   genderId: '',
   majorId: '',
+  additionalMajorSubjectIds: [],
+  taughtSubjectIds: [],
   educationalAttainmentId: '',
   countryCode: 'PH',
   regionCode: '',
@@ -308,11 +314,13 @@ async function fetchAddressOptions(path) {
 
 function TeacherSignUpPage({ onNavigate }) {
   const [step, setStep] = useState(0)
+  const [reviewEditStep, setReviewEditStep] = useState(null)
   const [form, setForm] = useState(INITIAL_FORM)
   const [referenceData, setReferenceData] = useState({
     genders: [],
     suffixes: [],
     majors: [],
+    subjects: [],
     educationalAttainments: [],
     schools: [],
     verificationMethods: [],
@@ -343,6 +351,8 @@ function TeacherSignUpPage({ onNavigate }) {
     confirmPassword: false,
   })
   const [accountSubmitAttempted, setAccountSubmitAttempted] = useState(false)
+  const [availability, setAvailability] = useState({ email: null, contactNumber: null })
+  const availabilityValuesRef = useRef({ email: '', contactNumber: '' })
 
   const todayDate = useMemo(() => getTodayDateString(), [])
   const maxBirthDate = useMemo(() => formatDateOnly(addYears(parseDateOnly(todayDate), -18)), [todayDate])
@@ -525,6 +535,14 @@ function TeacherSignUpPage({ onNavigate }) {
       school: getReferenceLabel(school, ['schoolName']) || form.schoolCode,
       major: getReferenceLabel(major, ['majorName']),
       attainment: getReferenceLabel(attainment, ['educationalAttainmentName']),
+      additionalMajors: referenceData.subjects
+        .filter((subject) => form.additionalMajorSubjectIds.includes(String(subject.subjectId)))
+        .map((subject) => subject.subjectName)
+        .join(', '),
+      subjectsTaughtBefore: referenceData.subjects
+        .filter((subject) => form.taughtSubjectIds.includes(String(subject.subjectId)))
+        .map((subject) => subject.subjectName)
+        .join(', '),
     }
   }, [form, referenceData])
 
@@ -538,9 +556,78 @@ function TeacherSignUpPage({ onNavigate }) {
   }
 
   const updateField = (field, value) => {
-    setForm((current) => ({ ...current, [field]: value }))
+    setForm((current) => {
+      const next = { ...current, [field]: value }
+      if (field === 'majorId') {
+        const mainSubject = referenceData.subjects.find(
+          (subject) => String(subject.majorId) === String(value),
+        )
+        if (mainSubject) {
+          next.additionalMajorSubjectIds = current.additionalMajorSubjectIds.filter(
+            (subjectId) => String(subjectId) !== String(mainSubject.subjectId),
+          )
+        }
+      }
+      return next
+    })
     clearFieldError(field)
+    if (field === 'email' || field === 'contactNumber') {
+      availabilityValuesRef.current[field] = value.trim()
+      setAvailability((current) => ({ ...current, [field]: null }))
+    }
     setSuccessMessage('')
+  }
+
+  const checkAvailability = async (field) => {
+    const value = form[field].trim()
+    const valid = field === 'email' ? isValidEmail(value) : isValidContactNumber(value)
+    if (!valid) return
+
+    setAvailability((current) => ({ ...current, [field]: { value, checking: true } }))
+    try {
+      const result = await checkTeacherRegistrationAvailabilityV3({ [field]: value })
+      if (availabilityValuesRef.current[field] !== value) return
+      const fieldResult = result[field]
+      setAvailability((current) => ({
+        ...current,
+        [field]: { value, checking: false, available: fieldResult?.available === true },
+      }))
+      if (fieldResult?.available === false) {
+        setFieldErrors((current) => ({
+          ...current,
+          [field]: field === 'email'
+            ? 'This email is already registered.'
+            : 'This contact number is already registered.',
+        }))
+      } else {
+        clearFieldError(field)
+      }
+    } catch (error) {
+      if (availabilityValuesRef.current[field] !== value) return
+      setAvailability((current) => ({ ...current, [field]: null }))
+      if (error.code === 'AVAILABILITY_RATE_LIMITED') {
+        const retryAfter = error.data?.retryAfterSeconds
+        setRequestError(
+          `Too many availability checks. Try again${retryAfter ? ` in ${retryAfter} seconds` : ' shortly'}.`,
+        )
+      }
+    }
+  }
+
+  const toggleSubject = (field, subjectId) => {
+    setForm((current) => {
+      const values = current[field]
+      const normalizedId = String(subjectId)
+      return {
+        ...current,
+        [field]: values.includes(normalizedId)
+          ? values.filter((value) => value !== normalizedId)
+          : values.length < 10
+            ? [...values, normalizedId]
+            : values,
+      }
+    })
+    clearFieldError(field)
   }
 
   const shouldShowFieldError = (field) =>
@@ -678,8 +765,17 @@ function TeacherSignUpPage({ onNavigate }) {
       }
 
       if (!isValidEmail(form.email)) errors.email = 'Enter a complete email address.'
+      else if (
+        availability.email?.value === form.email.trim() &&
+        availability.email.available === false
+      ) errors.email = 'This email is already registered.'
       if (!isValidContactNumber(form.contactNumber)) {
         errors.contactNumber = 'Use 09XXXXXXXXX or +639XXXXXXXXX.'
+      } else if (
+        availability.contactNumber?.value === form.contactNumber.trim() &&
+        availability.contactNumber.available === false
+      ) {
+        errors.contactNumber = 'This contact number is already registered.'
       }
       if (!form.majorId) errors.majorId = 'Select a major or specialization.'
       if (!form.educationalAttainmentId) {
@@ -699,6 +795,11 @@ function TeacherSignUpPage({ onNavigate }) {
       if (!form.addressLine.trim()) {
         errors.addressLine = 'Enter unit, building, house, or street details.'
       }
+      if (!form.postalCode.trim()) {
+        errors.postalCode = 'Postal code is required.'
+      } else if (!/^\d{4}$/.test(form.postalCode.trim())) {
+        errors.postalCode = 'Postal code must be 4 digits.'
+      }
     }
 
     if (stepIndex === 3) {
@@ -712,7 +813,7 @@ function TeacherSignUpPage({ onNavigate }) {
       }
     }
 
-    if (stepIndex === 4) {
+    if (stepIndex === 5) {
       if (!form.verificationMethod) {
         errors.verificationMethod = 'Select an available verification method.'
       } else if (!selectedVerificationMethod || selectedVerificationMethod.available !== true) {
@@ -754,7 +855,19 @@ function TeacherSignUpPage({ onNavigate }) {
       clearAccountErrors()
     }
 
-    setStep((current) => Math.min(current + 1, STEPS.length - 1))
+    if (reviewEditStep === step) {
+      setReviewEditStep(null)
+      setStep(4)
+    } else {
+      setStep((current) => Math.min(current + 1, STEPS.length - 1))
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const editReviewSection = (stepIndex) => {
+    setReviewEditStep(stepIndex)
+    setStep(stepIndex)
+    setRequestError('')
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -807,6 +920,8 @@ function TeacherSignUpPage({ onNavigate }) {
       genderId: Number(form.genderId),
       majorId: Number(form.majorId),
       educationalAttainmentId: Number(form.educationalAttainmentId),
+      additionalMajorSubjectIds: form.additionalMajorSubjectIds.map(Number),
+      taughtSubjectIds: form.taughtSubjectIds.map(Number),
       address: {
         countryCode: 'PH',
         regionCode: form.regionCode,
@@ -818,13 +933,12 @@ function TeacherSignUpPage({ onNavigate }) {
         barangayCode: form.barangayCode,
         barangayName: form.barangayName,
         addressLine: form.addressLine.trim(),
-        postalCode: form.postalCode.trim() || undefined,
+        postalCode: form.postalCode.trim(),
       },
     }
 
     if (form.schoolCode) payload.schoolCode = form.schoolCode
     if (!payload.middleName) delete payload.middleName
-    if (!payload.address.postalCode) delete payload.address.postalCode
 
     setIsSubmitting(true)
     setRequestError('')
@@ -969,7 +1083,7 @@ function TeacherSignUpPage({ onNavigate }) {
           <header className="teacher-registration-wizard-header">
             <div>
               <p>{STEPS[step].label}</p>
-              <h2>{step === 4 ? 'Choose verification method' : STEPS[step].description}</h2>
+              <h2>{step === 5 ? 'Choose verification method' : STEPS[step].description}</h2>
               <span>
                 {step === 0
                   ? 'Enter the teacher identity details and a valid birthdate.'
@@ -1138,11 +1252,17 @@ function TeacherSignUpPage({ onNavigate }) {
                     type="tel"
                     value={form.contactNumber}
                     onChange={(event) => updateField('contactNumber', event.target.value)}
+                    onBlur={() => checkAvailability('contactNumber')}
                     placeholder="09XXXXXXXXX or +639XXXXXXXX"
                     autoComplete="tel"
                     aria-invalid={Boolean(fieldErrors.contactNumber)}
                   />
                   <ErrorText message={fieldErrors.contactNumber} />
+                  {!fieldErrors.contactNumber && availability.contactNumber?.value === form.contactNumber.trim() ? (
+                    <small className={`registration-availability is-${availability.contactNumber.checking ? 'checking' : 'available'}`}>
+                      {availability.contactNumber.checking ? 'Checking availability...' : 'Contact number is available.'}
+                    </small>
+                  ) : null}
                 </label>
 
                 <label className="public-auth-field is-full" htmlFor="teacher-email">
@@ -1152,11 +1272,17 @@ function TeacherSignUpPage({ onNavigate }) {
                     type="email"
                     value={form.email}
                     onChange={(event) => updateField('email', event.target.value)}
+                    onBlur={() => checkAvailability('email')}
                     placeholder="teachername123@gmail.com"
                     autoComplete="email"
                     aria-invalid={Boolean(fieldErrors.email)}
                   />
                   <ErrorText message={fieldErrors.email} />
+                  {!fieldErrors.email && availability.email?.value === form.email.trim() ? (
+                    <small className={`registration-availability is-${availability.email.checking ? 'checking' : 'available'}`}>
+                      {availability.email.checking ? 'Checking availability...' : 'Email is available.'}
+                    </small>
+                  ) : null}
                 </label>
 
                 <label className="public-auth-field" htmlFor="teacher-major">
@@ -1204,6 +1330,56 @@ function TeacherSignUpPage({ onNavigate }) {
                   </select>
                   <ErrorText message={fieldErrors.educationalAttainmentId} />
                 </label>
+
+                <fieldset className="teacher-subject-picker is-full">
+                  <legend>Additional majors <small>(optional, up to 10)</small></legend>
+                  <div className="teacher-subject-options">
+                    {referenceData.subjects
+                      .filter((subject) => String(subject.majorId) !== String(form.majorId))
+                      .map((subject) => {
+                        const subjectId = String(subject.subjectId)
+                        return (
+                          <label key={`additional-${subjectId}`}>
+                            <input
+                              type="checkbox"
+                              checked={form.additionalMajorSubjectIds.includes(subjectId)}
+                              onChange={() => toggleSubject('additionalMajorSubjectIds', subjectId)}
+                              disabled={
+                                !form.additionalMajorSubjectIds.includes(subjectId) &&
+                                form.additionalMajorSubjectIds.length >= 10
+                              }
+                            />
+                            <span>{subject.subjectName}</span>
+                          </label>
+                        )
+                      })}
+                  </div>
+                  <ErrorText message={fieldErrors.additionalMajorSubjectIds} />
+                </fieldset>
+
+                <fieldset className="teacher-subject-picker is-full">
+                  <legend>Subjects taught before <small>(optional, up to 10)</small></legend>
+                  <div className="teacher-subject-options">
+                    {referenceData.subjects.map((subject) => {
+                      const subjectId = String(subject.subjectId)
+                      return (
+                        <label key={`taught-${subjectId}`}>
+                          <input
+                            type="checkbox"
+                            checked={form.taughtSubjectIds.includes(subjectId)}
+                            onChange={() => toggleSubject('taughtSubjectIds', subjectId)}
+                            disabled={
+                              !form.taughtSubjectIds.includes(subjectId) &&
+                              form.taughtSubjectIds.length >= 10
+                            }
+                          />
+                          <span>{subject.subjectName}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                  <ErrorText message={fieldErrors.taughtSubjectIds} />
+                </fieldset>
               </div>
             ) : null}
 
@@ -1328,15 +1504,20 @@ function TeacherSignUpPage({ onNavigate }) {
                 </label>
 
                 <label className="public-auth-field" htmlFor="teacher-postal-code">
-                  <span>
-                    Postal code <small>(optional)</small>
-                  </span>
+                  <span>Postal code</span>
                   <input
                     id="teacher-postal-code"
                     value={form.postalCode}
-                    onChange={(event) => updateField('postalCode', event.target.value)}
+                    onChange={(event) => updateField(
+                      'postalCode',
+                      event.target.value.replace(/\D/g, '').slice(0, 4),
+                    )}
                     autoComplete="postal-code"
+                    inputMode="numeric"
+                    maxLength="4"
+                    aria-invalid={Boolean(fieldErrors.postalCode)}
                   />
+                  <ErrorText message={fieldErrors.postalCode} />
                 </label>
 
                 <label className="public-auth-field" htmlFor="teacher-country">
@@ -1430,6 +1611,11 @@ function TeacherSignUpPage({ onNavigate }) {
                   </label>
                 </div>
 
+              </div>
+            ) : null}
+
+            {step === 4 ? (
+              <div className="teacher-registration-account-step">
                 <div className="teacher-registration-review-heading">
                   <span aria-hidden="true">
                     <ShieldCheck size={20} />
@@ -1438,6 +1624,24 @@ function TeacherSignUpPage({ onNavigate }) {
                     <h3>Review teacher registration</h3>
                     <p>Review the details, then choose where Marka should send the verification code.</p>
                   </div>
+                </div>
+
+                <div className="teacher-registration-review-actions" aria-label="Edit registration sections">
+                  {[
+                    [0, 'Personal'],
+                    [1, 'Professional'],
+                    [2, 'Address'],
+                    [3, 'Password'],
+                  ].map(([stepIndex, label]) => (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => editReviewSection(stepIndex)}
+                    >
+                      <Pencil size={15} aria-hidden="true" />
+                      Edit {label}
+                    </button>
+                  ))}
                 </div>
 
                 <dl className="teacher-registration-review-grid">
@@ -1459,6 +1663,8 @@ function TeacherSignUpPage({ onNavigate }) {
                   <ReviewItem label="Email" value={form.email} />
                   <ReviewItem label="Contact number" value={form.contactNumber} />
                   <ReviewItem label="Major" value={lookupNames.major} />
+                  <ReviewItem label="Additional majors" value={lookupNames.additionalMajors || 'None'} />
+                  <ReviewItem label="Subjects taught before" value={lookupNames.subjectsTaughtBefore || 'None'} />
                   <ReviewItem label="Educational attainment" value={lookupNames.attainment} />
                   <ReviewItem
                     label="Address"
@@ -1476,7 +1682,7 @@ function TeacherSignUpPage({ onNavigate }) {
               </div>
             ) : null}
 
-            {step === 4 ? (
+            {step === 5 ? (
               <fieldset className="teacher-registration-verification-step">
                 <legend className="sr-only">Choose verification method</legend>
 

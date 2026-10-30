@@ -863,7 +863,8 @@ h3 {
   overflow-wrap: anywhere;
 }
 
-.principal-school-profile-form input {
+.principal-school-profile-form input,
+.principal-school-profile-form select {
   width: 100%;
   min-height: 42px;
   padding: 9px 11px;
@@ -875,7 +876,8 @@ h3 {
   font-weight: 700;
 }
 
-.principal-school-profile-form input:focus {
+.principal-school-profile-form input:focus,
+.principal-school-profile-form select:focus {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(58, 207, 73, 0.14);
@@ -948,8 +950,38 @@ h3 {
   margin: 2px 0 0;
 }
 
-.principal-academic-calendar-header .principal-archive-refresh {
+.principal-academic-calendar-actions {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.principal-academic-calendar-tabs {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface-sunken);
+}
+
+.principal-academic-calendar-tabs button {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: calc(var(--radius-card) - 2px);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.principal-academic-calendar-tabs button.is-active {
+  background: var(--surface);
+  color: var(--primary-dark);
+  box-shadow: 0 1px 2px rgb(15 23 42 / 8%);
 }
 
 .principal-academic-year-list,
@@ -983,6 +1015,26 @@ h3 {
 
 .principal-academic-year-summary strong {
   color: var(--text);
+}
+
+.principal-archive-eligibility-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 10px 0 0;
+}
+
+.principal-archive-eligibility-details div {
+  display: flex;
+  gap: 6px;
+}
+
+.principal-archive-eligibility-details dt {
+  font-weight: 700;
+}
+
+.principal-archive-eligibility-details dd {
+  margin: 0;
 }
 
 .principal-term-grid {
@@ -1077,8 +1129,10 @@ h3 {
     flex-wrap: wrap;
   }
 
-  .principal-academic-calendar-header .principal-archive-refresh {
+  .principal-academic-calendar-actions {
     margin-left: 0;
+    width: 100%;
+    justify-content: space-between;
   }
 
   .principal-academic-year-summary,
@@ -3824,6 +3878,58 @@ h3 {
   grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
   align-items: start;
   gap: 18px;
+}
+
+.principal-school-profile-field-error {
+  color: var(--status-danger-text);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+}
+
+.teacher-subject-settings {
+  display: grid;
+  gap: 12px;
+}
+
+.teacher-subject-settings > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.teacher-subject-settings > header h2 {
+  margin: 2px 0 0;
+  font-size: 1.05rem;
+}
+
+.teacher-subject-settings > header button {
+  min-height: 36px;
+  padding: 0 13px;
+  border: 1px solid #2f9e24;
+  border-radius: 6px;
+  background: #2f9e24;
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.teacher-subject-settings > header button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.teacher-subject-settings-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 720px) {
+  .teacher-subject-settings-groups {
+    grid-template-columns: 1fr;
+  }
 }
 
 .teacher-account-summary {

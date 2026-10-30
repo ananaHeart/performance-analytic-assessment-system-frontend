@@ -22,6 +22,8 @@ const RESEND_COOLDOWN_SECONDS = TEACHER_VERIFICATION_RESEND_COOLDOWN_MS / 1000
 const VERIFICATION_ERROR_MESSAGES = {
   INVALID_VERIFICATION_CODE: 'The code is incorrect. Check it and try again.',
   VERIFICATION_CODE_EXPIRED: 'The code has expired. Request a new code.',
+  VERIFICATION_CODE_REPLACED:
+    'A newer verification code was sent. Enter the latest code.',
   VERIFICATION_ATTEMPTS_EXCEEDED:
     'Too many incorrect verification attempts. Request a new code before trying again.',
   VERIFICATION_CHALLENGE_LOCKED:
@@ -64,6 +66,21 @@ function getInitialCooldownSeconds(session) {
     : 0
 }
 
+function getExpirySeconds(session) {
+  if (!session?.otpExpiresAt) return null
+
+  const millisecondsRemaining = new Date(session.otpExpiresAt).getTime() - Date.now()
+  return Number.isFinite(millisecondsRemaining)
+    ? Math.max(0, Math.ceil(millisecondsRemaining / 1000))
+    : null
+}
+
+function formatCountdown(totalSeconds) {
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
 // Keep the teacher's own email and the new challenge, and drop the other channel's
 // masked destination so the screen never shows a stale address or number.
 function mergeChallenge(session, challenge) {
@@ -92,6 +109,9 @@ function TeacherEmailVerificationPage({ onNavigate }) {
   const [cooldownSeconds, setCooldownSeconds] = useState(
     () => getInitialCooldownSeconds(verificationSession),
   )
+  const [expirySeconds, setExpirySeconds] = useState(
+    () => getExpirySeconds(verificationSession),
+  )
   const [verified, setVerified] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const [statusMessage, setStatusMessage] = useState('')
@@ -107,6 +127,15 @@ function TeacherEmailVerificationPage({ onNavigate }) {
     )
     return () => window.clearInterval(timer)
   }, [challengeUuid, cooldownSeconds, verified])
+
+  useEffect(() => {
+    if (verified || !challengeUuid || !verificationSession?.otpExpiresAt) return undefined
+
+    const updateExpiry = () => setExpirySeconds(getExpirySeconds(verificationSession))
+    updateExpiry()
+    const timer = window.setInterval(updateExpiry, 1000)
+    return () => window.clearInterval(timer)
+  }, [challengeUuid, verificationSession, verified])
 
   const markVerified = () => {
     setVerified(true)
@@ -163,6 +192,7 @@ function TeacherEmailVerificationPage({ onNavigate }) {
       const nextSession = mergeChallenge(verificationSession, nextChallenge)
       setVerificationSession(nextSession)
       setCooldownSeconds(getInitialCooldownSeconds(nextSession))
+      setExpirySeconds(getExpirySeconds(nextSession))
       setOtp('')
       setStatusMessage(
         nextSession?.verificationMethod === 'sms'
@@ -183,6 +213,7 @@ function TeacherEmailVerificationPage({ onNavigate }) {
         const nextSession = mergeChallenge(verificationSession, error.errors)
         setVerificationSession(nextSession)
         setCooldownSeconds(getInitialCooldownSeconds(nextSession))
+        setExpirySeconds(getExpirySeconds(nextSession))
         setOtp('')
       } else if (error.code === 'VERIFICATION_RESEND_COOLDOWN') {
         setCooldownSeconds(
@@ -199,7 +230,7 @@ function TeacherEmailVerificationPage({ onNavigate }) {
   }
 
   const resendLabel = (label) =>
-    cooldownSeconds > 0 ? `${label} in ${cooldownSeconds}s` : label
+    cooldownSeconds > 0 ? `${label} in ${formatCountdown(cooldownSeconds)}` : label
 
   return (
     <PublicAuthShell
@@ -309,6 +340,17 @@ function TeacherEmailVerificationPage({ onNavigate }) {
               />
             </label>
 
+            {expirySeconds !== null ? (
+              <p
+                className={`teacher-verification-expiry${expirySeconds === 0 ? ' is-expired' : ''}`}
+                role={expirySeconds === 0 ? 'alert' : 'status'}
+              >
+                {expirySeconds === 0
+                  ? 'This code has expired. Request a new code.'
+                  : `Code expires in ${formatCountdown(expirySeconds)}`}
+              </p>
+            ) : null}
+
             {deliveryFailed && !errorMessage ? (
               <p className="public-auth-account-note">
                 {isSms
@@ -331,7 +373,7 @@ function TeacherEmailVerificationPage({ onNavigate }) {
             <button
               type="submit"
               className="public-auth-submit"
-              disabled={isVerifying || otp.length !== 6}
+              disabled={isVerifying || otp.length !== 6 || expirySeconds === 0}
             >
               <ShieldCheck size={18} strokeWidth={2.2} aria-hidden="true" />
               {isVerifying ? 'Verifying...' : 'Verify'}

@@ -94,13 +94,17 @@ test('genuine authentication failures still expire the matching session', async 
     assert.equal(error.isAuthenticationFailure, true)
     return true
   })
-  assert.deepEqual(authEvents, [{ token: 'expired-synthetic-token' }])
+  assert.deepEqual(authEvents, [{
+    token: 'expired-synthetic-token',
+    code: 'AUTHENTICATION_REQUIRED',
+    message: 'Authentication is required.',
+  }])
 })
 
 test('missing tokens still fail closed and never issue an unauthenticated export request', async () => {
   await assert.rejects(api.downloadTestQuestionnairePdfV3(12), { code: 'AUTHENTICATION_REQUIRED' })
   assert.equal(requests.length, 0)
-  assert.deepEqual(authEvents, [{ token: '' }])
+  assert.deepEqual(authEvents, [{ token: '', code: '', message: '' }])
 })
 
 test('questionnaire uses the established stored session when no explicit token is passed', async () => {

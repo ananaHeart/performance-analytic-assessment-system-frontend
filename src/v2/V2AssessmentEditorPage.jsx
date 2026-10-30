@@ -7,20 +7,26 @@ import {
   CirclePlus,
   CopyPlus,
   LoaderCircle,
+  Pencil,
   Printer,
   Save,
   Trash2,
+  X,
 } from 'lucide-react'
 
 import {
   activateAssessmentV3,
+  checkAssessmentSameDayV3,
   createAssessmentV3,
   downloadAnswerSheetPdfV3,
   downloadTestQuestionnairePdfV3,
   generateAnswerSheetVersionV3,
   getAnswerSheetEligibilityV3,
+  getAnswerSheetVersionV3,
   getAssessmentReferenceDataV3,
+  getAssessmentEditEligibilityV3,
   getAssessmentV3,
+  updateAssessmentDetailsV3,
   updateAssessmentV3,
 } from '@/api/apiV3Client'
 import { Badge } from '@/components/ui/badge'
@@ -48,9 +54,6 @@ import { dismissAssessmentRules, hasDismissedAssessmentRules, isPastDateTime } f
 const TEST_TYPES = [
   ['quiz', 'Quiz'],
   ['exam', 'Exam'],
-  ['diagnostic', 'Diagnostic'],
-  ['long_test', 'Long test'],
-  ['other', 'Other'],
 ]
 
 const SUPPORTED_QUESTION_TYPE_CODES = new Set([
@@ -602,7 +605,7 @@ function questionValidationError(part, question, itemNumber, rubrics = []) {
   return `${prefix}: select a supported question type.`
 }
 
-function validateDraft(form, rubrics = []) {
+function validateDraft(form, rubrics = [], selectedTerm = null) {
   if (!form.classAssignmentId || !form.termPeriodId) {
     return 'Assessment class or active term context is unavailable. Return to the class and try again.'
   }
@@ -613,6 +616,39 @@ function validateDraft(form, rubrics = []) {
 
   if (!form.openAt) {
     return 'Set the opening date (when the assessment is conducted).'
+  }
+
+  if (selectedTerm && String(selectedTerm.status ?? '').toLowerCase() !== 'active') {
+    return `${selectedTerm.termName || 'The selected term'} is not active. Assessments can only be scheduled during an active term.`
+  }
+
+  const termStart = selectedTerm?.startAt ? new Date(selectedTerm.startAt) : null
+  const termEnd = selectedTerm?.endAt ? new Date(selectedTerm.endAt) : null
+  const openingTime = form.openAt ? new Date(form.openAt) : null
+  const closingTime = form.closeAt ? new Date(form.closeAt) : null
+
+  if (openingTime && termStart && openingTime < termStart) {
+    return 'The opening date must be inside the selected term.'
+  }
+
+  if (openingTime && termEnd && openingTime > termEnd) {
+    return 'The opening date must be inside the selected term.'
+  }
+
+  if (closingTime && termStart && closingTime < termStart) {
+    return 'The closing date must be inside the selected term.'
+  }
+
+  if (closingTime && termEnd && closingTime > termEnd) {
+    return 'The closing date must be inside the selected term.'
+  }
+
+  if (form.openAt) {
+    const openingHour = openingTime.getHours()
+    const openingMinute = openingTime.getMinutes()
+    if (openingHour < 8 || openingHour > 17 || (openingHour === 17 && openingMinute > 0)) {
+      return 'Opening time must be between 8:00 AM and 5:00 PM (Philippine time).'
+    }
   }
 
   if (form.openAt && form.closeAt && new Date(form.closeAt) <= new Date(form.openAt)) {
@@ -1516,10 +1552,17 @@ function V2AssessmentEditorPage({
   const [answerSheetEligibility, setAnswerSheetEligibility] = useState(null)
   const [answerSheetChecking, setAnswerSheetChecking] = useState(false)
   const [answerSheetVersion, setAnswerSheetVersion] = useState(null)
+  const [answerSheetVersionNotice, setAnswerSheetVersionNotice] = useState('')
   const [answerSheetPreparing, setAnswerSheetPreparing] = useState(false)
   const [answerSheetError, setAnswerSheetError] = useState('')
   const [questionnairePreparing, setQuestionnairePreparing] = useState(false)
   const [questionnaireError, setQuestionnaireError] = useState('')
+  const [editEligibility, setEditEligibility] = useState(null)
+  const [editEligibilityLoading, setEditEligibilityLoading] = useState(Boolean(testId))
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false)
+  const [detailsDraft, setDetailsDraft] = useState({ testName: '', instructions: '' })
+  const [detailsError, setDetailsError] = useState('')
+  const [savingDetails, setSavingDetails] = useState(false)
   const [form, setForm] = useState({
     classAssignmentId: '',
     termPeriodId: '',
@@ -1543,12 +1586,16 @@ function V2AssessmentEditorPage({
   const [saving, setSaving] = useState(false)
   const [activating, setActivating] = useState(false)
   const [assessmentStatus, setAssessmentStatus] = useState('draft')
+  const [lastSavedAt, setLastSavedAt] = useState(null)
   const [savedPayloadSnapshot, setSavedPayloadSnapshot] = useState(null)
   const [message, setMessage] = useState(null)
   const [openAtError, setOpenAtError] = useState('')
   // Strict-looking warning only; a past opening time is not blocked on save.
   const [openAtPastWarning, setOpenAtPastWarning] = useState(false)
   const [showRules, setShowRules] = useState(() => !testId && !hasDismissedAssessmentRules(userId))
+  const testTypeOptions = TEST_TYPES.some(([value]) => value === form.testType)
+    ? TEST_TYPES
+    : [[form.testType, formatCodeLabel(form.testType)], ...TEST_TYPES]
 
   const refreshAnswerSheetEligibility = useCallback(async (testAssignmentId) => {
     if (!testAssignmentId) {
@@ -1567,6 +1614,26 @@ function V2AssessmentEditorPage({
       })
     } finally {
       setAnswerSheetChecking(false)
+    }
+  }, [token])
+
+  const refreshEditEligibility = useCallback(async (assessmentId) => {
+    if (!assessmentId) {
+      setEditEligibility(null)
+      setEditEligibilityLoading(false)
+      return
+    }
+
+    setEditEligibilityLoading(true)
+    try {
+      setEditEligibility(await getAssessmentEditEligibilityV3(assessmentId, token))
+    } catch (eligibilityError) {
+      setEditEligibility({
+        canEditDetails: false,
+        reason: eligibilityError.message || 'Unable to check editing permissions.',
+      })
+    } finally {
+      setEditEligibilityLoading(false)
     }
   }, [token])
 
@@ -1600,9 +1667,11 @@ function V2AssessmentEditorPage({
           const hydratedForm = hydrateAssessment(assessment, skillReference)
           setForm(hydratedForm)
           setAssessmentStatus(String(assessment.status ?? 'draft').toLowerCase())
+          setLastSavedAt(null)
           setSavedPayloadSnapshot(JSON.stringify(toPayload(hydratedForm)))
           setCurrentTestAssignmentId(assessment.testAssignmentId ?? null)
           refreshAnswerSheetEligibility(assessment.testAssignmentId ?? null)
+          refreshEditEligibility(assessment.testId ?? assessment.id ?? testId)
           return
         }
 
@@ -1647,7 +1716,7 @@ function V2AssessmentEditorPage({
 
     initialize()
     return () => { active = false }
-  }, [initialClassAssignmentId, testId, token, refreshAnswerSheetEligibility])
+  }, [initialClassAssignmentId, testId, token, refreshAnswerSheetEligibility, refreshEditEligibility])
 
   const selectedAssignment = useMemo(
     () => assignments.find((assignment) => String(assignment.classAssignmentId) === form.classAssignmentId),
@@ -1710,7 +1779,15 @@ function V2AssessmentEditorPage({
     currentTestId && savedPayloadSnapshot !== currentPayloadSnapshot,
   )
   const isDraft = assessmentStatus === 'draft'
-  const reviewError = validateDraft(form, rubrics)
+  const reviewError = validateDraft(form, rubrics, selectedTerm)
+  const termStartDateTime = toDateTimeLocal(selectedTerm?.startAt)
+  const termEndDateTime = toDateTimeLocal(selectedTerm?.endAt)
+  const termDateRange = selectedTerm?.startAt && selectedTerm?.endAt
+    ? `${new Date(selectedTerm.startAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })} - ${new Date(selectedTerm.endAt).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}`
+    : ''
+  const activationError = totalItems < 5
+    ? `Add at least ${5 - totalItems} more item${5 - totalItems === 1 ? '' : 's'} before activation.`
+    : reviewError
   const answerSheetBlockerMessage = answerSheetEligibility?.blockers
     ?.map((blocker) => blocker.message)
     .filter(Boolean)
@@ -1920,7 +1997,7 @@ function V2AssessmentEditorPage({
   }
 
   const submit = async () => {
-    const validationError = validateDraft(form, rubrics)
+    const validationError = validateDraft(form, rubrics, selectedTerm)
     if (validationError) {
       setMessage({ type: 'error', text: validationError })
       window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -1932,22 +2009,105 @@ function V2AssessmentEditorPage({
 
     try {
       const payload = toPayload(form)
+      try {
+        const sameDayCheck = await checkAssessmentSameDayV3({
+          classAssignmentId: payload.classAssignmentId,
+          openAt: payload.openAt,
+          excludeTestId: isEditing ? currentTestId : undefined,
+        }, token)
+
+        if (
+          sameDayCheck.hasConflict
+          && !window.confirm(
+            sameDayCheck.message
+              || 'This class already has another assessment opening on the same day. Save anyway?',
+          )
+        ) {
+          return
+        }
+      } catch {
+        // This advisory check must not replace the backend's save validation.
+      }
+
       const saved = isEditing
         ? await updateAssessmentV3(currentTestId, payload, token)
         : await createAssessmentV3(payload, token)
       setCurrentTestId(saved.testId)
       setAssessmentStatus(String(saved.status ?? 'draft').toLowerCase())
       setSavedPayloadSnapshot(JSON.stringify(payload))
+      setLastSavedAt(new Date())
       setMessage({ type: 'success', text: 'Draft assessment saved successfully.' })
       setCurrentTestAssignmentId(saved.testAssignmentId ?? null)
       setAnswerSheetVersion(null)
       refreshAnswerSheetEligibility(saved.testAssignmentId ?? null)
+      refreshEditEligibility(saved.testId)
     } catch (error) {
       setMessage({ type: 'error', text: error.message })
       setOpenAtError(error.errors?.openAt ?? '')
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const openDetailsDialog = () => {
+    if (!editEligibility?.canEditDetails) return
+    setDetailsDraft({
+      testName: form.testName,
+      instructions: form.instructions,
+    })
+    setDetailsError('')
+    setDetailsDialogOpen(true)
+  }
+
+  const closeDetailsDialog = () => {
+    if (savingDetails) return
+    setDetailsDialogOpen(false)
+    setDetailsError('')
+  }
+
+  const saveAssessmentDetails = async (event) => {
+    event.preventDefault()
+    const testName = detailsDraft.testName.trim()
+    const instructions = detailsDraft.instructions.trim()
+
+    if (!testName) {
+      setDetailsError('Enter an assessment title.')
+      return
+    }
+    if (testName.length > 120 || instructions.length > 10000) {
+      setDetailsError('Keep the title within 120 characters and instructions within 10,000 characters.')
+      return
+    }
+
+    setSavingDetails(true)
+    setDetailsError('')
+    try {
+      const updated = await updateAssessmentDetailsV3(
+        currentTestId,
+        { testName, instructions: instructions || null },
+        token,
+      )
+      const nextForm = {
+        ...form,
+        testName: updated?.testName ?? testName,
+        instructions: updated?.instructions ?? instructions,
+      }
+      setForm(nextForm)
+      setSavedPayloadSnapshot(JSON.stringify(toPayload(nextForm)))
+      setLastSavedAt(new Date())
+      setDetailsDialogOpen(false)
+      setMessage({ type: 'success', text: 'Assessment title and instructions updated successfully.' })
+      await refreshEditEligibility(currentTestId)
+    } catch (detailsUpdateError) {
+      setDetailsError(
+        detailsUpdateError.errors?.testName ||
+        detailsUpdateError.errors?.instructions ||
+        detailsUpdateError.message ||
+        'Unable to update assessment details.',
+      )
+    } finally {
+      setSavingDetails(false)
     }
   }
 
@@ -1962,11 +2122,25 @@ function V2AssessmentEditorPage({
 
     setAnswerSheetPreparing(true)
     setAnswerSheetError('')
+    setAnswerSheetVersionNotice('')
 
     try {
       let version = answerSheetVersion
+      if (version?.answerSheetVersionId) {
+        version = await getAnswerSheetVersionV3(version.answerSheetVersionId, token)
+      }
+
+      if (version && version.latest === false) {
+        setAnswerSheetVersionNotice(
+          'A newer answer sheet exists. The latest version will be printed for new copies; older printed sheets remain valid.',
+        )
+        version = null
+      }
+
       if (!version) {
         version = await generateAnswerSheetVersionV3(currentTestAssignmentId, 'A4', token)
+        setAnswerSheetVersion(version)
+      } else {
         setAnswerSheetVersion(version)
       }
 
@@ -2012,9 +2186,18 @@ function V2AssessmentEditorPage({
   const handleActivate = async () => {
     if (!currentTestId || !isDraft || hasUnsavedChanges) return
 
-    const validationError = validateDraft(form, rubrics)
+    const validationError = validateDraft(form, rubrics, selectedTerm)
     if (validationError) {
       setMessage({ type: 'error', text: validationError })
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
+
+    if (totalItems < 5) {
+      setMessage({
+        type: 'error',
+        text: 'An assessment needs at least 5 items before it can be activated. You can keep this as a draft.',
+      })
       window.scrollTo({ top: 0, behavior: 'smooth' })
       return
     }
@@ -2027,6 +2210,7 @@ function V2AssessmentEditorPage({
       setAssessmentStatus(String(activated.status ?? 'active').toLowerCase())
       setAnswerSheetVersion(null)
       refreshAnswerSheetEligibility(activated.testAssignmentId ?? currentTestAssignmentId)
+      refreshEditEligibility(currentTestId)
       setMessage({ type: 'success', text: 'Assessment activated successfully.' })
     } catch (error) {
       setMessage({ type: 'error', text: error.message })
@@ -2081,6 +2265,14 @@ function V2AssessmentEditorPage({
             <Badge variant={assessmentStatus === 'active' ? 'default' : 'secondary'}>
               {assessmentStatus === 'active' ? 'Active' : 'Draft'}
             </Badge>
+            {lastSavedAt ? (
+              <span className="text-xs font-medium text-muted-foreground" role="status">
+                Saved at {lastSavedAt.toLocaleTimeString('en-PH', {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                })}
+              </span>
+            ) : null}
             <p className="m-0 max-w-2xl text-sm text-muted-foreground">
               Complete every part, answer key, and skill range before activation.
             </p>
@@ -2095,6 +2287,21 @@ function V2AssessmentEditorPage({
             {saving ? <LoaderCircle className="animate-spin" /> : <Save />}
             Save draft
           </Button>
+          {!isDraft ? (
+            <Button
+              variant="outline"
+              disabled={editEligibilityLoading || savingDetails || !editEligibility?.canEditDetails}
+              title={
+                editEligibilityLoading
+                  ? 'Checking editing permissions...'
+                  : editEligibility?.reason || 'Edit the assessment title and instructions.'
+              }
+              onClick={openDetailsDialog}
+            >
+              {editEligibilityLoading ? <LoaderCircle className="animate-spin" /> : <Pencil />}
+              Edit details
+            </Button>
+          ) : null}
           <Button
             disabled={
               saving ||
@@ -2102,12 +2309,12 @@ function V2AssessmentEditorPage({
               !currentTestId ||
               !isDraft ||
               hasUnsavedChanges ||
-              Boolean(reviewError)
+              Boolean(activationError)
             }
             title={
               hasUnsavedChanges
                 ? 'Save the latest draft changes before activation.'
-                : reviewError || ''
+                : activationError || ''
             }
             onClick={handleActivate}
           >
@@ -2151,8 +2358,18 @@ function V2AssessmentEditorPage({
         {answerSheetError ? (
           <p className="col-span-full m-0 text-sm text-destructive">{answerSheetError}</p>
         ) : null}
+        {answerSheetVersionNotice ? (
+          <p className="col-span-full m-0 text-sm font-medium text-amber-700" role="status">
+            {answerSheetVersionNotice}
+          </p>
+        ) : null}
         {questionnaireError ? (
           <p className="col-span-full m-0 text-sm text-destructive">{questionnaireError}</p>
+        ) : null}
+        {!isDraft && !editEligibilityLoading && !editEligibility?.canEditDetails && editEligibility?.reason ? (
+          <p className="col-span-full m-0 text-sm text-muted-foreground">
+            Details cannot be edited: {editEligibility.reason}
+          </p>
         ) : null}
       </header>
 
@@ -2216,7 +2433,7 @@ function V2AssessmentEditorPage({
                 <SelectValue placeholder="Select assessment type" />
               </SelectTrigger>
               <SelectContent>
-                {TEST_TYPES.map(([value, label]) => (
+                {testTypeOptions.map(([value, label]) => (
                   <SelectItem key={value} value={value}>{label}</SelectItem>
                 ))}
               </SelectContent>
@@ -2229,6 +2446,10 @@ function V2AssessmentEditorPage({
               <DateTimePicker
                 id="assessment-open-at"
                 value={form.openAt}
+                minDateTime={termStartDateTime}
+                maxDateTime={termEndDateTime}
+                minTime="08:00"
+                maxTime="17:00"
                 onChange={(value) => {
                   updateForm('openAt', value)
                   setOpenAtPastWarning(isPastDateTime(value))
@@ -2241,6 +2462,12 @@ function V2AssessmentEditorPage({
                   Opening time must be now or later. Choose the current time or a future time.
                 </p>
               ) : null}
+              {!openAtError && !openAtPastWarning ? (
+                <p className="m-0 text-sm text-muted-foreground">
+                  {termDateRange ? `${selectedTerm.termName}: ${termDateRange}. ` : ''}
+                  Opening time must be from 8:00 AM to 5:00 PM, Philippine time.
+                </p>
+              ) : null}
             </div>
 
             <div className="space-y-2">
@@ -2248,7 +2475,8 @@ function V2AssessmentEditorPage({
               <DateTimePicker
                 id="assessment-close-at"
                 value={form.closeAt}
-                minDateTime={form.openAt}
+                minDateTime={form.openAt || termStartDateTime}
+                maxDateTime={termEndDateTime}
                 onChange={(value) => updateForm('closeAt', value)}
                 placeholder="Select closing date and time"
               />
@@ -2693,10 +2921,96 @@ function V2AssessmentEditorPage({
                   {reviewError}
                 </p>
               ) : null}
+              {!reviewError && totalItems < 5 ? (
+                <p className="assessment-editor-summary-error" role="status">
+                  Draft can be saved, but at least 5 items are required for activation.
+                </p>
+              ) : null}
             </CardContent>
           </Card>
         </aside>
       </div>
+
+      {detailsDialogOpen ? (
+        <div
+          className="assignment-delete-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeDetailsDialog()
+          }}
+        >
+          <section
+            className="assignment-delete-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="assessmentDetailsDialogTitle"
+          >
+            <header className="assignment-delete-header assignment-confirm-header">
+              <span className="assignment-delete-warning assignment-confirm-icon" aria-hidden="true">
+                <Pencil size={21} />
+              </span>
+              <div>
+                <p>Safe active-assessment edit</p>
+                <h3 id="assessmentDetailsDialogTitle">Edit title and instructions</h3>
+              </div>
+              <button
+                type="button"
+                className="assignment-delete-close"
+                onClick={closeDetailsDialog}
+                disabled={savingDetails}
+                aria-label="Close assessment details dialog"
+              >
+                <X size={18} aria-hidden="true" />
+              </button>
+            </header>
+            <div className="assignment-delete-body">
+              <p className="assignment-confirm-instruction">
+                Questions, answer keys, competency mappings, and schedule remain locked.
+              </p>
+              <form onSubmit={saveAssessmentDetails}>
+                <Label htmlFor="active-assessment-name">Assessment title</Label>
+                <Input
+                  id="active-assessment-name"
+                  value={detailsDraft.testName}
+                  maxLength="120"
+                  onChange={(event) => {
+                    setDetailsDraft((current) => ({ ...current, testName: event.target.value }))
+                    setDetailsError('')
+                  }}
+                  disabled={savingDetails}
+                  autoFocus
+                  required
+                />
+                <Label htmlFor="active-assessment-instructions">Instructions (optional)</Label>
+                <textarea
+                  id="active-assessment-instructions"
+                  className={TEXTAREA_CLASS}
+                  value={detailsDraft.instructions}
+                  maxLength="10000"
+                  onChange={(event) => {
+                    setDetailsDraft((current) => ({ ...current, instructions: event.target.value }))
+                    setDetailsError('')
+                  }}
+                  disabled={savingDetails}
+                  rows="5"
+                />
+                {detailsError ? (
+                  <p className="form-message form-message-error" role="alert">{detailsError}</p>
+                ) : null}
+                <div className="assignment-delete-actions">
+                  <Button type="button" variant="outline" onClick={closeDetailsDialog} disabled={savingDetails}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={savingDetails || !detailsDraft.testName.trim()}>
+                    {savingDetails ? <LoaderCircle className="animate-spin" /> : <Save />}
+                    {savingDetails ? 'Saving...' : 'Save details'}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </section>
   )
 }

@@ -68,11 +68,11 @@ function NotificationCenter({ token, variant = 'principal' }) {
     }
   }, [])
 
-  const refreshUnreadCount = useCallback(async () => {
+  const refreshUnreadCount = useCallback(async (background = false) => {
     if (!token) return
 
     try {
-      const result = await getNotificationUnreadCountV3(token)
+      const result = await getNotificationUnreadCountV3(token, { background })
       if (mountedRef.current) {
         setUnreadCount(result.unreadCount)
       }
@@ -85,14 +85,18 @@ function NotificationCenter({ token, variant = 'principal' }) {
     }
   }, [token])
 
-  const refreshNotifications = useCallback(async () => {
+  const refreshNotifications = useCallback(async (background = false) => {
     if (!token) return
 
     setIsLoading(true)
     setError('')
 
     try {
-      const result = await getNotificationsV3(token, { unreadOnly: false, limit: 20 })
+      const result = await getNotificationsV3(token, {
+        unreadOnly: false,
+        limit: 20,
+        background,
+      })
       if (mountedRef.current) {
         setNotifications(result.notifications)
         setUnreadCount(result.unreadCount)
@@ -114,14 +118,14 @@ function NotificationCenter({ token, variant = 'principal' }) {
 
   useEffect(() => {
     const initialRefresh = window.setTimeout(() => {
-      void refreshUnreadCount()
+      void refreshUnreadCount(true)
     }, 0)
 
     const handleWindowFocus = () => {
       if (isOpenRef.current) {
-        void refreshNotifications()
+        void refreshNotifications(true)
       } else {
-        void refreshUnreadCount()
+        void refreshUnreadCount(true)
       }
     }
 

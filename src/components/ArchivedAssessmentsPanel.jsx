@@ -52,6 +52,7 @@ function ArchivedAssessmentsPanel({ token }) {
   const [error, setError] = useState('')
   const [restoringId, setRestoringId] = useState(null)
   const [restoreError, setRestoreError] = useState('')
+  const [restoreSuccess, setRestoreSuccess] = useState('')
 
   useEffect(() => {
     let active = true
@@ -81,11 +82,20 @@ function ArchivedAssessmentsPanel({ token }) {
 
     setRestoringId(assessment.id)
     setRestoreError('')
+    setRestoreSuccess('')
 
     try {
-      await restoreAssessmentV3(assessment.id, token)
+      const restored = await restoreAssessmentV3(assessment.id, token)
+      const restoredStatus = String(restored?.status ?? restored?.testStatus ?? '').toLowerCase()
       const nextGroups = await fetchArchivedGroups(token)
       setGroups(nextGroups)
+      setRestoreSuccess(
+        restoredStatus === 'active'
+          ? 'Assessment restored as Active.'
+          : restoredStatus === 'draft'
+            ? 'Assessment restored as Draft.'
+            : 'Assessment restored successfully.',
+      )
     } catch (restoreErrorCause) {
       setRestoreError(restoreErrorCause.message || 'Unable to restore this assessment.')
     } finally {
@@ -115,6 +125,10 @@ function ArchivedAssessmentsPanel({ token }) {
 
       {!isLoading && !error && restoreError ? (
         <p className="form-message form-message-error">{restoreError}</p>
+      ) : null}
+
+      {!isLoading && !error && restoreSuccess ? (
+        <p className="form-message form-message-success" role="status">{restoreSuccess}</p>
       ) : null}
 
       {!isLoading && !error && !groups.length ? (
@@ -148,7 +162,7 @@ function ArchivedAssessmentsPanel({ token }) {
                       type="button"
                       className="secondary-button"
                       disabled={Boolean(restoringId)}
-                      title="Move this assessment back to Draft in its class."
+                      title="Restore this assessment to its class."
                       onClick={() => handleRestore(assessment)}
                     >
                       {restoringId === assessment.id ? (

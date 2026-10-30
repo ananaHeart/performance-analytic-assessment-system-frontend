@@ -18,11 +18,41 @@ import {
 import PublicAuthShell from '../components/PublicAuthShell'
 import { storeTeacherVerificationSession } from '../utils/teacherEmailVerification'
 
-function LoginPage({ onLoginSuccess, onAuthenticationFailure, onNavigate }) {
+function formatContractEndDate(value) {
+  if (!value) return ''
+  const parsedDate = new Date(`${String(value).slice(0, 10)}T00:00:00`)
+  if (Number.isNaN(parsedDate.getTime())) return String(value)
+  return parsedDate.toLocaleDateString('en-PH', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+}
+
+function getAccountLoginError(error) {
+  const contractEndDate = formatContractEndDate(error?.errors?.contractEndDate)
+  const messages = {
+    ACCOUNT_PENDING_APPROVAL:
+      'Your teacher registration is still awaiting principal approval.',
+    ACCOUNT_REJECTED:
+      'Your teacher registration was rejected. Contact the school principal for assistance.',
+    ACCOUNT_INACTIVE:
+      'Your account is inactive. Contact the school principal to restore access.',
+    ACCOUNT_ARCHIVED:
+      'Your account has been archived. Contact the school principal if access should be restored.',
+    ACCOUNT_CONTRACT_ENDED: contractEndDate
+      ? `Your teaching contract ended on ${contractEndDate}. Contact the school principal to extend it.`
+      : 'Your teaching contract has ended. Contact the school principal to extend it.',
+  }
+
+  return messages[error?.code] || ''
+}
+
+function LoginPage({ onLoginSuccess, onAuthenticationFailure, onNavigate, initialMessage = '' }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isPasswordVisible, setIsPasswordVisible] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(initialMessage)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [mfaChallenge, setMfaChallenge] = useState(null)
   const [mfaMethod, setMfaMethod] = useState('authenticator')
@@ -96,10 +126,12 @@ function LoginPage({ onLoginSuccess, onAuthenticationFailure, onNavigate }) {
         return
       }
 
+      const accountError = getAccountLoginError(submitError)
+
       if (submitError.status === 401 || submitError.isAuthenticationFailure) {
         onAuthenticationFailure?.()
       }
-      setError(submitError.message || 'Unable to sign in. Please try again.')
+      setError(accountError || submitError.message || 'Unable to sign in. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
@@ -346,6 +378,15 @@ function LoginPage({ onLoginSuccess, onAuthenticationFailure, onNavigate }) {
               </button>
             </div>
           </label>
+
+          <button
+            type="button"
+            className="login-forgot-password"
+            onClick={() => onNavigate('forgot-password')}
+            disabled={isSubmitting}
+          >
+            Forgot password?
+          </button>
 
           {error ? (
             <p className="public-auth-message is-error" role="alert" aria-live="polite">

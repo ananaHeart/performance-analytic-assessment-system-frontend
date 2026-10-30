@@ -8,15 +8,23 @@ function DateTimePicker({
   className,
   disabled = false,
   id,
+  maxDateTime = '',
+  maxTime = '',
   minDateTime = '',
+  minTime = '',
   onChange,
   value,
 }) {
   const datePart = value ? value.slice(0, 10) : ''
   const timePart = value ? value.slice(11, 16) : ''
   const minDatePart = minDateTime ? minDateTime.slice(0, 10) : ''
+  const maxDatePart = maxDateTime ? maxDateTime.slice(0, 10) : ''
   const minTimePart = minDateTime ? minDateTime.slice(11, 16) : ''
-  const timeMin = datePart && minDatePart && datePart === minDatePart ? minTimePart : undefined
+  const maxTimePart = maxDateTime ? maxDateTime.slice(11, 16) : ''
+  const dateSpecificMin = datePart && minDatePart && datePart === minDatePart ? minTimePart : ''
+  const dateSpecificMax = datePart && maxDatePart && datePart === maxDatePart ? maxTimePart : ''
+  const effectiveTimeMin = [minTime, dateSpecificMin].filter(Boolean).sort().at(-1)
+  const effectiveTimeMax = [maxTime, dateSpecificMax].filter(Boolean).sort().at(0)
 
   const handleDateChange = (event) => {
     const nextDate = event.target.value
@@ -35,6 +43,7 @@ function DateTimePicker({
         type="date"
         value={datePart}
         min={minDatePart || undefined}
+        max={maxDatePart || undefined}
         disabled={disabled}
         onChange={handleDateChange}
         className={cn(inputClassName, 'flex-1')}
@@ -42,7 +51,8 @@ function DateTimePicker({
       <input
         type="time"
         value={timePart}
-        min={timeMin}
+        min={effectiveTimeMin || undefined}
+        max={effectiveTimeMax || undefined}
         disabled={disabled || !datePart}
         onChange={handleTimeChange}
         className={cn(inputClassName, 'w-32 shrink-0')}

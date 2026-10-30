@@ -1,15 +1,51 @@
-const API_BASE_URL = (import.meta.env.VITE_V3_API_URL || '').replace(/\/$/, '')
+const configuredV3ApiUrl = String(import.meta.env.VITE_V3_API_URL || '').trim()
+const configuredLegacyApiUrl = String(import.meta.env.VITE_API_URL || '').trim()
+const configuredLocalApiUrl = String(import.meta.env.VITE_LOCAL_V3_API_URL || '').trim()
+const configuredRenderApiUrl = String(import.meta.env.VITE_RENDER_V3_API_URL || '').trim()
+
+function isLocalApiUrl(value) {
+  try {
+    return ['localhost', '127.0.0.1', '::1'].includes(new URL(value).hostname)
+  } catch {
+    return false
+  }
+}
+
+function resolveApiBaseUrl() {
+  const browserHost = typeof window === 'undefined' ? '' : window.location.hostname
+  const isLocalBrowser = ['localhost', '127.0.0.1', '::1'].includes(browserHost)
+
+  if (isLocalBrowser) {
+    return configuredLocalApiUrl
+      || (isLocalApiUrl(configuredV3ApiUrl) ? configuredV3ApiUrl : '')
+      || 'http://127.0.0.1:8080'
+  }
+
+  return configuredRenderApiUrl
+    || (!isLocalApiUrl(configuredV3ApiUrl) ? configuredV3ApiUrl : '')
+    || configuredLegacyApiUrl
+}
+
+const API_BASE_URL = resolveApiBaseUrl().replace(/\/$/, '')
 
 export const V3_AUTH_EXPIRED_EVENT = 'smart:v3-auth-expired'
 
 const PUBLIC_AUTH_PATHS = new Set([
   '/api/v3/auth/teacher-registration/reference-data',
+  '/api/v3/auth/teacher-registration/availability',
   '/api/v3/auth/register-teacher',
   '/api/v3/auth/verify-teacher-email',
   '/api/v3/auth/resend-teacher-verification',
   '/api/v3/auth/login',
   '/api/v3/auth/mfa/login/verify',
+  '/api/v3/auth/password-reset/request',
+  '/api/v3/auth/password-reset/resend',
+  '/api/v3/auth/password-reset/confirm',
 ])
+
+function isPublicAuthPath(path) {
+  return PUBLIC_AUTH_PATHS.has(String(path).split('?', 1)[0])
+}
 const AUTH_STORAGE_KEY = 'assessment-auth-session'
 const LEGACY_TOKEN_STORAGE_KEY = 'assessment-token'
 const V3_DEVICE_IDENTIFIER_STORAGE_KEY = 'assessment-v3-device-identifier'
@@ -63,12 +99,16 @@ function readStoredAccessToken() {
   return normalizeAccessToken(window.localStorage.getItem(LEGACY_TOKEN_STORAGE_KEY))
 }
 
-function dispatchAuthenticationFailure(rejectedToken) {
+function dispatchAuthenticationFailure(rejectedToken, error = null) {
   if (typeof window === 'undefined') return
 
   window.dispatchEvent(
     new CustomEvent(V3_AUTH_EXPIRED_EVENT, {
-      detail: { token: normalizeAccessToken(rejectedToken) },
+      detail: {
+        token: normalizeAccessToken(rejectedToken),
+        code: error?.code ?? '',
+        message: error?.message ?? '',
+      },
     }),
   )
 }
@@ -86,7 +126,7 @@ function extractMessage(payload) {
 }
 
 function extractErrorCode(payload) {
-  const code = payload?.errors?.code ?? payload?.code ?? ''
+  const code = payload?.errors?.code ?? payload?.data?.code ?? payload?.code ?? ''
   return typeof code === 'string' ? code.trim() : ''
 }
 
@@ -135,11 +175,12 @@ async function requestV3(
 
   const requestHeaders = new Headers(headers)
   const explicitToken = normalizeAccessToken(token)
-  const requestToken = PUBLIC_AUTH_PATHS.has(path)
+  const publicAuthPath = isPublicAuthPath(path)
+  const requestToken = publicAuthPath
     ? explicitToken
     : explicitToken || readStoredAccessToken()
 
-  if (!PUBLIC_AUTH_PATHS.has(path) && !requestToken) {
+  if (!publicAuthPath && !requestToken) {
     const authenticationError = new Error('Your session is unavailable. Please sign in again.')
     authenticationError.status = 401
     authenticationError.code = 'AUTHENTICATION_REQUIRED'
@@ -182,12 +223,12 @@ async function requestV3(
     const requestError = new Error(extractMessage(errorPayload))
     requestError.status = response.status
     requestError.code = code
-    requestError.errors = errorPayload?.errors ?? null
+    requestError.errors = errorPayload?.errors ?? errorPayload?.data ?? null
     requestError.data = errorPayload?.data ?? null
     requestError.isAuthenticationFailure = isAuthenticationFailure(response.status, code)
 
-    if (requestError.isAuthenticationFailure && !PUBLIC_AUTH_PATHS.has(path)) {
-      dispatchAuthenticationFailure(requestToken)
+    if (requestError.isAuthenticationFailure && !publicAuthPath) {
+      dispatchAuthenticationFailure(requestToken, requestError)
     }
 
     throw requestError
@@ -307,6 +348,7 @@ export async function getTeacherRegistrationReferenceDataV3() {
     educationalAttainments: Array.isArray(data.educationalAttainments)
       ? data.educationalAttainments
       : [],
+    subjects: Array.isArray(data.subjects) ? data.subjects : [],
     schools: Array.isArray(data.schools) ? data.schools : [],
     verificationMethods: Array.isArray(data.verificationMethods)
       ? data.verificationMethods
@@ -351,6 +393,7 @@ export async function loginV3(email, password, deviceIdentifier = '') {
     token: normalizeAccessToken(data.accessToken),
     tokenType: data.tokenType ?? 'Bearer',
     expiresAt: data.expiresAt ?? '',
+    sessionIdleTimeoutSeconds: Number(data.sessionIdleTimeoutSeconds) || null,
     user: data.user ? normalizeV3User(data.user) : null,
     mfaRequired: Boolean(data.mfaRequired),
     mfaChallenge: data.mfaChallenge ?? null,
@@ -373,6 +416,7 @@ export async function verifyMfaLoginV3(challengeUuid, code, verificationMethod, 
     token: normalizeAccessToken(data.accessToken),
     tokenType: data.tokenType ?? 'Bearer',
     expiresAt: data.expiresAt ?? '',
+    sessionIdleTimeoutSeconds: Number(data.sessionIdleTimeoutSeconds) || null,
     user: data.user ? normalizeV3User(data.user) : null,
     mfaRequired: Boolean(data.mfaRequired),
     mfaChallenge: data.mfaChallenge ?? null,
@@ -427,6 +471,131 @@ export async function getCurrentUserV3(token) {
 
 export function logoutV3(token) {
   return requestV3('/api/v3/auth/logout', { method: 'POST', token })
+}
+
+export async function requestPasswordResetV3(identifier) {
+  const payload = await requestV3('/api/v3/auth/password-reset/request', {
+    method: 'POST',
+    body: JSON.stringify({ identifier }),
+  })
+  return extractData(payload) ?? null
+}
+
+export async function resendPasswordResetV3(challengeUuid) {
+  const payload = await requestV3('/api/v3/auth/password-reset/resend', {
+    method: 'POST',
+    body: JSON.stringify({ challengeUuid }),
+  })
+  return extractData(payload) ?? null
+}
+
+export async function confirmPasswordResetV3(challengeUuid, code, newPassword) {
+  const payload = await requestV3('/api/v3/auth/password-reset/confirm', {
+    method: 'POST',
+    body: JSON.stringify({ challengeUuid, code, newPassword }),
+  })
+  const data = extractData(payload) ?? {}
+  return { passwordChangedAt: data.passwordChangedAt ?? null }
+}
+
+export async function touchSessionV3(token) {
+  const payload = await requestV3('/api/v3/auth/session/touch', {
+    method: 'POST',
+    token,
+  })
+  const data = extractData(payload) ?? {}
+
+  return {
+    sessionIdleTimeoutSeconds: Number(data.sessionIdleTimeoutSeconds) || null,
+  }
+}
+
+export async function getAccountV3(token) {
+  const payload = await requestV3('/api/v3/account', { token })
+  return normalizeV3User(extractData(payload) ?? {})
+}
+
+export async function updateAccountProfileV3(profile, token) {
+  const payload = await requestV3('/api/v3/account/profile', {
+    method: 'PUT',
+    token,
+    body: JSON.stringify(profile),
+  })
+  return normalizeV3User(extractData(payload) ?? {})
+}
+
+export async function updateAccountPasswordV3(passwords, token) {
+  const payload = await requestV3('/api/v3/account/password', {
+    method: 'POST',
+    token,
+    body: JSON.stringify(passwords),
+  })
+  const data = extractData(payload) ?? {}
+  return {
+    passwordChangedAt: data.passwordChangedAt ?? null,
+  }
+}
+
+export async function startAccountVerificationV3(channel, token) {
+  const payload = await requestV3('/api/v3/account/verification/start', {
+    method: 'POST',
+    token,
+    body: JSON.stringify({ channel }),
+  })
+  return extractData(payload) ?? null
+}
+
+export async function resendAccountVerificationV3(challengeUuid, token) {
+  const payload = await requestV3('/api/v3/account/verification/resend', {
+    method: 'POST',
+    token,
+    body: JSON.stringify({ challengeUuid }),
+  })
+  return extractData(payload) ?? null
+}
+
+export async function confirmAccountVerificationV3(challengeUuid, code, token) {
+  const payload = await requestV3('/api/v3/account/verification/confirm', {
+    method: 'POST',
+    token,
+    body: JSON.stringify({ challengeUuid, code }),
+  })
+  return normalizeV3User(extractData(payload) ?? {})
+}
+
+function getAccountContactChangePath(kind, action) {
+  const segment = kind === 'contact' ? 'contact-change' : 'email-change'
+  return `/api/v3/account/${segment}/${action}`
+}
+
+export async function startAccountContactChangeV3(kind, value, token) {
+  const field = kind === 'contact' ? 'newContactNumber' : 'newEmail'
+  const payload = await requestV3(getAccountContactChangePath(kind, 'start'), {
+    method: 'POST',
+    token,
+    body: JSON.stringify({ [field]: value }),
+  })
+  return extractData(payload) ?? null
+}
+
+export async function resendAccountContactChangeV3(kind, value, challengeUuid, token) {
+  const field = kind === 'contact' ? 'newContactNumber' : 'newEmail'
+  const payload = await requestV3(getAccountContactChangePath(kind, 'resend'), {
+    method: 'POST',
+    token,
+    body: JSON.stringify({ [field]: value, challengeUuid }),
+  })
+  return extractData(payload) ?? null
+}
+
+export async function confirmAccountContactChangeV3(kind, value, challengeUuid, code, token) {
+  const field = kind === 'contact' ? 'newContactNumber' : 'newEmail'
+  const payload = await requestV3(getAccountContactChangePath(kind, 'confirm'), {
+    method: 'POST',
+    token,
+    body: JSON.stringify({ [field]: value, challengeUuid, code }),
+  })
+  return normalizeV3User(extractData(payload) ?? {})
 }
 
 export async function getReportReferenceDataV3(token) {
@@ -737,8 +906,11 @@ function normalizeNotificationUnreadCount(data) {
   return Number.isFinite(unreadCount) && unreadCount > 0 ? Math.floor(unreadCount) : 0
 }
 
-export async function getNotificationUnreadCountV3(token) {
-  const payload = await requestV3('/api/v3/notifications/unread-count', { token })
+export async function getNotificationUnreadCountV3(token, { background = false } = {}) {
+  const payload = await requestV3('/api/v3/notifications/unread-count', {
+    token,
+    headers: background ? { 'X-Marka-Background': '1' } : {},
+  })
   const data = extractData(payload)
 
   return {
@@ -746,10 +918,16 @@ export async function getNotificationUnreadCountV3(token) {
   }
 }
 
-export async function getNotificationsV3(token, { unreadOnly = false, limit = 20 } = {}) {
+export async function getNotificationsV3(
+  token,
+  { unreadOnly = false, limit = 20, background = false } = {},
+) {
   const payload = await requestV3(
     `/api/v3/notifications${buildQuery({ unreadOnly, limit })}`,
-    { token },
+    {
+      token,
+      headers: background ? { 'X-Marka-Background': '1' } : {},
+    },
   )
   const data = extractData(payload) ?? {}
 
@@ -791,6 +969,91 @@ export async function getTeacherAccountsV3(token, status = 'pending_approval') {
 
 export async function getTeacherAccountV3(teacherUserId, token) {
   const payload = await requestV3(`/api/v3/users/teachers/${teacherUserId}`, { token })
+  return normalizeV3User(extractData(payload) ?? {})
+}
+
+export async function checkTeacherRegistrationAvailabilityV3(fields = {}) {
+  const payload = await requestV3(
+    `/api/v3/auth/teacher-registration/availability${buildQuery(fields)}`,
+  )
+  const data = extractData(payload) ?? {}
+  return {
+    email: data.email ?? null,
+    contactNumber: data.contactNumber ?? null,
+  }
+}
+
+export async function getTeacherSubjectsV3(token) {
+  const payload = await requestV3('/api/v3/account/subjects', { token })
+  const data = extractData(payload) ?? {}
+  return {
+    additionalMajors: Array.isArray(data.additionalMajors) ? data.additionalMajors : [],
+    subjectsTaughtBefore: Array.isArray(data.subjectsTaughtBefore)
+      ? data.subjectsTaughtBefore
+      : [],
+  }
+}
+
+export async function updateTeacherSubjectsV3(subjects, token) {
+  const payload = await requestV3('/api/v3/account/subjects', {
+    method: 'PUT',
+    token,
+    body: JSON.stringify(subjects),
+  })
+  return extractData(payload) ?? { additionalMajors: [], subjectsTaughtBefore: [] }
+}
+
+export async function updateTeacherAccountV3(teacherUserId, teacher, token) {
+  const payload = await requestV3(`/api/v3/users/teachers/${teacherUserId}`, {
+    method: 'PUT',
+    token,
+    body: JSON.stringify(teacher),
+  })
+  return normalizeV3User(extractData(payload) ?? {})
+}
+
+export async function updateTeacherAccountStatusV3(teacherUserId, status, reason, token) {
+  const payload = await requestV3(`/api/v3/users/teachers/${teacherUserId}/status`, {
+    method: 'PATCH',
+    token,
+    body: JSON.stringify({ status, reason }),
+  })
+  return normalizeV3User(extractData(payload) ?? {})
+}
+
+export async function updateTeacherContractV3(teacherUserId, contractEndDate, reason, token) {
+  const payload = await requestV3(`/api/v3/users/teachers/${teacherUserId}/contract`, {
+    method: 'PUT',
+    token,
+    body: JSON.stringify({ contractEndDate, reason }),
+  })
+  return normalizeV3User(extractData(payload) ?? {})
+}
+
+export async function updateTeacherDecisionV3(teacherUserId, decision, reason, token) {
+  const payload = await requestV3(`/api/v3/users/teachers/${teacherUserId}/decision`, {
+    method: 'POST',
+    token,
+    body: JSON.stringify({ decision, reason }),
+  })
+  return normalizeV3User(extractData(payload) ?? {})
+}
+
+export async function archiveTeacherAccountV3(teacherUserId, reason, token) {
+  const payload = await requestV3(`/api/v3/users/teachers/${teacherUserId}/archive`, {
+    method: 'POST',
+    token,
+    body: JSON.stringify({ reason }),
+  })
+  return normalizeV3User(extractData(payload) ?? {})
+}
+
+export async function restoreTeacherAccountV3(teacherUserId, reason, token) {
+  const payload = await requestV3(`/api/v3/users/teachers/${teacherUserId}/restore`, {
+    method: 'POST',
+    token,
+    body: JSON.stringify({ reason }),
+  })
   return normalizeV3User(extractData(payload) ?? {})
 }
 
@@ -848,10 +1111,61 @@ export async function getSchoolSetupReferenceDataV3(token) {
   }
 }
 
-export async function getAcademicYearsV3(token) {
-  const payload = await requestV3('/api/v3/school-setup/academic-years', { token })
+export async function getAcademicYearsV3(token, view = 'current') {
+  const payload = await requestV3(
+    `/api/v3/school-setup/academic-years${buildQuery({ view })}`,
+    { token },
+  )
   const data = extractData(payload)
   return Array.isArray(data) ? data : data ? [data] : []
+}
+
+export async function getAcademicYearArchiveEligibilityV3(academicYearId, token) {
+  const payload = await requestV3(
+    `/api/v3/school-setup/academic-years/${encodeURIComponent(academicYearId)}/archive-eligibility`,
+    { token },
+  )
+  const data = extractData(payload) ?? {}
+
+  return {
+    ...data,
+    reasons: Array.isArray(data.reasons) ? data.reasons : [],
+    canArchive: Boolean(data.canArchive),
+    readyToArchive: Boolean(data.readyToArchive),
+    incompleteTermCount: Number(data.incompleteTermCount) || 0,
+    openAssessmentCount: Number(data.openAssessmentCount) || 0,
+    pendingSyncCount: Number(data.pendingSyncCount) || 0,
+    unfinalizedResultCount: Number(data.unfinalizedResultCount) || 0,
+  }
+}
+
+export async function archiveAcademicYearV3(academicYearId, reason, token) {
+  const payload = await requestV3(
+    `/api/v3/school-setup/academic-years/${encodeURIComponent(academicYearId)}/archive`,
+    {
+      method: 'POST',
+      token,
+      body: JSON.stringify({ reason }),
+    },
+  )
+  return extractData(payload) ?? null
+}
+
+export async function updateTermPeriodDatesV3(
+  academicYearId,
+  termPeriodId,
+  dates,
+  token,
+) {
+  const payload = await requestV3(
+    `/api/v3/school-setup/academic-years/${encodeURIComponent(academicYearId)}/term-periods/${encodeURIComponent(termPeriodId)}/dates`,
+    {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify(dates),
+    },
+  )
+  return extractData(payload) ?? null
 }
 
 export async function getClassesV3(filters = {}, token) {
@@ -869,13 +1183,67 @@ export async function createClassV3(classPayload, token) {
   return normalizeV3Class(extractData(payload) ?? {})
 }
 
-export async function getClassAssignmentsV3(token, academicYearId = '') {
+export async function getClassAssignmentsV3(token, academicYearId = '', view = 'current') {
   const payload = await requestV3(
-    `/api/v3/school-setup/class-assignments${buildQuery({ academicYearId })}`,
+    `/api/v3/school-setup/class-assignments${buildQuery({ academicYearId, view })}`,
     { token },
   )
   const records = extractData(payload)
   return Array.isArray(records) ? records.map(normalizeV3ClassAssignment) : []
+}
+
+export async function getTeacherOptionsV3(subjectId, classId, token) {
+  const payload = await requestV3(
+    `/api/v3/school-setup/teacher-options${buildQuery({ subjectId, classId })}`,
+    { token },
+  )
+  const data = extractData(payload) ?? {}
+  return {
+    subjectId: data.subjectId ?? null,
+    subjectName: data.subjectName ?? '',
+    groups: Array.isArray(data.groups)
+      ? data.groups.map((group) => ({
+          ...group,
+          teachers: Array.isArray(group.teachers) ? group.teachers : [],
+        }))
+      : [],
+  }
+}
+
+export async function deleteClassAssignmentV3(classAssignmentId, reason, token) {
+  const payload = await requestV3(
+    `/api/v3/school-setup/class-assignments/${classAssignmentId}${buildQuery({ reason })}`,
+    { method: 'DELETE', token },
+  )
+  return normalizeV3ClassAssignment(extractData(payload) ?? {})
+}
+
+export async function getClassAssignmentDeleteEligibilityV3(classAssignmentId, token) {
+  const payload = await requestV3(
+    `/api/v3/school-setup/class-assignments/${encodeURIComponent(classAssignmentId)}/delete-eligibility`,
+    { token },
+  )
+  const data = extractData(payload) ?? {}
+
+  return {
+    ...data,
+    canHardDelete: Boolean(data.canHardDelete),
+    canArchive: Boolean(data.canArchive),
+    assessmentCount: Number(data.assessmentCount) || 0,
+    resultCount: Number(data.resultCount) || 0,
+  }
+}
+
+export async function updateClassAssignmentStatusV3(classAssignmentId, status, reason, token) {
+  const payload = await requestV3(
+    `/api/v3/school-setup/class-assignments/${classAssignmentId}/status`,
+    {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify({ status, reason }),
+    },
+  )
+  return normalizeV3ClassAssignment(extractData(payload) ?? {})
 }
 
 export async function createClassAssignmentV3(assignmentPayload, token) {
@@ -884,6 +1252,18 @@ export async function createClassAssignmentV3(assignmentPayload, token) {
     token,
     body: JSON.stringify(assignmentPayload),
   })
+  return normalizeV3ClassAssignment(extractData(payload) ?? {})
+}
+
+export async function updateClassAssignmentV3(classAssignmentId, assignmentPayload, token) {
+  const payload = await requestV3(
+    `/api/v3/school-setup/class-assignments/${classAssignmentId}`,
+    {
+      method: 'PUT',
+      token,
+      body: JSON.stringify(assignmentPayload),
+    },
+  )
   return normalizeV3ClassAssignment(extractData(payload) ?? {})
 }
 
@@ -1073,6 +1453,44 @@ export async function getAssessmentV3(testId, token) {
   return extractData(payload) ?? null
 }
 
+export async function getAssessmentEditEligibilityV3(testId, token) {
+  const payload = await requestV3(
+    `/api/v3/assessments/${encodeURIComponent(testId)}/edit-eligibility`,
+    { token },
+  )
+  const data = extractData(payload) ?? {}
+
+  return {
+    ...data,
+    canEditContent: Boolean(data.canEditContent),
+    canEditDetails: Boolean(data.canEditDetails),
+    canCorrectAnswerKey: Boolean(data.canCorrectAnswerKey),
+    canHardDelete: Boolean(data.canHardDelete),
+    canArchive: Boolean(data.canArchive),
+    canRestore: Boolean(data.canRestore),
+    resultCount: Number(data.resultCount) || 0,
+  }
+}
+
+export async function checkAssessmentSameDayV3(filters, token) {
+  const payload = await requestV3(
+    `/api/v3/assessments/same-day-check${buildQuery(filters)}`,
+    { token },
+  )
+  const data = extractData(payload) ?? {}
+  const assessments = Array.isArray(data.assessments)
+    ? data.assessments
+    : Array.isArray(data.conflicts)
+      ? data.conflicts
+      : []
+
+  return {
+    ...data,
+    assessments,
+    hasConflict: Boolean(data.hasConflict ?? data.hasConflicts ?? assessments.length),
+  }
+}
+
 export async function createAssessmentV3(assessment, token) {
   const payload = await requestV3('/api/v3/assessments', {
     method: 'POST',
@@ -1088,6 +1506,26 @@ export async function updateAssessmentV3(testId, assessment, token) {
     method: 'PUT',
     token,
     body: JSON.stringify(assessment),
+  })
+  return extractData(payload) ?? null
+}
+
+export async function updateAssessmentDetailsV3(testId, details, token) {
+  const payload = await requestV3(
+    `/api/v3/assessments/${encodeURIComponent(testId)}/details`,
+    {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify(details),
+    },
+  )
+  return extractData(payload) ?? null
+}
+
+export async function deleteAssessmentV3(testId, token) {
+  const payload = await requestV3(`/api/v3/assessments/${encodeURIComponent(testId)}`, {
+    method: 'DELETE',
+    token,
   })
   return extractData(payload) ?? null
 }
@@ -1133,6 +1571,14 @@ export async function generateAnswerSheetVersionV3(testAssignmentId, paperSizeCo
       expectedStatus: 201,
       body: JSON.stringify({ paperSizeCode }),
     },
+  )
+  return extractData(payload) ?? null
+}
+
+export async function getAnswerSheetVersionV3(answerSheetVersionId, token) {
+  const payload = await requestV3(
+    `/api/v3/answer-sheet-versions/${encodeURIComponent(answerSheetVersionId)}`,
+    { token },
   )
   return extractData(payload) ?? null
 }
