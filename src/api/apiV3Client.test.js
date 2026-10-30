@@ -137,3 +137,48 @@ test('answer-sheet download behavior remains unchanged', async () => {
   assert.equal(requests[0].options.headers.get('Accept'), 'application/pdf')
   assert.deepEqual(authEvents, [])
 })
+
+test('active assessment edit eligibility preserves ASM-7 content and pending-result rules', async () => {
+  respond = () => json(200, {
+    success: true,
+    data: {
+      canEditContent: true,
+      canEditDetails: true,
+      canCorrectAnswerKey: false,
+      contentEditMode: 'same_layout',
+      canEditSchedule: true,
+      pendingResultCount: 3,
+      resultCount: 12,
+    },
+  })
+
+  const eligibility = await api.getAssessmentEditEligibilityV3(42, 'synthetic-token')
+
+  assert.equal(requests[0].url, `${baseUrl}/api/v3/assessments/42/edit-eligibility`)
+  assert.equal(eligibility.contentEditMode, 'same_layout')
+  assert.equal(eligibility.canEditSchedule, true)
+  assert.equal(eligibility.canCorrectAnswerKey, false)
+  assert.equal(eligibility.pendingResultCount, 3)
+  assert.equal(eligibility.resultCount, 12)
+})
+
+test('ASM-7 update conflicts retain their field and pending-count details', async () => {
+  for (const [code, errors] of [
+    ['ASSESSMENT_STRUCTURE_LOCKED', { field: 'parts[0].questionTypeCode' }],
+    ['ASSESSMENT_RESULTS_PENDING', { pendingCount: 2 }],
+  ]) {
+    respond = () => json(409, { message: 'Synthetic ASM-7 conflict', errors: { code, ...errors } })
+    await assert.rejects(
+      api.updateAssessmentV3(42, { testName: 'Updated assessment' }, 'synthetic-token'),
+      (error) => {
+        assert.equal(error.status, 409)
+        assert.equal(error.code, code)
+        Object.entries(errors).forEach(([field, value]) => {
+          assert.equal(error.errors[field], value)
+        })
+        return true
+      },
+    )
+  }
+  assert.deepEqual(authEvents, [])
+})

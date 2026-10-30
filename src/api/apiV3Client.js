@@ -1465,6 +1465,11 @@ export async function getAssessmentEditEligibilityV3(testId, token) {
     canEditContent: Boolean(data.canEditContent),
     canEditDetails: Boolean(data.canEditDetails),
     canCorrectAnswerKey: Boolean(data.canCorrectAnswerKey),
+    contentEditMode: ['full', 'same_layout', 'none'].includes(data.contentEditMode)
+      ? data.contentEditMode
+      : 'none',
+    canEditSchedule: Boolean(data.canEditSchedule),
+    pendingResultCount: Number(data.pendingResultCount) || 0,
     canHardDelete: Boolean(data.canHardDelete),
     canArchive: Boolean(data.canArchive),
     canRestore: Boolean(data.canRestore),

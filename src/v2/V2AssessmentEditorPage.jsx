@@ -854,7 +854,7 @@ function assignmentLabel(assignment = {}) {
   return [className || 'Assigned class', details].filter(Boolean).join(' | ')
 }
 
-function ToggleField({ id, checked, onChange, label }) {
+function ToggleField({ id, checked, onChange, label, disabled = false }) {
   return (
     <label
       className="flex min-h-10 cursor-pointer items-center gap-3 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm"
@@ -865,6 +865,7 @@ function ToggleField({ id, checked, onChange, label }) {
         type="checkbox"
         className="size-4 accent-primary"
         checked={checked}
+        disabled={disabled}
         onChange={(event) => onChange(event.target.checked)}
       />
       <span>{label}</span>
@@ -878,6 +879,7 @@ function WrittenResponseSettings({
   onChange,
   responseRegionSizes,
   required = false,
+  disabled = false,
 }) {
   const regionSizes = responseRegionSizes.filter((size) => size !== 'none')
 
@@ -893,6 +895,7 @@ function WrittenResponseSettings({
           min="1"
           step="1"
           value={question.maximumResponseLength}
+          disabled={disabled}
           placeholder={required ? 'Enter maximum characters' : 'No character limit'}
           onChange={(event) => onChange({ maximumResponseLength: event.target.value })}
         />
@@ -904,6 +907,7 @@ function WrittenResponseSettings({
         </Label>
         <Select
           value={question.responseRegionSize || '__default'}
+          disabled={disabled}
           onValueChange={(value) => onChange({
             responseRegionSize: value === '__default' ? '' : value,
           })}
@@ -933,6 +937,8 @@ function QuestionTypeEditor({
   onChange,
   rubrics,
   responseRegionSizes,
+  structureLocked = false,
+  answerKeyLocked = false,
 }) {
   const idPrefix = `part-${partIndex}-question-${questionIndex}`
 
@@ -958,6 +964,7 @@ function QuestionTypeEditor({
             <Label htmlFor={`${idPrefix}-answer`}>Correct option</Label>
             <Select
               value={question.correctOption || undefined}
+              disabled={answerKeyLocked}
               onValueChange={(value) => onChange({ correctOption: value })}
             >
               <SelectTrigger id={`${idPrefix}-answer`}>
@@ -993,6 +1000,7 @@ function QuestionTypeEditor({
         <Label htmlFor={`${idPrefix}-answer`}>Correct answer</Label>
         <Select
           value={question.correctOption || undefined}
+          disabled={answerKeyLocked}
           onValueChange={(value) => onChange({ correctOption: value })}
         >
           <SelectTrigger id={`${idPrefix}-answer`}>
@@ -1019,6 +1027,7 @@ function QuestionTypeEditor({
             <Button
               variant="outline"
               size="sm"
+              disabled={answerKeyLocked}
               onClick={() => onChange({
                 acceptedAnswers: [
                   ...question.acceptedAnswers,
@@ -1045,6 +1054,7 @@ function QuestionTypeEditor({
                     id={`${idPrefix}-accepted-${answerIndex}`}
                     value={answer.acceptedText}
                     maxLength="500"
+                    disabled={answerKeyLocked}
                     onChange={(event) => onChange({
                       acceptedAnswers: question.acceptedAnswers.map((item, index) => (
                         index === answerIndex
@@ -1058,10 +1068,10 @@ function QuestionTypeEditor({
                   variant="ghost"
                   size="icon-sm"
                   className="self-end"
-                  disabled={question.acceptedAnswers.length === 1}
+                  disabled={answerKeyLocked || question.acceptedAnswers.length === 1}
                   title="Remove accepted variant"
                   aria-label={`Remove accepted variant ${answerIndex + 1}`}
-                  onClick={() => onChange({
+                  onClick={() => !answerKeyLocked && onChange({
                     acceptedAnswers: question.acceptedAnswers.filter((_, index) => index !== answerIndex),
                   })}
                 >
@@ -1077,6 +1087,7 @@ function QuestionTypeEditor({
             <Label htmlFor={`${idPrefix}-matching`}>Matching mode</Label>
             <Select
               value={question.matchingMode}
+              disabled={answerKeyLocked}
               onValueChange={(value) => onChange({ matchingMode: value })}
             >
               <SelectTrigger id={`${idPrefix}-matching`}>
@@ -1094,6 +1105,7 @@ function QuestionTypeEditor({
             <ToggleField
               id={`${idPrefix}-case-sensitive`}
               checked={question.caseSensitive}
+              disabled={answerKeyLocked}
               onChange={(caseSensitive) => onChange({ caseSensitive })}
               label="Case-sensitive answers"
             />
@@ -1105,6 +1117,7 @@ function QuestionTypeEditor({
           question={question}
           onChange={onChange}
           responseRegionSizes={responseRegionSizes}
+          disabled={structureLocked}
         />
       </div>
     )
@@ -1146,6 +1159,7 @@ function QuestionTypeEditor({
               min="1"
               step="1"
               value={question.expectedResponseCount}
+              disabled={structureLocked}
               onChange={(event) => resizeExpectedAnswers(event.target.value)}
             />
           </div>
@@ -1153,6 +1167,7 @@ function QuestionTypeEditor({
             <Label htmlFor={`${idPrefix}-matching`}>Matching mode</Label>
             <Select
               value={question.matchingMode}
+              disabled={answerKeyLocked}
               onValueChange={(value) => onChange({ matchingMode: value })}
             >
               <SelectTrigger id={`${idPrefix}-matching`}>
@@ -1170,6 +1185,7 @@ function QuestionTypeEditor({
             <ToggleField
               id={`${idPrefix}-case-sensitive`}
               checked={question.caseSensitive}
+              disabled={answerKeyLocked}
               onChange={(caseSensitive) => onChange({ caseSensitive })}
               label="Case-sensitive answers"
             />
@@ -1189,6 +1205,7 @@ function QuestionTypeEditor({
                       id={`${idPrefix}-order-${answerIndex}-primary`}
                       value={answer.primaryAnswer}
                       maxLength="500"
+                      disabled={answerKeyLocked}
                       onChange={(event) => onChange({
                         enumerationAnswers: question.enumerationAnswers.map((item, index) => (
                           index === answerIndex
@@ -1206,6 +1223,7 @@ function QuestionTypeEditor({
                       min="0"
                       step="1"
                       value={answer.points}
+                      disabled={structureLocked}
                       onChange={(event) => onChange({
                         enumerationAnswers: question.enumerationAnswers.map((item, index) => (
                           index === answerIndex
@@ -1230,6 +1248,7 @@ function QuestionTypeEditor({
                         id={`${idPrefix}-order-${answerIndex}-variant-${variantIndex}`}
                         value={variant.acceptedText}
                         maxLength="500"
+                        disabled={answerKeyLocked}
                         onChange={(event) => onChange({
                           enumerationAnswers: question.enumerationAnswers.map((item, index) => (
                             index === answerIndex
@@ -1252,6 +1271,7 @@ function QuestionTypeEditor({
                       className="self-end"
                       title="Remove accepted variant"
                       aria-label={`Remove answer ${answerIndex + 1} variant ${variantIndex + 1}`}
+                      disabled={answerKeyLocked}
                       onClick={() => onChange({
                         enumerationAnswers: question.enumerationAnswers.map((item, index) => (
                           index === answerIndex
@@ -1274,6 +1294,7 @@ function QuestionTypeEditor({
                   variant="outline"
                   size="sm"
                   className="md:ml-20"
+                  disabled={answerKeyLocked}
                   onClick={() => onChange({
                     enumerationAnswers: question.enumerationAnswers.map((item, index) => (
                       index === answerIndex
@@ -1298,6 +1319,7 @@ function QuestionTypeEditor({
           question={question}
           onChange={onChange}
           responseRegionSizes={responseRegionSizes}
+          disabled={structureLocked}
         />
       </div>
     )
@@ -1329,11 +1351,13 @@ function QuestionTypeEditor({
           onChange={onChange}
           responseRegionSizes={responseRegionSizes}
           required
+          disabled={structureLocked}
         />
 
         <ToggleField
           id={`${idPrefix}-page-break`}
           checked={question.forcePageBreakBefore}
+          disabled={structureLocked}
           onChange={(forcePageBreakBefore) => onChange({ forcePageBreakBefore })}
           label="Start this essay on a new page"
         />
@@ -1343,6 +1367,7 @@ function QuestionTypeEditor({
             <Label htmlFor={`${idPrefix}-scoring-mode`}>Scoring</Label>
             <Select
               value={question.scoringMode}
+              disabled={structureLocked}
               onValueChange={(scoringMode) => onChange({
                 scoringMode,
                 rubricSource: scoringMode === 'rubric'
@@ -1366,6 +1391,7 @@ function QuestionTypeEditor({
               <Label htmlFor={`${idPrefix}-rubric-source`}>Rubric source</Label>
               <Select
                 value={question.rubricSource}
+                disabled={structureLocked}
                 onValueChange={(rubricSource) => onChange({ rubricSource, rubricId: '' })}
               >
                 <SelectTrigger id={`${idPrefix}-rubric-source`}>
@@ -1385,7 +1411,7 @@ function QuestionTypeEditor({
             <Label htmlFor={`${idPrefix}-rubric`}>Rubric</Label>
             <Select
               value={question.rubricId || undefined}
-              disabled={!rubrics.length}
+              disabled={structureLocked || !rubrics.length}
               onValueChange={(rubricId) => onChange({ rubricId })}
             >
               <SelectTrigger id={`${idPrefix}-rubric`}>
@@ -1411,6 +1437,7 @@ function QuestionTypeEditor({
                   id={`${idPrefix}-rubric-name`}
                   value={inlineRubric.rubricName}
                   maxLength="120"
+                  disabled={structureLocked}
                   onChange={(event) => updateInlineRubric({ rubricName: event.target.value })}
                 />
               </div>
@@ -1419,6 +1446,7 @@ function QuestionTypeEditor({
                 <Input
                   id={`${idPrefix}-rubric-description`}
                   value={inlineRubric.description}
+                  disabled={structureLocked}
                   onChange={(event) => updateInlineRubric({ description: event.target.value })}
                 />
               </div>
@@ -1429,6 +1457,7 @@ function QuestionTypeEditor({
               <Button
                 variant="outline"
                 size="sm"
+                disabled={structureLocked}
                 onClick={() => updateInlineRubric({
                   criteria: [
                     ...inlineRubric.criteria,
@@ -1453,6 +1482,7 @@ function QuestionTypeEditor({
                         id={`${idPrefix}-criterion-${criterionIndex}-name`}
                         value={criterion.criterionName}
                         maxLength="120"
+                        disabled={structureLocked}
                         onChange={(event) => updateInlineRubric({
                           criteria: inlineRubric.criteria.map((item, index) => (
                             index === criterionIndex
@@ -1470,6 +1500,7 @@ function QuestionTypeEditor({
                         min="1"
                         step="1"
                         value={criterion.maximumPoints}
+                        disabled={structureLocked}
                         onChange={(event) => updateInlineRubric({
                           criteria: inlineRubric.criteria.map((item, index) => (
                             index === criterionIndex
@@ -1482,7 +1513,7 @@ function QuestionTypeEditor({
                     <Button
                       variant="ghost"
                       size="icon-sm"
-                      disabled={inlineRubric.criteria.length === 1}
+                      disabled={structureLocked || inlineRubric.criteria.length === 1}
                       title="Remove rubric criterion"
                       aria-label={`Remove rubric criterion ${criterionIndex + 1}`}
                       onClick={() => updateInlineRubric({
@@ -1504,6 +1535,7 @@ function QuestionTypeEditor({
                       className={TEXTAREA_CLASS}
                       rows="2"
                       value={criterion.criterionDescription}
+                      disabled={structureLocked}
                       onChange={(event) => updateInlineRubric({
                         criteria: inlineRubric.criteria.map((item, index) => (
                           index === criterionIndex
@@ -1517,6 +1549,7 @@ function QuestionTypeEditor({
                   <ToggleField
                     id={`${idPrefix}-criterion-${criterionIndex}-required`}
                     checked={criterion.required !== false}
+                    disabled={structureLocked}
                     onChange={(required) => updateInlineRubric({
                       criteria: inlineRubric.criteria.map((item, index) => (
                         index === criterionIndex ? { ...item, required } : item
@@ -1779,6 +1812,12 @@ function V2AssessmentEditorPage({
     currentTestId && savedPayloadSnapshot !== currentPayloadSnapshot,
   )
   const isDraft = assessmentStatus === 'draft'
+  const contentEditMode = isDraft ? 'full' : editEligibility?.contentEditMode ?? 'none'
+  const canEditContent = isDraft || ['full', 'same_layout'].includes(contentEditMode)
+  const structureLocked = !isDraft && contentEditMode !== 'full'
+  const answerKeyLocked = !isDraft && !editEligibility?.canCorrectAnswerKey
+  const canEditSchedule = isDraft || Boolean(editEligibility?.canEditSchedule)
+  const pendingResultCount = editEligibility?.pendingResultCount ?? 0
   const reviewError = validateDraft(form, rubrics, selectedTerm)
   const termStartDateTime = toDateTimeLocal(selectedTerm?.startAt)
   const termEndDateTime = toDateTimeLocal(selectedTerm?.endAt)
@@ -2036,13 +2075,25 @@ function V2AssessmentEditorPage({
       setAssessmentStatus(String(saved.status ?? 'draft').toLowerCase())
       setSavedPayloadSnapshot(JSON.stringify(payload))
       setLastSavedAt(new Date())
-      setMessage({ type: 'success', text: 'Draft assessment saved successfully.' })
+      setMessage({
+        type: 'success',
+        text: !isDraft && contentEditMode === 'full'
+          ? 'Assessment updated. Generate and print the answer sheet again before scanning.'
+          : !isDraft
+            ? 'Assessment changes saved successfully. Any affected objective results were recalculated automatically.'
+            : 'Draft assessment saved successfully.',
+      })
       setCurrentTestAssignmentId(saved.testAssignmentId ?? null)
       setAnswerSheetVersion(null)
       refreshAnswerSheetEligibility(saved.testAssignmentId ?? null)
       refreshEditEligibility(saved.testId)
     } catch (error) {
-      setMessage({ type: 'error', text: error.message })
+      const errorMessage = error.code === 'ASSESSMENT_STRUCTURE_LOCKED'
+        ? `${error.errors?.field || 'This layout field'} is locked because printed sheets or results already exist.`
+        : error.code === 'ASSESSMENT_RESULTS_PENDING'
+          ? `Answer-key and point changes are temporarily locked while ${Number(error.errors?.pendingCount) || pendingResultCount || 'some'} result(s) are still being processed.`
+          : error.errors?.openAt || error.errors?.closeAt || error.message
+      setMessage({ type: 'error', text: errorMessage })
       setOpenAtError(error.errors?.openAt ?? '')
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } finally {
@@ -2281,13 +2332,13 @@ function V2AssessmentEditorPage({
         <div className="assessment-editor-header-actions">
           <Button
             variant="outline"
-            disabled={saving || activating || !isDraft}
+            disabled={saving || activating || (!isDraft && !canEditContent)}
             onClick={submit}
           >
             {saving ? <LoaderCircle className="animate-spin" /> : <Save />}
-            Save draft
+            {isDraft ? 'Save draft' : 'Save changes'}
           </Button>
-          {!isDraft ? (
+          {!isDraft && !canEditContent ? (
             <Button
               variant="outline"
               disabled={editEligibilityLoading || savingDetails || !editEligibility?.canEditDetails}
@@ -2371,6 +2422,24 @@ function V2AssessmentEditorPage({
             Details cannot be edited: {editEligibility.reason}
           </p>
         ) : null}
+        {!isDraft && !editEligibilityLoading && contentEditMode === 'same_layout' ? (
+          <p className="col-span-full m-0 text-sm text-muted-foreground" role="status">
+            Printed layout is locked. You can still edit text, answer keys, objective points,
+            accepted answers, competency mappings, and the schedule.
+          </p>
+        ) : null}
+        {!isDraft && !editEligibilityLoading && contentEditMode === 'full' ? (
+          <p className="col-span-full m-0 text-sm text-muted-foreground" role="status">
+            No sheets have been scanned. All fields are editable, but structural changes require
+            a newly generated and printed answer sheet.
+          </p>
+        ) : null}
+        {!isDraft && !editEligibilityLoading && answerKeyLocked && canEditContent ? (
+          <p className="col-span-full m-0 text-sm font-medium text-amber-700" role="status">
+            Answer-key and objective-point changes will be available after {pendingResultCount || 'the pending'}
+            {' '}result{pendingResultCount === 1 ? '' : 's'} finish processing.
+          </p>
+        ) : null}
       </header>
 
       {message && (
@@ -2386,7 +2455,7 @@ function V2AssessmentEditorPage({
 
       <div className="assessment-editor-layout">
         <main className="assessment-editor-configuration">
-      <fieldset className="contents" disabled={!isDraft}>
+      <fieldset className="contents" disabled={!isDraft && !canEditContent}>
       <Card>
         <CardHeader>
           <CardTitle>Assessment details</CardTitle>
@@ -2400,6 +2469,7 @@ function V2AssessmentEditorPage({
               value={form.testName}
               maxLength="120"
               placeholder="Example: Quarter 1 Mathematics Quiz"
+              disabled={!canEditContent}
               onChange={(event) => updateForm('testName', event.target.value)}
             />
           </div>
@@ -2408,6 +2478,7 @@ function V2AssessmentEditorPage({
             <Label htmlFor="assessment-term">Term period</Label>
             <Select
               value={form.termPeriodId ? String(form.termPeriodId) : undefined}
+              disabled={structureLocked}
               onValueChange={handleTermChange}
             >
               <SelectTrigger id="assessment-term">
@@ -2427,6 +2498,7 @@ function V2AssessmentEditorPage({
             <Label htmlFor="assessment-type">Assessment type</Label>
             <Select
               value={form.testType}
+              disabled={structureLocked}
               onValueChange={(value) => updateForm('testType', value)}
             >
               <SelectTrigger id="assessment-type">
@@ -2450,6 +2522,7 @@ function V2AssessmentEditorPage({
                 maxDateTime={termEndDateTime}
                 minTime="08:00"
                 maxTime="17:00"
+                disabled={!canEditSchedule}
                 onChange={(value) => {
                   updateForm('openAt', value)
                   setOpenAtPastWarning(isPastDateTime(value))
@@ -2477,6 +2550,7 @@ function V2AssessmentEditorPage({
                 value={form.closeAt}
                 minDateTime={form.openAt || termStartDateTime}
                 maxDateTime={termEndDateTime}
+                disabled={!canEditSchedule}
                 onChange={(value) => updateForm('closeAt', value)}
                 placeholder="Select closing date and time"
               />
@@ -2487,12 +2561,14 @@ function V2AssessmentEditorPage({
             <ToggleField
               id="assessment-allow-late-capture"
               checked={form.allowLateCapture}
+              disabled={!canEditSchedule}
               onChange={(checked) => updateForm('allowLateCapture', checked)}
               label="Allow late result capture"
             />
             <ToggleField
               id="assessment-confirm-outside-timetable"
               checked={form.confirmOutsideClassSchedule}
+              disabled={!canEditSchedule}
               onChange={(checked) => {
                 setForm((current) => ({
                   ...current,
@@ -2517,6 +2593,7 @@ function V2AssessmentEditorPage({
                 minLength="5"
                 maxLength="255"
                 placeholder="Enter the reason for this schedule"
+                disabled={!canEditSchedule}
                 onChange={(event) => updateForm(
                   'outsideClassScheduleReason',
                   event.target.value,
@@ -2533,6 +2610,7 @@ function V2AssessmentEditorPage({
               rows="3"
               value={form.instructions}
               placeholder="Instructions shown with the assessment"
+              disabled={!canEditContent}
               onChange={(event) => updateForm('instructions', event.target.value)}
             />
           </div>
@@ -2547,6 +2625,7 @@ function V2AssessmentEditorPage({
         </div>
         <Button
           variant="outline"
+          disabled={structureLocked}
           onClick={() => setForm((current) => ({
             ...current,
             parts: [...current.parts, emptyPart(current.parts.length + 1)],
@@ -2577,6 +2656,7 @@ function V2AssessmentEditorPage({
                     size="icon-sm"
                     title="Remove part"
                     aria-label={`Remove part ${partIndex + 1}`}
+                    disabled={structureLocked}
                     onClick={() => setForm((current) => ({
                       ...current,
                       parts: current.parts
@@ -2616,7 +2696,7 @@ function V2AssessmentEditorPage({
                     <Label htmlFor={`part-${partIndex}-type`}>Part type</Label>
                     <Select
                       value={part.partType || undefined}
-                      disabled={!questionTypes.length}
+                      disabled={structureLocked || !questionTypes.length}
                       onValueChange={(value) => handlePartTypeChange(partIndex, value)}
                     >
                       <SelectTrigger id={`part-${partIndex}-type`}>
@@ -2644,6 +2724,7 @@ function V2AssessmentEditorPage({
                       max="200"
                       step="1"
                       value={part.questions.length}
+                      disabled={structureLocked}
                       onChange={(event) => handleItemCountChange(partIndex, event.target.value)}
                     />
                   </div>
@@ -2655,6 +2736,10 @@ function V2AssessmentEditorPage({
                       min="1"
                       step="1"
                       value={part.pointsPerItem}
+                      disabled={
+                        structureLocked
+                        && !(['multiple_choice', 'true_false'].includes(part.partType) && !answerKeyLocked)
+                      }
                       onChange={(event) => handlePointsPerItemChange(partIndex, event.target.value)}
                     />
                   </div>
@@ -2701,6 +2786,8 @@ function V2AssessmentEditorPage({
                             questionIndex={questionIndex}
                             rubrics={rubrics}
                             responseRegionSizes={responseRegionSizes}
+                            structureLocked={structureLocked}
+                            answerKeyLocked={answerKeyLocked}
                             onChange={(updates) => updateQuestionFields(
                               partIndex,
                               questionIndex,
