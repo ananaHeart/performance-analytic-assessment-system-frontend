@@ -149,7 +149,7 @@
 }
 
 .principal-teachers-page .principal-teachers-table :is(th, td):nth-child(4) {
-  min-width: 150px;
+  min-width: 290px;
 }
 
 .principal-teachers-page .principal-teachers-table .principal-teachers-empty {
@@ -184,7 +184,19 @@
 }
 
 .principal-teachers-page .principal-teacher-actions {
+  flex-wrap: nowrap;
   gap: 6px;
+}
+
+.principal-teachers-page .principal-teacher-actions > :is(
+  .principal-approve-button,
+  .principal-reject-button
+) {
+  width: auto;
+  min-width: 88px;
+  min-height: 36px;
+  padding: 0 12px;
+  white-space: nowrap;
 }
 
 .principal-teachers-page .principal-teacher-view-button {
@@ -388,6 +400,10 @@
 
 .principal-teachers-page .principal-teacher-modal-actions .principal-teacher-decision-button {
   margin-left: auto;
+}
+
+.principal-teachers-page .principal-teacher-modal-actions > .principal-teacher-cancel-button:first-child {
+  margin-right: auto;
 }
 
 .principal-teachers-page .principal-teacher-decision-button:disabled {

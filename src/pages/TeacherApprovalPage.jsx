@@ -1076,13 +1076,33 @@ function TeacherApprovalPage({ token, user }) {
                   </button>
                 ) : null}
                 {getApprovalStatus(selectedTeacher) === 'pending' ? (
-                  <button
-                    type="button"
-                    className="principal-teacher-cancel-button"
-                    onClick={() => setSelectedTeacher(null)}
-                  >
-                    Close
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className="principal-teacher-cancel-button"
+                      onClick={() => setSelectedTeacher(null)}
+                    >
+                      Close
+                    </button>
+                    <button
+                      type="button"
+                      className="principal-reject-button"
+                      onClick={() => openTeacherAction('reject', selectedTeacher)}
+                      disabled={activeUserId === selectedTeacher.userId}
+                    >
+                      <X size={15} strokeWidth={2.3} aria-hidden="true" />
+                      Reject
+                    </button>
+                    <button
+                      type="button"
+                      className="principal-approve-button"
+                      onClick={() => openTeacherAction('approve', selectedTeacher)}
+                      disabled={activeUserId === selectedTeacher.userId}
+                    >
+                      <Check size={15} strokeWidth={2.3} aria-hidden="true" />
+                      Approve
+                    </button>
+                  </>
                 ) : null}
               </div>
             </footer>
