@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { LogOut } from 'lucide-react'
+import { Archive, BookOpen, LogOut, ShieldCheck, UserRound } from 'lucide-react'
 import ArchivedAssessmentsPanel from '../components/ArchivedAssessmentsPanel'
 import AccountProfilePanel from '../components/AccountProfilePanel'
 import AccountPasswordPanel from '../components/AccountPasswordPanel'
@@ -13,6 +13,7 @@ import {
 } from '../api/apiV3Client'
 
 function TeacherSettingsPage({ user, token, onLogout, onAccountUpdated }) {
+  const [activeSettingsTab, setActiveSettingsTab] = useState('account')
   const [confirmingLogout, setConfirmingLogout] = useState(false)
   const [subjectOptions, setSubjectOptions] = useState([])
   const [additionalMajorSubjectIds, setAdditionalMajorSubjectIds] = useState([])
@@ -86,7 +87,26 @@ function TeacherSettingsPage({ user, token, onLogout, onAccountUpdated }) {
 
   return (
     <div className="teacher-settings-page smart-ui">
-      <div className="teacher-account-layout">
+      <nav className="settings-section-tabs" aria-label="Teacher settings sections" role="tablist">
+        <button type="button" role="tab" aria-selected={activeSettingsTab === 'account'} className={activeSettingsTab === 'account' ? 'is-active' : ''} onClick={() => setActiveSettingsTab('account')}>
+          <UserRound size={17} aria-hidden="true" />
+          Account
+        </button>
+        <button type="button" role="tab" aria-selected={activeSettingsTab === 'security'} className={activeSettingsTab === 'security' ? 'is-active' : ''} onClick={() => setActiveSettingsTab('security')}>
+          <ShieldCheck size={17} aria-hidden="true" />
+          Security
+        </button>
+        <button type="button" role="tab" aria-selected={activeSettingsTab === 'teaching'} className={activeSettingsTab === 'teaching' ? 'is-active' : ''} onClick={() => setActiveSettingsTab('teaching')}>
+          <BookOpen size={17} aria-hidden="true" />
+          Teaching
+        </button>
+        <button type="button" role="tab" aria-selected={activeSettingsTab === 'archives'} className={activeSettingsTab === 'archives' ? 'is-active' : ''} onClick={() => setActiveSettingsTab('archives')}>
+          <Archive size={17} aria-hidden="true" />
+          Archives
+        </button>
+      </nav>
+
+      <div className="teacher-account-layout" hidden={activeSettingsTab !== 'account'} role="tabpanel">
         <aside className="teacher-account-summary content-card" aria-label="Account summary">
           <span className="teacher-profile-avatar" aria-hidden="true">
             {initial}
@@ -109,10 +129,18 @@ function TeacherSettingsPage({ user, token, onLogout, onAccountUpdated }) {
 
         <div className="teacher-account-security">
           <AccountProfilePanel token={token} onAccountUpdated={onAccountUpdated} />
-          <AccountPasswordPanel token={token} />
-          <AccountVerificationPanel token={token} onAccountUpdated={onAccountUpdated} />
           <AccountContactChangePanel token={token} onAccountUpdated={onAccountUpdated} />
-          <section className="content-card teacher-subject-settings">
+        </div>
+      </div>
+
+      <div className="settings-section-content" hidden={activeSettingsTab !== 'security'} role="tabpanel">
+        <AccountPasswordPanel token={token} />
+        <AccountVerificationPanel token={token} onAccountUpdated={onAccountUpdated} />
+        <MfaSecurityPanel token={token} />
+      </div>
+
+      <div className="settings-section-content" hidden={activeSettingsTab !== 'teaching'} role="tabpanel">
+        <section className="content-card teacher-subject-settings">
             <header>
               <div>
                 <p className="content-card-tag">Teaching profile</p>
@@ -147,10 +175,11 @@ function TeacherSettingsPage({ user, token, onLogout, onAccountUpdated }) {
                 </fieldset>
               </div>
             )}
-          </section>
-          <MfaSecurityPanel token={token} />
-          <ArchivedAssessmentsPanel token={token} />
-        </div>
+        </section>
+      </div>
+
+      <div className="settings-section-content" hidden={activeSettingsTab !== 'archives'} role="tabpanel">
+        <ArchivedAssessmentsPanel token={token} />
       </div>
 
       {confirmingLogout ? (

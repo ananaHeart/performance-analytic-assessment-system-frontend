@@ -8,6 +8,9 @@ import {
   RefreshCw,
   RotateCcw,
   Save,
+  School,
+  ShieldCheck,
+  UserRound,
   X,
 } from 'lucide-react'
 import MfaSecurityPanel from '../components/MfaSecurityPanel'
@@ -116,6 +119,9 @@ function createSchoolProfileDraft(profile = {}) {
 function PrincipalSettingsPage({ user, token, scrollTarget = null, onAccountUpdated }) {
   const displayName =
     user.name || [user.firstName, user.middleName, user.lastName].filter(Boolean).join(' ')
+  const [activeSettingsTab, setActiveSettingsTab] = useState(
+    scrollTarget === 'academic-calendar' ? 'calendar' : 'account',
+  )
   const [archivedAssignments, setArchivedAssignments] = useState([])
   const [schoolProfile, setSchoolProfile] = useState(null)
   const [schoolProfileDraft, setSchoolProfileDraft] = useState(
@@ -592,10 +598,7 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null, onAccountUpda
 
   useEffect(() => {
     if (scrollTarget !== 'academic-calendar') return
-
-    document
-      .getElementById('academicCalendarSection')
-      ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    setActiveSettingsTab('calendar')
   }, [scrollTarget])
 
   const openRestoreDialog = (assignment) => {
@@ -655,7 +658,30 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null, onAccountUpda
         </p>
       </section>
 
-      <section className="content-card principal-settings-card">
+      <nav className="settings-section-tabs" aria-label="Principal settings sections" role="tablist">
+        <button type="button" role="tab" aria-selected={activeSettingsTab === 'account'} className={activeSettingsTab === 'account' ? 'is-active' : ''} onClick={() => setActiveSettingsTab('account')}>
+          <UserRound size={17} aria-hidden="true" />
+          Account
+        </button>
+        <button type="button" role="tab" aria-selected={activeSettingsTab === 'security'} className={activeSettingsTab === 'security' ? 'is-active' : ''} onClick={() => setActiveSettingsTab('security')}>
+          <ShieldCheck size={17} aria-hidden="true" />
+          Security
+        </button>
+        <button type="button" role="tab" aria-selected={activeSettingsTab === 'school'} className={activeSettingsTab === 'school' ? 'is-active' : ''} onClick={() => setActiveSettingsTab('school')}>
+          <School size={17} aria-hidden="true" />
+          School
+        </button>
+        <button type="button" role="tab" aria-selected={activeSettingsTab === 'calendar'} className={activeSettingsTab === 'calendar' ? 'is-active' : ''} onClick={() => setActiveSettingsTab('calendar')}>
+          <CalendarDays size={17} aria-hidden="true" />
+          Calendar
+        </button>
+        <button type="button" role="tab" aria-selected={activeSettingsTab === 'archives'} className={activeSettingsTab === 'archives' ? 'is-active' : ''} onClick={() => setActiveSettingsTab('archives')}>
+          <Archive size={17} aria-hidden="true" />
+          Archives
+        </button>
+      </nav>
+
+      <section className="content-card principal-settings-card" hidden={activeSettingsTab !== 'account'}>
         <div className="principal-settings-avatar" aria-hidden="true">
           {(displayName || user.email || 'P').slice(0, 1).toUpperCase()}
         </div>
@@ -667,15 +693,20 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null, onAccountUpda
         </div>
       </section>
 
-      <AccountProfilePanel token={token} onAccountUpdated={onAccountUpdated} />
-      <AccountPasswordPanel token={token} />
-      <AccountVerificationPanel token={token} onAccountUpdated={onAccountUpdated} />
-      <AccountContactChangePanel token={token} onAccountUpdated={onAccountUpdated} />
+      <div className="settings-section-content" hidden={activeSettingsTab !== 'account'} role="tabpanel">
+        <AccountProfilePanel token={token} onAccountUpdated={onAccountUpdated} />
+        <AccountContactChangePanel token={token} onAccountUpdated={onAccountUpdated} />
+      </div>
 
-      <MfaSecurityPanel token={token} />
+      <div className="settings-section-content" hidden={activeSettingsTab !== 'security'} role="tabpanel">
+        <AccountPasswordPanel token={token} />
+        <AccountVerificationPanel token={token} onAccountUpdated={onAccountUpdated} />
+        <MfaSecurityPanel token={token} />
+      </div>
 
       <section
-        className="content-card principal-school-profile-card"
+        className="content-card principal-school-profile-card settings-section-panel"
+        hidden={activeSettingsTab !== 'school'}
         aria-labelledby="schoolProfileTitle"
       >
         <header className="principal-school-profile-header">
@@ -855,7 +886,8 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null, onAccountUpda
 
       <section
         id="academicCalendarSection"
-        className="content-card principal-academic-calendar-card"
+        className="content-card principal-academic-calendar-card settings-section-panel"
+        hidden={activeSettingsTab !== 'calendar'}
         aria-labelledby="academicCalendarTitle"
       >
         <header className="principal-academic-calendar-header">
@@ -1148,7 +1180,7 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null, onAccountUpda
         )}
       </section>
 
-      <section className="principal-archive-panel" aria-labelledby="archivedAssignmentsTitle">
+      <section className="principal-archive-panel settings-section-panel" hidden={activeSettingsTab !== 'archives'} aria-labelledby="archivedAssignmentsTitle">
         <div className="principal-archive-header">
           <div className="principal-archive-heading">
             <span className="principal-archive-icon" aria-hidden="true">

@@ -3880,6 +3880,69 @@ h3 {
   gap: 18px;
 }
 
+.settings-section-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 18px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border);
+  scrollbar-width: thin;
+}
+
+.settings-section-tabs button {
+  flex: 0 0 auto;
+  min-height: 46px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--ui-muted-foreground);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.settings-section-tabs button:hover {
+  color: var(--ui-foreground);
+  background: var(--surface-subtle, #f7faf8);
+}
+
+.settings-section-tabs button.is-active {
+  border-bottom-color: var(--primary);
+  color: var(--primary-strong, #237a1c);
+  background: transparent;
+}
+
+.settings-section-content {
+  display: grid;
+  gap: 18px;
+}
+
+.settings-section-content[hidden],
+.settings-section-panel[hidden],
+.teacher-account-layout[hidden],
+.principal-settings-card[hidden] {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .settings-section-tabs {
+    margin-inline: -4px;
+  }
+
+  .settings-section-tabs button {
+    min-height: 44px;
+    padding-inline: 12px;
+  }
+}
+
 .principal-school-profile-field-error {
   color: var(--status-danger-text);
   font-size: var(--font-size-xs);
