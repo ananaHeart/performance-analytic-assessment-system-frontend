@@ -504,7 +504,7 @@
 
 .teacher-registration-steps {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: var(--space-2);
   margin: 0 0 var(--space-5);
   padding: 0;
