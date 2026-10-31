@@ -900,7 +900,10 @@ function TeacherApprovalPage({ token, user }) {
           className="principal-teacher-modal-backdrop"
           role="presentation"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
+            if (
+              event.target === event.currentTarget &&
+              getApprovalStatus(selectedTeacher) !== 'pending'
+            ) {
               setSelectedTeacher(null)
             }
           }}
@@ -924,14 +927,16 @@ function TeacherApprovalPage({ token, user }) {
                   {formatStatus(getDisplayAccountStatus(selectedTeacher))}
                 </span>
               </div>
-              <button
-                type="button"
-                className="principal-teacher-modal-close"
-                onClick={() => setSelectedTeacher(null)}
-                aria-label="Close teacher details"
-              >
-                <X size={18} strokeWidth={2.2} />
-              </button>
+              {getApprovalStatus(selectedTeacher) !== 'pending' ? (
+                <button
+                  type="button"
+                  className="principal-teacher-modal-close"
+                  onClick={() => setSelectedTeacher(null)}
+                  aria-label="Close teacher details"
+                >
+                  <X size={18} strokeWidth={2.2} />
+                </button>
+              ) : null}
             </header>
 
             <div className="principal-teacher-detail-sections">
@@ -1076,33 +1081,13 @@ function TeacherApprovalPage({ token, user }) {
                   </button>
                 ) : null}
                 {getApprovalStatus(selectedTeacher) === 'pending' ? (
-                  <>
-                    <button
-                      type="button"
-                      className="principal-teacher-cancel-button"
-                      onClick={() => setSelectedTeacher(null)}
-                    >
-                      Close
-                    </button>
-                    <button
-                      type="button"
-                      className="principal-reject-button"
-                      onClick={() => openTeacherAction('reject', selectedTeacher)}
-                      disabled={activeUserId === selectedTeacher.userId}
-                    >
-                      <X size={15} strokeWidth={2.3} aria-hidden="true" />
-                      Reject
-                    </button>
-                    <button
-                      type="button"
-                      className="principal-approve-button"
-                      onClick={() => openTeacherAction('approve', selectedTeacher)}
-                      disabled={activeUserId === selectedTeacher.userId}
-                    >
-                      <Check size={15} strokeWidth={2.3} aria-hidden="true" />
-                      Approve
-                    </button>
-                  </>
+                  <button
+                    type="button"
+                    className="principal-teacher-cancel-button"
+                    onClick={() => setSelectedTeacher(null)}
+                  >
+                    Cancel
+                  </button>
                 ) : null}
               </div>
             </footer>
