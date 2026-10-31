@@ -164,6 +164,10 @@ function getAccountStatus(teacher = {}) {
   return 'inactive'
 }
 
+function getDisplayAccountStatus(teacher = {}) {
+  return getAccountStatus(teacher) === 'active' ? 'active' : 'inactive'
+}
+
 function getTeacherTab(teacher = {}) {
   return getAccountStatus(teacher) === 'archived' ? 'archived' : getApprovalStatus(teacher)
 }
@@ -266,8 +270,8 @@ function TeacherApprovalPage({ token, user }) {
       teachers.map((teacher) => ({
         ...teacher,
         genderLabel: teacher.genderName || 'Not provided',
-        majorLabel: teacher.majorName || 'View details',
-        educationalAttainmentLabel: teacher.educationalAttainmentName || 'View details',
+        majorLabel: teacher.majorName || 'Not provided',
+        educationalAttainmentLabel: teacher.educationalAttainmentName || 'Not provided',
       })),
     [teachers],
   )
@@ -809,7 +813,7 @@ function TeacherApprovalPage({ token, user }) {
             <thead>
               <tr>
                 <th>Name</th>
-                <th>Major</th>
+                <th>Status</th>
                 <th>Registered</th>
                 <th>Actions</th>
               </tr>
@@ -845,9 +849,9 @@ function TeacherApprovalPage({ token, user }) {
                           </div>
                         </td>
                         <td>
-                          <div className="principal-teacher-profile-summary">
-                            <strong>{teacher.majorLabel}</strong>
-                          </div>
+                          <span className={`principal-teacher-status status-${getDisplayAccountStatus(teacher)}`}>
+                            {formatStatus(getDisplayAccountStatus(teacher))}
+                          </span>
                         </td>
                         <td>{formatDate(teacher.createdAt)}</td>
                         <td>
@@ -896,10 +900,7 @@ function TeacherApprovalPage({ token, user }) {
           className="principal-teacher-modal-backdrop"
           role="presentation"
           onMouseDown={(event) => {
-            if (
-              event.target === event.currentTarget &&
-              getApprovalStatus(selectedTeacher) !== 'pending'
-            ) {
+            if (event.target === event.currentTarget) {
               setSelectedTeacher(null)
             }
           }}
@@ -911,19 +912,26 @@ function TeacherApprovalPage({ token, user }) {
             aria-labelledby="teacherDetailsTitle"
           >
             <header className="principal-teacher-modal-header">
-              <div>
-                <h3 id="teacherDetailsTitle">{selectedTeacher.name || 'Teacher details'}</h3>
+              <div className="principal-teacher-modal-identity">
+                <span className="principal-teacher-modal-avatar" aria-hidden="true">
+                  {getInitials(selectedTeacher.name)}
+                </span>
+                <div>
+                  <h3 id="teacherDetailsTitle">{selectedTeacher.name || 'Teacher details'}</h3>
+                  <p>{selectedTeacher.email || 'No email provided'}</p>
+                </div>
+                <span className={`principal-teacher-status status-${getDisplayAccountStatus(selectedTeacher)}`}>
+                  {formatStatus(getDisplayAccountStatus(selectedTeacher))}
+                </span>
               </div>
-              {getApprovalStatus(selectedTeacher) !== 'pending' ? (
-                <button
-                  type="button"
-                  className="principal-teacher-modal-close"
-                  onClick={() => setSelectedTeacher(null)}
-                  aria-label="Close teacher details"
-                >
-                  <X size={18} strokeWidth={2.2} />
-                </button>
-              ) : null}
+              <button
+                type="button"
+                className="principal-teacher-modal-close"
+                onClick={() => setSelectedTeacher(null)}
+                aria-label="Close teacher details"
+              >
+                <X size={18} strokeWidth={2.2} />
+              </button>
             </header>
 
             <div className="principal-teacher-detail-sections">
@@ -998,59 +1006,21 @@ function TeacherApprovalPage({ token, user }) {
             </div>
 
             <footer className="principal-teacher-modal-footer">
-              <div className="principal-teacher-lifecycle-statuses">
-                <span className={`principal-teacher-status status-${getApprovalStatus(selectedTeacher)}`}>
-                  Approval: {formatStatus(getApprovalStatus(selectedTeacher))}
-                </span>
-                <span className={`principal-teacher-status status-${getAccountStatus(selectedTeacher)}`}>
-                  Account: {formatStatus(getAccountStatus(selectedTeacher))}
-                </span>
-              </div>
-              {getApprovalStatus(selectedTeacher) !== 'pending' &&
-              getAccountStatus(selectedTeacher) !== 'archived' ? (
-                <button
-                  type="button"
-                  className="principal-teacher-edit-button"
-                  onClick={openTeacherEdit}
-                  disabled={isLoadingDetail}
-                >
-                  <Pencil size={15} strokeWidth={2.2} aria-hidden="true" />
-                  Edit details
-                </button>
-              ) : null}
-              {getAccountStatus(selectedTeacher) !== 'archived' &&
-              ['approved', 'rejected'].includes(getApprovalStatus(selectedTeacher)) ? (
-                <button
-                  type="button"
-                  className="principal-teacher-decision-button"
-                  onClick={openDecisionAction}
-                  disabled={isLoadingDetail}
-                >
-                  <RotateCcw size={15} strokeWidth={2.2} aria-hidden="true" />
-                  Reverse decision
-                </button>
-              ) : null}
-              {(getAccountStatus(selectedTeacher) === 'archived' ||
-                getApprovalStatus(selectedTeacher) === 'approved') ? (
-                <button
-                  type="button"
-                  className={`principal-teacher-archive-button is-${
-                    getAccountStatus(selectedTeacher) === 'archived' ? 'restore' : 'archive'
-                  }`}
-                  onClick={openArchiveAction}
-                  disabled={isLoadingDetail}
-                >
-                  {getAccountStatus(selectedTeacher) === 'archived' ? (
-                    <ArchiveRestore size={15} strokeWidth={2.2} aria-hidden="true" />
-                  ) : (
-                    <Archive size={15} strokeWidth={2.2} aria-hidden="true" />
-                  )}
-                  {getAccountStatus(selectedTeacher) === 'archived' ? 'Restore' : 'Archive'}
-                </button>
-              ) : null}
-              {getApprovalStatus(selectedTeacher) === 'approved' &&
-              ['active', 'inactive'].includes(getAccountStatus(selectedTeacher)) ? (
-                <>
+              <div className="principal-teacher-modal-actions">
+                {getApprovalStatus(selectedTeacher) !== 'pending' &&
+                getAccountStatus(selectedTeacher) !== 'archived' ? (
+                  <button
+                    type="button"
+                    className="principal-teacher-edit-button"
+                    onClick={openTeacherEdit}
+                    disabled={isLoadingDetail}
+                  >
+                    <Pencil size={15} strokeWidth={2.2} aria-hidden="true" />
+                    Edit details
+                  </button>
+                ) : null}
+                {getApprovalStatus(selectedTeacher) === 'approved' &&
+                ['active', 'inactive'].includes(getAccountStatus(selectedTeacher)) ? (
                   <button
                     type="button"
                     className="principal-teacher-contract-button"
@@ -1060,6 +1030,39 @@ function TeacherApprovalPage({ token, user }) {
                     <CalendarRange size={15} strokeWidth={2.2} aria-hidden="true" />
                     Contract
                   </button>
+                ) : null}
+                {getAccountStatus(selectedTeacher) !== 'archived' &&
+                ['approved', 'rejected'].includes(getApprovalStatus(selectedTeacher)) ? (
+                  <button
+                    type="button"
+                    className="principal-teacher-decision-button"
+                    onClick={openDecisionAction}
+                    disabled={isLoadingDetail}
+                  >
+                    <RotateCcw size={15} strokeWidth={2.2} aria-hidden="true" />
+                    Reverse decision
+                  </button>
+                ) : null}
+                {(getAccountStatus(selectedTeacher) === 'archived' ||
+                  getApprovalStatus(selectedTeacher) === 'approved') ? (
+                  <button
+                    type="button"
+                    className={`principal-teacher-archive-button is-${
+                      getAccountStatus(selectedTeacher) === 'archived' ? 'restore' : 'archive'
+                    }`}
+                    onClick={openArchiveAction}
+                    disabled={isLoadingDetail}
+                  >
+                    {getAccountStatus(selectedTeacher) === 'archived' ? (
+                      <ArchiveRestore size={15} strokeWidth={2.2} aria-hidden="true" />
+                    ) : (
+                      <Archive size={15} strokeWidth={2.2} aria-hidden="true" />
+                    )}
+                    {getAccountStatus(selectedTeacher) === 'archived' ? 'Restore' : 'Archive'}
+                  </button>
+                ) : null}
+                {getApprovalStatus(selectedTeacher) === 'approved' &&
+                ['active', 'inactive'].includes(getAccountStatus(selectedTeacher)) ? (
                   <button
                     type="button"
                     className={`principal-teacher-status-button is-${
@@ -1071,19 +1074,17 @@ function TeacherApprovalPage({ token, user }) {
                     <Power size={15} strokeWidth={2.2} aria-hidden="true" />
                     {getAccountStatus(selectedTeacher) === 'active' ? 'Deactivate' : 'Activate'}
                   </button>
-                </>
-              ) : null}
-              {getApprovalStatus(selectedTeacher) === 'pending' ? (
-                <div className="principal-teacher-modal-actions">
+                ) : null}
+                {getApprovalStatus(selectedTeacher) === 'pending' ? (
                   <button
                     type="button"
                     className="principal-teacher-cancel-button"
                     onClick={() => setSelectedTeacher(null)}
                   >
-                    Cancel
+                    Close
                   </button>
-                </div>
-              ) : null}
+                ) : null}
+              </div>
             </footer>
           </section>
         </div>

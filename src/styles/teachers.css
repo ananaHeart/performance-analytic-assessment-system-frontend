@@ -199,16 +199,57 @@
   max-height: calc(100dvh - 32px);
 }
 
+.principal-teachers-page .principal-teacher-modal {
+  width: min(880px, 100%);
+  border-radius: 8px;
+}
+
 .principal-teachers-page :is(.principal-teacher-modal-header, .principal-teacher-modal-footer) {
   min-height: 0;
   flex-shrink: 0;
   flex-direction: row;
-  padding: 10px 16px;
+  padding: 14px 20px;
   gap: 8px 12px;
 }
 
 .principal-teachers-page .principal-teacher-modal-header > div {
   min-width: 0;
+}
+
+.principal-teachers-page .principal-teacher-modal-identity {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.principal-teachers-page .principal-teacher-modal-avatar {
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.principal-teachers-page .principal-teacher-modal-identity > div {
+  min-width: 0;
+}
+
+.principal-teachers-page .principal-teacher-modal-identity p {
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
 }
 
 .principal-teachers-page :is(.principal-teacher-modal-header, .principal-teacher-confirmation) h3 {
@@ -224,11 +265,11 @@
 }
 
 .principal-teachers-page .principal-teacher-detail-sections {
-  padding: 0 16px;
+  padding: 4px 20px 10px;
 }
 
 .principal-teachers-page .principal-teacher-detail-section {
-  padding: 12px 0;
+  padding: 16px 0;
 }
 
 .principal-teachers-page .principal-teacher-detail-section > header {
@@ -236,7 +277,7 @@
 }
 
 .principal-teachers-page .principal-teacher-detail-grid {
-  gap: 10px 16px;
+  gap: 14px 28px;
 }
 
 .principal-teachers-page .principal-teacher-detail {
@@ -244,8 +285,10 @@
 }
 
 .principal-teachers-page .principal-teacher-modal-footer {
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
+  justify-content: flex-end;
+  background: var(--surface);
 }
 
 .principal-teachers-page .principal-teacher-lifecycle-statuses {
@@ -256,10 +299,10 @@
 }
 
 .principal-teachers-page .principal-teacher-modal-actions {
-  width: auto;
+  width: 100%;
   flex-wrap: wrap;
+  justify-content: flex-start;
   gap: 8px;
-  margin-left: auto;
 }
 
 .principal-teachers-page .principal-teacher-edit-button {
@@ -267,7 +310,6 @@
   min-height: 36px;
   align-items: center;
   gap: 6px;
-  margin-left: auto;
   padding: 0 11px;
   border: 1px solid var(--color-border, #d7e0dc);
   border-radius: 6px;
@@ -342,6 +384,10 @@
   font: inherit;
   font-weight: 700;
   cursor: pointer;
+}
+
+.principal-teachers-page .principal-teacher-modal-actions .principal-teacher-decision-button {
+  margin-left: auto;
 }
 
 .principal-teachers-page .principal-teacher-decision-button:disabled {
@@ -484,6 +530,38 @@
 }
 
 @media (max-width: 560px) {
+  .principal-teachers-page .principal-teacher-modal-backdrop {
+    padding: 8px;
+  }
+
+  .principal-teachers-page .principal-teacher-modal {
+    max-height: calc(100dvh - 16px);
+  }
+
+  .principal-teachers-page .principal-teacher-modal-identity {
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .principal-teachers-page .principal-teacher-modal-avatar {
+    width: 36px;
+    height: 36px;
+  }
+
+  .principal-teachers-page .principal-teacher-modal-identity > .principal-teacher-status {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .principal-teachers-page .principal-teacher-modal-actions > button {
+    flex: 1 1 calc(50% - 4px);
+    justify-content: center;
+  }
+
+  .principal-teachers-page .principal-teacher-modal-actions .principal-teacher-decision-button {
+    margin-left: 0;
+  }
+
   .principal-teachers-page .principal-teacher-edit-grid {
     grid-template-columns: 1fr;
   }
