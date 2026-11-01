@@ -10,6 +10,7 @@ import {
   FileText,
   Pencil,
   Plus,
+  Power,
   RefreshCw,
   Save,
   Trash2,
@@ -94,6 +95,11 @@ function formatStatus(status) {
     .toString()
     .replace(/[_-]/g, ' ')
     .replace(/\b\w/g, (character) => character.toUpperCase())
+}
+
+// Labels match the Role options in the edit-assignment dialog.
+function formatAssignmentRole(assignmentRole) {
+  return String(assignmentRole ?? '').toLowerCase() === 'co_teacher' ? 'Co-teacher' : 'Primary teacher'
 }
 
 function isActiveClassAssignment(assignment) {
@@ -2551,14 +2557,19 @@ function ClassRecordsPage({
               ) : (
                  sortedClassAssignments.map((assignment, index) => (
                   <tr key={assignment.id ?? `${assignment.teacherName}-${assignment.sectionName}-${index}`}>
-                    <td>{formatTeacherRosterName(assignment, schoolTeachers)}</td>
+                    <td>
+                      <span className="principal-assignment-teacher-cell">
+                        <strong>{formatTeacherRosterName(assignment, schoolTeachers)}</strong>
+                        <small>{formatAssignmentRole(assignment.assignmentRole)}</small>
+                      </span>
+                    </td>
                     <td>{assignment.subjectName || 'Not assigned'}</td>
                     <td>
                       {assignment.gradeLevelName || 'Grade level'} -{' '}
                       {assignment.sectionName || 'Section'}
                     </td>
                      <td>
-                       <span className="status-pill status-active">
+                       <span className={`status-pill status-${String(assignment.status || 'active').toLowerCase()}`}>
                          {formatStatus(assignment.status || 'active')}
                        </span>
                      </td>
@@ -2572,7 +2583,7 @@ function ClassRecordsPage({
                              aria-label={`${String(assignment.status).toLowerCase() === 'inactive' ? 'Activate' : 'Deactivate'} ${assignment.teacherName || 'teacher'} class assignment`}
                              title={String(assignment.status).toLowerCase() === 'inactive' ? 'Activate assignment' : 'Deactivate assignment'}
                            >
-                             <RefreshCw size={16} aria-hidden="true" />
+                             <Power size={16} aria-hidden="true" />
                            </button>
                          ) : null}
                          <button

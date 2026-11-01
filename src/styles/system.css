@@ -133,10 +133,10 @@
   border-color: var(--ui-border);
 }
 
-.smart-ui button,
-.smart-ui input,
-.smart-ui select,
-.smart-ui textarea {
+/* Zero specificity on purpose: as `.smart-ui button` it outranked every class rule, so
+   .secondary-button, the settings tabs and Tailwind text-* classes lost their font size
+   and weight on teacher pages only. */
+:where(.smart-ui) :where(button, input, select, textarea) {
   font: inherit;
 }
 
@@ -577,6 +577,7 @@
   position: absolute;
   top: 50%;
   right: 4px;
+  transform: translateY(-50%);
   width: 34px;
   height: 34px;
   display: inline-flex;

@@ -941,9 +941,11 @@ h3 {
   gap: 14px;
 }
 
+/* Tag above title, like every other settings card (flex put them side by side). */
 .principal-academic-calendar-header > div:first-of-type {
   min-width: 0;
-  gap: 14px;
+  display: grid;
+  gap: 2px;
 }
 
 .principal-academic-calendar-header h3 {
@@ -4074,6 +4076,11 @@ h3 {
   display: grid;
   gap: 18px;
   align-content: start;
+}
+
+/* The principal summary has no logout button, so it should not reserve room for one. */
+.teacher-account-layout.is-principal .teacher-account-summary {
+  min-height: 0;
 }
 
 .archived-assessments-header {

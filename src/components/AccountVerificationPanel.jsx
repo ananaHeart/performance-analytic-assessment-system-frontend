@@ -165,8 +165,8 @@ function AccountVerificationPanel({ token, onAccountUpdated }) {
 
       {!isLoading && account ? (
         <div className="account-verification-methods">
-          <div><MailCheck size={18} aria-hidden="true" /><span><strong>Email</strong><small>{account.email || 'Not provided'}</small></span>{account.emailVerified ? <em><CheckCircle2 size={15} />Verified</em> : <button type="button" onClick={() => startVerification('email')} disabled={Boolean(busyAction)}>Verify</button>}</div>
-          <div><MessageSquareText size={18} aria-hidden="true" /><span><strong>Contact number</strong><small>{account.contactNumber || 'Not provided'}</small></span>{account.contactVerified ? <em><CheckCircle2 size={15} />Verified</em> : <button type="button" onClick={() => startVerification('sms')} disabled={Boolean(busyAction) || !account.contactNumber}>Verify</button>}</div>
+          <div><MailCheck size={18} aria-hidden="true" /><span><strong>Email</strong><small>{account.email || 'Not provided'}</small></span>{account.emailVerified ? <em><CheckCircle2 size={15} />Verified</em> : <button type="button" className="secondary-button" onClick={() => startVerification('email')} disabled={Boolean(busyAction)}>Verify</button>}</div>
+          <div><MessageSquareText size={18} aria-hidden="true" /><span><strong>Contact number</strong><small>{account.contactNumber || 'Not provided'}</small></span>{account.contactVerified ? <em><CheckCircle2 size={15} />Verified</em> : <button type="button" className="secondary-button" onClick={() => startVerification('sms')} disabled={Boolean(busyAction) || !account.contactNumber}>Verify</button>}</div>
         </div>
       ) : null}
 

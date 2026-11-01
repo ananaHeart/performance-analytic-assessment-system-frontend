@@ -116,7 +116,7 @@ const REPORT_TYPES = [
 ]
 
 const PRINCIPAL_REPORT_TABS = [
-  { key: 'by_teacher', label: 'By teacher assessments', reportType: 'principal_consolidated', groupBy: 'TEACHER', icon: GraduationCap, tone: 'green' },
+  { key: 'by_teacher', label: 'Teacher assessment', reportType: 'principal_consolidated', groupBy: 'TEACHER', icon: GraduationCap, tone: 'green' },
   { key: 'by_student', label: 'Student performance', reportType: 'student_performance_profile', groupBy: null, icon: UserRound, tone: 'blue' },
   { key: 'by_term', label: 'By term', reportType: 'principal_consolidated', groupBy: 'TERM_PERIOD', icon: CalendarDays, tone: 'orange' },
   { key: 'by_sync_activity', label: 'Sync activity', reportType: 'teacher_sync_activity', groupBy: null, icon: Activity, tone: 'purple' },
@@ -333,9 +333,24 @@ function formatLocalDate(value, emptyLabel) {
 function formatStatus(value, emptyLabel = 'Not available') {
   if (!value) return emptyLabel
 
+  // Lowercased first so backend codes like "VERIFIED" read "Verified", not stay in capitals.
   return String(value)
+    .toLowerCase()
     .replace(/[_-]/g, ' ')
     .replace(/\b\w/g, (character) => character.toUpperCase())
+}
+
+const CONSOLIDATED_GROUP_LABELS = {
+  TEACHER: 'teacher',
+  TERM_PERIOD: 'term',
+  CLASS: 'class',
+  SUBJECT: 'subject',
+  GRADE_LEVEL: 'grade level',
+}
+
+function formatGroupedBy(groupedBy) {
+  const code = String(groupedBy ?? '').toUpperCase()
+  return CONSOLIDATED_GROUP_LABELS[code] || formatStatus(groupedBy, 'group').toLowerCase()
 }
 
 function getMasteryPillClass(masteryStatusCode) {
@@ -1293,6 +1308,8 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
   )
 
   const consolidatedGroups = Array.isArray(consolidatedData?.groups) ? consolidatedData.groups : []
+  const selectedConsolidatedAssessment =
+    sourceData.assessments.find((assessment) => sameId(assessment.testId, filters.testId)) ?? null
   const consolidatedChartData = consolidatedGroups.map((group) => ({
     id: group.groupKey,
     label: group.groupLabel || `Group ${group.groupKey}`,
@@ -1776,7 +1793,8 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
               />
             ) : null}
 
-            {selectedReportType !== 'student_performance_profile' && !isSyncActivityReport && !isLearningCompetencyReport && !isSupportReport ? (
+            {/* Only the class record filters rows by student; the other reports ignore it. */}
+            {selectedReportType === 'assessment_results' ? (
               <FilterSelect
                 id="reportStudent"
                 label="Student (optional)"
@@ -2072,10 +2090,9 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
             </div>
 
             {itemAnalysisChartData.length ? (
-              <HorizontalMasteryChart
-                data={itemAnalysisChartData}
-                height={Math.max(180, itemAnalysisChartData.length * 34)}
-              />
+              <div className="reports-chart-panel">
+                <HorizontalMasteryChart data={itemAnalysisChartData} />
+              </div>
             ) : null}
 
             <div className="reports-results-table-wrap">
@@ -2279,8 +2296,13 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
           <div className="reports-assessment-results">
             <div className="reports-report-meta">
               <div>
-                <strong>Consolidated by {formatStatus(consolidatedData.groupedBy)}</strong>
-                <span>School-wide unless filters above narrow the scope.</span>
+                <strong>{selectedConsolidatedAssessment?.testName || 'Consolidated results'}</strong>
+                <span>
+                  Consolidated by {formatGroupedBy(consolidatedData.groupedBy)}
+                  {selectedConsolidatedAssessment?.openAt
+                    ? ` · ${formatLocalDate(selectedConsolidatedAssessment.openAt, '')}`
+                    : ''}
+                </span>
               </div>
               <div>
                 <span className={`reports-data-status is-${normalizeText(consolidatedData.dataStatus)}`}>
@@ -2313,15 +2335,18 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
               </div>
             ) : null}
 
-            {consolidatedChartData.length ? (
-              <VerticalMasteryChart
-                data={consolidatedChartData}
-                height={220}
-              />
+            {/* One group is one bar, which the card below already says better. */}
+            {consolidatedChartData.length > 1 ? (
+              <div className="reports-chart-panel">
+                <VerticalMasteryChart
+                  data={consolidatedChartData}
+                  height={240}
+                />
+              </div>
             ) : null}
 
             {consolidatedGroups.length ? (
-              <div className="reports-consolidated-grid">
+              <div className={`reports-consolidated-grid ${consolidatedGroups.length === 1 ? 'is-single' : ''}`}>
                 {consolidatedGroups.map((group) => (
                   <article className="reports-consolidated-card" key={group.groupKey}>
                     <header>
@@ -2361,12 +2386,12 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
                           {group.leastMasteredSkills.map((skill) => (
                             <li key={skill.skillId}>
                               <div className="reports-skill-heading">
-                                <span
-                                  className={`performance-pill ${getMasteryPillClass(skill.masteryStatusCode)}`}
-                                >
+                                <span className="reports-skill-name">
                                   {skill.skillName || `Skill #${skill.skillId}`}
                                 </span>
-                                <small>{formatBackendNumber(skill.masteryPercentage, '%')}</small>
+                                <small className={getMasteryPillClass(skill.masteryStatusCode)}>
+                                  {formatBackendNumber(skill.masteryPercentage, '%')}
+                                </small>
                               </div>
                               <div className="reports-skill-bar">
                                 <div
@@ -2742,17 +2767,31 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
                   {learningCompetencyData.rootCompetencies
                     .filter((root) => !filters.rootTagId || sameId(root.rootTagId, filters.rootTagId))
                     .map((root) => (
-                      <div key={root.rootTagId}>
+                      <section className="reports-competency-root" key={root.rootTagId}>
                         <div className="reports-report-meta">
                           <div>
                             <strong>{root.rootTagName}</strong>
                             <span>Least mastered competencies first. Click one to see who needs help.</span>
                           </div>
-                          <span
-                            className={`performance-pill ${getMasteryPillClass(root.masteryStatusCode)}`}
-                          >
-                            {formatBackendNumber(root.masteryPercentage, '%')}
-                          </span>
+                          <div className="reports-root-mastery">
+                            <small>Root mastery</small>
+                            <span
+                              className={`performance-pill ${getMasteryPillClass(root.masteryStatusCode)}`}
+                            >
+                              {formatBackendNumber(root.masteryPercentage, '%')}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="reports-chart-panel">
+                          <HorizontalMasteryChart
+                            data={root.skills.map((skill) => ({
+                              id: skill.skillId,
+                              label: skill.competencyName || `Skill #${skill.skillId}`,
+                              value: skill.masteryPercentage,
+                              tone: masteryToneByStatus(skill.masteryStatusCode),
+                            }))}
+                          />
                         </div>
 
                         <div className="reports-results-table-wrap">
@@ -2798,17 +2837,7 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
                             </tbody>
                           </table>
                         </div>
-
-                        <HorizontalMasteryChart
-                          data={root.skills.map((skill) => ({
-                            id: skill.skillId,
-                            label: skill.competencyName || `Skill #${skill.skillId}`,
-                            value: skill.masteryPercentage,
-                            tone: masteryToneByStatus(skill.masteryStatusCode),
-                          }))}
-                          height={Math.max(180, root.skills.length * 34)}
-                        />
-                      </div>
+                      </section>
                     ))}
                 </>
               ) : (
@@ -3036,19 +3065,23 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
                   <strong>{masterySummary.needsSupportCount}</strong>
                 </article>
                 {masterySummary.topSkill ? (
-                  <article className="is-positive">
+                  <article className="is-positive is-skill">
                     <Trophy size={18} aria-hidden="true" />
                     <span>Most mastered</span>
-                    <strong>{masterySummary.topSkill.skillName || 'Skill'}</strong>
-                    <small>{formatBackendNumber(masterySummary.topSkill.masteryPercentage, '%')}</small>
+                    <strong title={masterySummary.topSkill.skillName || ''}>
+                      {masterySummary.topSkill.skillName || 'Skill'}
+                    </strong>
+                    <small>{formatBackendNumber(masterySummary.topSkill.masteryPercentage, '%')} mastery</small>
                   </article>
                 ) : null}
                 {masterySummary.weakestSkill ? (
-                  <article className="is-negative">
+                  <article className="is-negative is-skill">
                     <TrendingDown size={18} aria-hidden="true" />
                     <span>Needs the most support</span>
-                    <strong>{masterySummary.weakestSkill.skillName || 'Skill'}</strong>
-                    <small>{formatBackendNumber(masterySummary.weakestSkill.masteryPercentage, '%')}</small>
+                    <strong title={masterySummary.weakestSkill.skillName || ''}>
+                      {masterySummary.weakestSkill.skillName || 'Skill'}
+                    </strong>
+                    <small>{formatBackendNumber(masterySummary.weakestSkill.masteryPercentage, '%')} mastery</small>
                   </article>
                 ) : null}
               </div>
@@ -3064,10 +3097,9 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
             ) : null}
 
             {studentCompetencyPerformance.length ? (
-              <HorizontalMasteryChart
-                data={masteryChartData}
-                height={Math.max(180, studentCompetencyPerformance.length * 34)}
-              />
+              <div className="reports-chart-panel">
+                <HorizontalMasteryChart data={masteryChartData} />
+              </div>
             ) : null}
 
             {studentProfileData.dataStatus === 'empty' || studentProfileData.dataStatus === 'partial' ? (

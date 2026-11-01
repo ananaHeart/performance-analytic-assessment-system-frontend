@@ -376,9 +376,31 @@
   gap: 4px;
 }
 
-.reports-report-meta > div:last-child {
+/* Right-aligns the status/date column. A heading with no right column must stay left-aligned,
+   which is why :not(:first-child) is needed. */
+.reports-report-meta > div:last-child:not(:first-child) {
+  flex: 0 0 auto;
   justify-items: end;
   text-align: right;
+}
+
+.reports-report-meta > .reports-export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.reports-report-meta > .reports-profile-identity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.reports-report-meta > .reports-root-mastery {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .reports-report-meta strong,
@@ -456,8 +478,37 @@
   font-size: 1rem;
 }
 
+/* Three short counts, then two wider cards for the skill names, which run long. */
 .reports-summary-grid.is-mastery {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 0.75fr)) repeat(2, minmax(0, 1.5fr));
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+
+.reports-summary-grid.is-mastery article {
+  min-height: 0;
+  align-content: start;
+  padding: 14px 16px;
+}
+
+.reports-summary-grid.is-mastery article > strong {
+  font-size: 1.35rem;
+  line-height: 1.15;
+}
+
+.reports-summary-grid.is-mastery article.is-skill > strong {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+/* With only one skill card (a single assessed skill), let it fill both skill columns. */
+.reports-summary-grid.is-mastery article.is-skill:nth-child(4):last-child {
+  grid-column: 4 / -1;
 }
 
 .reports-summary-grid article.is-mastered svg {
@@ -489,22 +540,27 @@
   min-width: 0;
 }
 
-.reports-profile-avatar {
-  width: 44px;
-  height: 44px;
+/* Two classes deep so `.reports-profile-identity span` (the name/LRN lines) cannot override it. */
+.reports-profile-identity .reports-profile-avatar {
+  width: 48px;
+  height: 48px;
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  border: 1px solid var(--primary-border);
   border-radius: 50%;
-  background: var(--brand);
-  color: var(--on-brand);
-  font-size: 1rem;
-  font-weight: 900;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  font-size: 0.95rem;
+  font-weight: 850;
+  letter-spacing: 0.02em;
 }
 
 .reports-profile-identity > div {
   min-width: 0;
+  display: grid;
+  gap: 2px;
 }
 
 .reports-profile-identity strong {
@@ -563,7 +619,11 @@
 
 .reports-student-row:hover,
 .reports-student-row:focus-visible {
-  background: var(--surface);
+  background: var(--surface-muted);
+}
+
+.reports-student-row:hover > svg:last-child {
+  color: var(--primary-dark);
 }
 
 .reports-student-row:focus-visible {
@@ -588,6 +648,10 @@
   color: var(--primary-dark);
   font-size: 0.74rem;
   font-weight: 900;
+}
+
+.reports-student-row .reports-student-avatar svg {
+  color: inherit;
 }
 
 .reports-student-copy {
@@ -674,7 +738,7 @@
   padding: 11px 12px;
   border-bottom: 1px solid var(--ui-border);
   text-align: left;
-  vertical-align: top;
+  vertical-align: middle;
 }
 
 .reports-results-table th {
@@ -694,7 +758,33 @@
 }
 
 .reports-results-table tbody tr.reports-clickable-row:hover {
+  background: var(--surface-muted);
+}
+
+/* Charts sit in their own framed panel so they read as a figure, not loose bars on the page. */
+.reports-chart-panel {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-control);
   background: var(--surface);
+}
+
+.reports-chart-panel .analytics-chart-shell {
+  min-height: 0;
+}
+
+.reports-competency-root {
+  display: grid;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.reports-root-mastery small {
+  color: var(--ui-muted-foreground);
+  font-size: 0.7rem;
+  font-weight: 700;
 }
 
 .reports-results-table td > strong,
@@ -838,6 +928,22 @@
   .reports-summary-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .reports-summary-grid.is-mastery {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .reports-summary-grid.is-mastery article {
+    grid-column: span 2;
+  }
+
+  .reports-summary-grid.is-mastery article.is-skill {
+    grid-column: span 3;
+  }
+
+  .reports-summary-grid.is-mastery article.is-skill:nth-child(4):last-child {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 900px) {
@@ -896,13 +1002,30 @@
     flex-direction: column;
   }
 
-  .reports-report-meta > div:last-child {
+  .reports-report-meta > div:last-child:not(:first-child) {
     justify-items: start;
     text-align: left;
   }
 
+  .reports-report-meta > .reports-export-actions {
+    justify-content: flex-start;
+  }
+
   .reports-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reports-summary-grid.is-mastery {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .reports-summary-grid.is-mastery article {
+    grid-column: auto;
+  }
+
+  .reports-summary-grid.is-mastery article.is-skill,
+  .reports-summary-grid.is-mastery article.is-skill:nth-child(4):last-child {
+    grid-column: 1 / -1;
   }
 }
 
@@ -920,7 +1043,7 @@
 
 .reports-consolidated-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
   gap: 14px;
 }
 
@@ -937,14 +1060,18 @@
 
 .reports-consolidated-card header {
   display: flex;
-  align-items: baseline;
+  flex-wrap: wrap;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px 10px;
 }
 
 .reports-consolidated-card header strong {
+  flex: 1 1 220px;
+  min-width: 0;
   overflow-wrap: anywhere;
   font-size: 0.88rem;
+  line-height: 1.35;
 }
 
 .reports-consolidated-card header span {
@@ -1010,9 +1137,13 @@
   gap: 8px;
 }
 
+/* justify-content must be reset: the shared li rule's space-between makes a grid track
+   shrink to its content, so every bar came out a different length. */
 .reports-consolidated-section ul.reports-skill-list li {
   display: grid;
-  gap: 4px;
+  grid-template-columns: minmax(0, 1fr);
+  justify-content: stretch;
+  gap: 5px;
 }
 
 .reports-skill-heading {
@@ -1022,20 +1153,77 @@
   gap: 8px;
 }
 
-.reports-skill-heading .performance-pill {
+.reports-skill-name {
   min-width: 0;
-  height: auto;
-  min-height: 24px;
-  padding-top: 3px;
-  padding-bottom: 3px;
-  white-space: normal;
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.35;
   overflow-wrap: anywhere;
-  text-align: left;
 }
 
 .reports-skill-heading small {
   flex: 0 0 auto;
-  font-weight: 700;
+  font-weight: 800;
+}
+
+.reports-skill-heading small.is-proficient {
+  color: var(--status-success-text);
+}
+
+.reports-skill-heading small.is-developing {
+  color: var(--status-warning-text);
+}
+
+.reports-skill-heading small.is-needs-support {
+  color: var(--status-danger-text);
+}
+
+/* A single group (one assessment, one teacher or term): lay the card out across the page
+   instead of leaving one narrow card in the corner. */
+.reports-consolidated-grid.is-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.reports-consolidated-grid.is-single .reports-consolidated-card {
+  grid-template-columns: minmax(180px, 0.7fr) minmax(0, 1fr) minmax(0, 1.4fr);
+  align-items: start;
+  gap: 14px 28px;
+  padding: 16px 18px;
+}
+
+.reports-consolidated-grid.is-single .reports-consolidated-card > header {
+  grid-column: 1 / -1;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.reports-consolidated-grid.is-single .reports-consolidated-metric {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.reports-consolidated-grid.is-single .reports-consolidated-metric strong {
+  font-size: 1.3rem;
+}
+
+@media (max-width: 1100px) {
+  .reports-consolidated-grid.is-single .reports-consolidated-card {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .reports-consolidated-grid.is-single .reports-consolidated-section:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 640px) {
+  .reports-consolidated-grid.is-single .reports-consolidated-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .reports-skill-bar {

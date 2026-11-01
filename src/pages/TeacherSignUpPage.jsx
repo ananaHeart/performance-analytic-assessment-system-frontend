@@ -1051,6 +1051,7 @@ function TeacherSignUpPage({ onNavigate }) {
                   disabled={index >= step}
                   onClick={() => setStep(index)}
                   aria-current={isCurrent ? 'step' : undefined}
+                  title={`Step ${index + 1}: ${item.label}`}
                 >
                   <span className="teacher-registration-step-icon" aria-hidden="true">
                     {isComplete ? <Check size={17} strokeWidth={2.3} /> : <Icon size={17} />}

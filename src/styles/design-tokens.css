@@ -568,6 +568,11 @@ textarea:focus,
   color: var(--status-neutral-text);
 }
 
+/* The school-year status arrives lowercase ("active"); term pills are already capitalized. */
+.principal-academic-year-summary .status-pill {
+  text-transform: capitalize;
+}
+
 .section-tag,
 .content-card-tag,
 .brand-kicker {
@@ -3973,6 +3978,7 @@ textarea:focus,
   border-radius: var(--radius-control);
   background: var(--danger-strong);
   color: var(--on-danger);
+  font-size: var(--font-size-sm);
   font-weight: 850;
   cursor: pointer;
 }
@@ -4037,6 +4043,7 @@ textarea:focus,
   border-radius: var(--radius-control);
   background: var(--primary-dark);
   color: var(--on-primary);
+  font-size: var(--font-size-sm);
   font-weight: 850;
   cursor: pointer;
 }
@@ -5240,8 +5247,11 @@ textarea:focus,
   line-height: 1.35;
 }
 
+/* The email tells apart teachers with similar names, so it stays visible under the name. */
 .principal-teacher-name-cell small {
-  display: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .principal-teacher-contact span {
@@ -5608,6 +5618,7 @@ textarea:focus,
   border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text);
+  font-size: var(--font-size-sm);
   font-weight: 850;
   cursor: pointer;
 }

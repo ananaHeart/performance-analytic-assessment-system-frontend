@@ -654,7 +654,7 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null, onAccountUpda
         <p className="section-tag">Settings</p>
         <h2>Principal account</h2>
         <p className="supporting-text">
-          Review the account details available from the current login session.
+          Manage your account, security, school profile, and academic calendar.
         </p>
       </section>
 
@@ -681,21 +681,25 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null, onAccountUpda
         </button>
       </nav>
 
-      <section className="content-card principal-settings-card" hidden={activeSettingsTab !== 'account'}>
-        <div className="principal-settings-avatar" aria-hidden="true">
-          {(displayName || user.email || 'P').slice(0, 1).toUpperCase()}
-        </div>
-        <div>
-          <p className="content-card-tag">Signed In</p>
-          <h3>{displayName || 'Principal'}</h3>
-          <p>{user.email || 'No email available'}</p>
-          <span className="status-pill status-active">Principal</span>
-        </div>
-      </section>
+      {/* Same two-column account layout as Teacher settings, minus the logout button
+          (the principal sidebar already has one). */}
+      <div className="teacher-account-layout is-principal" hidden={activeSettingsTab !== 'account'} role="tabpanel">
+        <aside className="teacher-account-summary content-card" aria-label="Account summary">
+          <span className="teacher-profile-avatar" aria-hidden="true">
+            {(displayName || user.email || 'P').slice(0, 1).toUpperCase()}
+          </span>
+          <div>
+            <p className="content-card-tag">Signed in</p>
+            <h2>{displayName || 'Principal'}</h2>
+            <p>{user.email || 'No email available'}</p>
+            <span className="status-pill status-active">Principal</span>
+          </div>
+        </aside>
 
-      <div className="settings-section-content" hidden={activeSettingsTab !== 'account'} role="tabpanel">
-        <AccountProfilePanel token={token} onAccountUpdated={onAccountUpdated} />
-        <AccountContactChangePanel token={token} onAccountUpdated={onAccountUpdated} />
+        <div className="teacher-account-security">
+          <AccountProfilePanel token={token} onAccountUpdated={onAccountUpdated} />
+          <AccountContactChangePanel token={token} onAccountUpdated={onAccountUpdated} />
+        </div>
       </div>
 
       <div className="settings-section-content" hidden={activeSettingsTab !== 'security'} role="tabpanel">

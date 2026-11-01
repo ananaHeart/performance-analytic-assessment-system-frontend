@@ -164,8 +164,16 @@ function getAccountStatus(teacher = {}) {
   return 'inactive'
 }
 
+// Active/Inactive only describes an approved account; a pending or rejected
+// registration was never active, so "Inactive" there would mislead.
 function getDisplayAccountStatus(teacher = {}) {
-  return getAccountStatus(teacher) === 'active' ? 'active' : 'inactive'
+  const accountStatus = getAccountStatus(teacher)
+  if (accountStatus === 'archived') return 'archived'
+
+  const approvalStatus = getApprovalStatus(teacher)
+  if (approvalStatus === 'pending' || approvalStatus === 'rejected') return approvalStatus
+
+  return accountStatus === 'active' ? 'active' : 'inactive'
 }
 
 function getTeacherTab(teacher = {}) {
@@ -977,19 +985,21 @@ function TeacherApprovalPage({ token, user }) {
                     value={formatDate(selectedTeacher.createdAt)}
                   />
                   <TeacherDetail
-                    label="Contract end date"
-                    value={formatDate(selectedTeacher.contractEndDate)}
-                  />
-                  <TeacherDetail
                     label="Additional majors"
                     value={formatTeacherSubjects(selectedTeacher.subjects?.additionalMajors)}
-                    wide
                   />
                   <TeacherDetail
                     label="Subjects taught before"
                     value={formatTeacherSubjects(selectedTeacher.subjects?.subjectsTaughtBefore)}
-                    wide
                   />
+                  {/* Only an approved account has a contract; for a pending or rejected
+                      registration this row would always read "Not provided". */}
+                  {getApprovalStatus(selectedTeacher) === 'approved' ? (
+                    <TeacherDetail
+                      label="Contract end date"
+                      value={formatDate(selectedTeacher.contractEndDate)}
+                    />
+                  ) : null}
                 </dl>
               </section>
 

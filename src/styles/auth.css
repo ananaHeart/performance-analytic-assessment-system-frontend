@@ -503,6 +503,7 @@
 }
 
 .teacher-registration-steps {
+  container-type: inline-size;
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 6px;
@@ -596,6 +597,72 @@
   font-size: var(--font-size-xs);
   font-weight: 600;
   line-height: 1.25;
+}
+
+/* All six steps stay on one row at every width (they used to wrap to 2 or 1 columns).
+   Each step stacks its icon over a one-line label; the step description is already in the
+   card header, so it is hidden here. */
+.teacher-registration-step {
+  position: relative;
+  min-height: 74px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 6px;
+  text-align: center;
+}
+
+.teacher-registration-step-copy {
+  width: 100%;
+  justify-items: center;
+}
+
+.teacher-registration-step-copy strong {
+  max-width: 100%;
+  overflow: hidden;
+  overflow-wrap: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.teacher-registration-step-copy small {
+  display: none;
+}
+
+/* A little narrower (small laptops): smaller labels still fit on one line. */
+@container (max-width: 680px) {
+  .teacher-registration-step-copy strong {
+    font-size: 0.75rem;
+  }
+}
+
+@container (max-width: 600px) {
+  .teacher-registration-step {
+    padding-inline: 3px;
+  }
+
+  .teacher-registration-step-copy strong {
+    font-size: 0.7rem;
+    letter-spacing: -0.01em;
+  }
+}
+
+/* Too narrow for six labels (phones, or the form beside the photo on tablets): show the
+   icons only. The label stays in the button for screen readers and as a tooltip. */
+@container (max-width: 520px) {
+  .teacher-registration-step {
+    min-height: 46px;
+    padding: 7px 4px;
+  }
+
+  .teacher-registration-step-copy {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 
 .teacher-registration-request-error {
@@ -1176,10 +1243,6 @@
     font-size: 2.45rem;
   }
 
-  .teacher-registration-steps {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .teacher-registration-review-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1292,7 +1355,6 @@
     padding: var(--space-4);
   }
 
-  .teacher-registration-steps,
   .teacher-registration-form-grid,
   .teacher-verification-methods,
   .teacher-registration-review-grid {
