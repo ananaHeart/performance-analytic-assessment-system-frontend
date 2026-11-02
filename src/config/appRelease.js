@@ -3,7 +3,7 @@ export const APP_RELEASE = {
   // Current Google Drive share link provided by Heart on 2026-10-28.
   // For deployment-specific releases, this can still be overridden with VITE_APK_URL.
   url: import.meta.env.VITE_APK_URL ||
-    'https://drive.google.com/file/d/1_zKSqucsx0QYMI6jzAC563jdTzwDH28d/view?usp=sharing',
+    'https://drive.google.com/file/d/1Is9ZZEi34hNK11XneeniqYjdAOcndyfJ/view?usp=sharing',
   version: '1.2', // v1.2 (versionCode 3) is the first build with a real versionName; shown as "Version 1.2"
   size: 'about 33 MB', // Drive shows 33M for the 2026-10-18 build; update after each rebuild
   minAndroid: 'Android 7.0 or later', // minSdk 24
