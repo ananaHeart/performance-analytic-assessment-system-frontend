@@ -524,6 +524,22 @@ export async function updateAccountProfileV3(profile, token) {
   return normalizeV3User(extractData(payload) ?? {})
 }
 
+// R2-10: a password change needs a 6-digit code emailed to the account. The response is the
+// shared account-code shape: { challengeUuid, channel, destinationMasked, otpExpiresAt, resendAvailableAt }.
+export async function startPasswordChangeCodeV3(token) {
+  const payload = await requestV3('/api/v3/account/password/code', { method: 'POST', token })
+  return extractData(payload) ?? {}
+}
+
+export async function resendPasswordChangeCodeV3(challengeUuid, token) {
+  const payload = await requestV3('/api/v3/account/password/code/resend', {
+    method: 'POST',
+    token,
+    body: JSON.stringify({ challengeUuid }),
+  })
+  return extractData(payload) ?? {}
+}
+
 export async function updateAccountPasswordV3(passwords, token) {
   const payload = await requestV3('/api/v3/account/password', {
     method: 'POST',
@@ -1151,6 +1167,19 @@ export async function archiveAcademicYearV3(academicYearId, reason, token) {
   return extractData(payload) ?? null
 }
 
+// R2-4: the school year's own dates. Shares the 3-changes-per-school-year limit with term dates.
+export async function updateAcademicYearDatesV3(academicYearId, dates, token) {
+  const payload = await requestV3(
+    `/api/v3/school-setup/academic-years/${encodeURIComponent(academicYearId)}/dates`,
+    {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify(dates),
+    },
+  )
+  return extractData(payload) ?? null
+}
+
 export async function updateTermPeriodDatesV3(
   academicYearId,
   termPeriodId,
@@ -1450,6 +1479,20 @@ export async function getAssessmentsV3(token, classAssignmentId) {
 
 export async function getAssessmentV3(testId, token) {
   const payload = await requestV3(`/api/v3/assessments/${testId}`, { token })
+  return extractData(payload) ?? null
+}
+
+// R2-9: what saving this edit would do (reprint, rescoring, or refusal), without saving.
+// The body is the same payload as the update request.
+export async function previewAssessmentEditImpactV3(testId, assessmentPayload, token) {
+  const payload = await requestV3(
+    `/api/v3/assessments/${encodeURIComponent(testId)}/edit-impact`,
+    {
+      method: 'POST',
+      token,
+      body: JSON.stringify(assessmentPayload),
+    },
+  )
   return extractData(payload) ?? null
 }
 

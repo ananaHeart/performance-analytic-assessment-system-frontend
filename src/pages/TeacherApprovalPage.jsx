@@ -248,6 +248,7 @@ function TeacherApprovalPage({ token, user }) {
   const [rejectionReason, setRejectionReason] = useState('')
   const [editForm, setEditForm] = useState(null)
   const [editError, setEditError] = useState('')
+  const [editFieldErrors, setEditFieldErrors] = useState({})
   const [isSavingEdit, setIsSavingEdit] = useState(false)
   const [referenceData, setReferenceData] = useState({
     genders: [],
@@ -419,6 +420,7 @@ function TeacherApprovalPage({ token, user }) {
     if (!selectedTeacher || getAccountStatus(selectedTeacher) === 'archived') return
     setEditForm(createTeacherEditForm(selectedTeacher))
     setEditError('')
+    setEditFieldErrors({})
 
     if (!referenceData.genders.length) {
       try {
@@ -433,6 +435,7 @@ function TeacherApprovalPage({ token, user }) {
   const updateEditField = (field, value) => {
     setEditForm((current) => ({ ...current, [field]: value }))
     if (editError) setEditError('')
+    if (editFieldErrors[field]) setEditFieldErrors((current) => ({ ...current, [field]: '' }))
   }
 
   const handleSaveTeacherEdit = async (event) => {
@@ -490,6 +493,7 @@ function TeacherApprovalPage({ token, user }) {
 
     setIsSavingEdit(true)
     setEditError('')
+    setEditFieldErrors({})
     try {
       const updatedTeacher = await updateTeacherAccountV3(selectedTeacher.userId, payload, accessToken)
       setSelectedTeacher({
@@ -502,7 +506,20 @@ function TeacherApprovalPage({ token, user }) {
       setSuccess('Teacher details updated successfully.')
       await loadTeachers({ preserveSuccess: true })
     } catch (updateError) {
-      setEditError(updateError.message || 'Unable to update teacher details.')
+      // Backend field errors arrive as "address.postalCode" and similar; show them under the field
+      // (R2-3: a postal code that does not belong to the selected city/municipality).
+      const fieldErrors = Object.entries(updateError.errors ?? {}).reduce((errors, [key, message]) => {
+        if (key !== 'code' && typeof message === 'string' && message.trim()) {
+          errors[key.replace(/^address\./, '')] = message
+        }
+        return errors
+      }, {})
+      setEditFieldErrors(fieldErrors)
+      setEditError(
+        Object.keys(fieldErrors).length
+          ? 'Review the highlighted field and save again.'
+          : updateError.message || 'Unable to update teacher details.',
+      )
     } finally {
       setIsSavingEdit(false)
     }
@@ -1144,7 +1161,7 @@ function TeacherApprovalPage({ token, user }) {
                 <label><span>City / municipality *</span><input value={editForm.cityMunicipalityName} onChange={(event) => updateEditField('cityMunicipalityName', event.target.value)} required /></label>
                 <label><span>Barangay *</span><input value={editForm.barangayName} onChange={(event) => updateEditField('barangayName', event.target.value)} required /></label>
                 <label className="is-wide"><span>Street / address line *</span><input value={editForm.addressLine} onChange={(event) => updateEditField('addressLine', event.target.value)} required /></label>
-                <label><span>Postal code *</span><input inputMode="numeric" value={editForm.postalCode} onChange={(event) => updateEditField('postalCode', event.target.value.replace(/\D/g, '').slice(0, 4))} pattern="\d{4}" required /></label>
+                <label><span>Postal code *</span><input inputMode="numeric" value={editForm.postalCode} onChange={(event) => updateEditField('postalCode', event.target.value.replace(/\D/g, '').slice(0, 4))} pattern="\d{4}" aria-invalid={Boolean(editFieldErrors.postalCode)} required />{editFieldErrors.postalCode ? <small className="principal-teacher-edit-field-error">{editFieldErrors.postalCode}</small> : null}</label>
                 <label className="is-wide"><span>Reason (optional)</span><textarea value={editForm.reason} onChange={(event) => updateEditField('reason', event.target.value)} maxLength="255" rows="2" /></label>
               </div>
 

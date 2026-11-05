@@ -13,14 +13,15 @@ import {
   RefreshCw,
   ShieldCheck,
   UserRound,
-  X,
 } from 'lucide-react'
 import {
   checkTeacherRegistrationAvailabilityV3,
   getTeacherRegistrationReferenceDataV3,
   registerTeacherV3,
 } from '../api/apiV3Client'
+import PasswordGuide from '../components/PasswordGuide'
 import PublicAuthShell from '../components/PublicAuthShell'
+import { getPasswordErrors } from '../utils/passwordRules'
 import { storeTeacherVerificationSession } from '../utils/teacherEmailVerification'
 
 const STEPS = [
@@ -219,75 +220,6 @@ function isValidEmail(value) {
 
 function isValidContactNumber(value) {
   return /^(09\d{9}|\+639\d{9})$/.test(String(value ?? '').trim())
-}
-
-// REG-5 rules, shared by the password guide (shown before typing) and the step validation,
-// so the checklist and the error message can never disagree. Matches the backend rule:
-// 10-128 characters, upper, lower, number, special character, no spaces.
-const PASSWORD_RULES = [
-  { label: '10 to 128 characters', missing: '10 to 128 characters', test: (value) => value.length >= 10 && value.length <= 128 },
-  { label: 'An uppercase letter (A-Z)', missing: 'an uppercase letter', test: (value) => /[A-Z]/.test(value) },
-  { label: 'A lowercase letter (a-z)', missing: 'a lowercase letter', test: (value) => /[a-z]/.test(value) },
-  { label: 'A number (0-9)', missing: 'a number', test: (value) => /\d/.test(value) },
-  { label: 'A symbol, such as ! @ # $ % & *', missing: 'a symbol', test: (value) => /[^A-Za-z0-9\s]/.test(value) },
-  { label: 'No spaces', missing: 'no spaces', test: (value) => value.length > 0 && !/\s/.test(value) },
-]
-
-const PASSWORD_EXAMPLES = [
-  { value: 'Tg7#rQm2!vLx', note: 'Random mix of letters, numbers, and symbols', good: true },
-  { value: 'Maria1996!', note: 'Uses a name and a birth year', good: false },
-  { value: 'Password123', note: 'Common word, easy to guess', good: false },
-  { value: '04121996', note: 'A birth date, numbers only', good: false },
-]
-
-function getPasswordErrors(value) {
-  const password = String(value ?? '')
-  return PASSWORD_RULES.filter((rule) => !rule.test(password)).map((rule) => rule.missing)
-}
-
-function PasswordGuide({ password }) {
-  const hasTyped = password.length > 0
-
-  return (
-    <section className="teacher-password-guide" aria-label="Password guide">
-      <div className="teacher-password-guide-rules">
-        <h4>Your password needs</h4>
-        <ul>
-          {PASSWORD_RULES.map((rule) => {
-            const isMet = hasTyped && rule.test(password)
-            return (
-              <li key={rule.label} className={isMet ? 'is-met' : ''}>
-                <span aria-hidden="true">{isMet ? <Check size={13} strokeWidth={3} /> : null}</span>
-                {rule.label}
-                <span className="teacher-visually-hidden">{isMet ? ' (done)' : ''}</span>
-              </li>
-            )
-          })}
-        </ul>
-        <p>Avoid your name, birth date, email, or school name. Don't reuse a password from another site.</p>
-      </div>
-
-      <div className="teacher-password-guide-examples">
-        <h4>Secure passwords are random</h4>
-        <ul>
-          {PASSWORD_EXAMPLES.map((example) => (
-            <li key={example.value} className={example.good ? 'is-good' : 'is-bad'}>
-              <span aria-hidden="true">
-                {example.good ? <Check size={14} strokeWidth={3} /> : <X size={14} strokeWidth={3} />}
-              </span>
-              <div>
-                <code>{example.value}</code>
-                <small>
-                  <span className="teacher-visually-hidden">{example.good ? 'Strong: ' : 'Weak: '}</span>
-                  {example.note}
-                </small>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </section>
-  )
 }
 
 function pickValue(record, keys) {

@@ -996,9 +996,10 @@ h3 {
   border-top: 1px solid var(--border);
 }
 
+/* Year name, dates, status, then one action (archive readiness or "Edit school-year dates"). */
 .principal-academic-year-summary {
   display: grid;
-  grid-template-columns: minmax(160px, 0.7fr) minmax(260px, 1.3fr) auto;
+  grid-template-columns: minmax(160px, 0.7fr) minmax(260px, 1.3fr) repeat(2, auto);
   gap: 18px;
 }
 

@@ -433,6 +433,13 @@
   padding: 8px 10px;
 }
 
+.principal-teachers-page .principal-teacher-edit-field-error {
+  color: var(--status-danger-text);
+  font-size: var(--font-size-xs);
+  font-weight: 650;
+  line-height: 1.35;
+}
+
 .principal-teachers-page .principal-teacher-edit-grid textarea {
   min-height: 62px;
   resize: vertical;

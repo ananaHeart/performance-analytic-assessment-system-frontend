@@ -26,6 +26,7 @@ import {
   getAcademicYearArchiveEligibilityV3,
   getSchoolProfileV3,
   reactivateClassAssignmentV3,
+  updateAcademicYearDatesV3,
   updateSchoolProfileV3,
   updateTermPeriodDatesV3,
 } from '../api/apiV3Client'
@@ -116,6 +117,15 @@ function createSchoolProfileDraft(profile = {}) {
   }
 }
 
+// R2-4: date changes are limited per school year, counting its own dates and all its terms.
+function getDateEditLimitMessage(errors) {
+  const editCount = Number(errors?.editCount)
+  const maxEdits = Number(errors?.maxEdits)
+  return Number.isFinite(editCount) && Number.isFinite(maxEdits)
+    ? `This school year has used ${editCount} of ${maxEdits} allowed date changes (its own dates and its terms together). No changes remain.`
+    : 'This school year has reached its date-change limit.'
+}
+
 function PrincipalSettingsPage({ user, token, scrollTarget = null, onAccountUpdated }) {
   const displayName =
     user.name || [user.firstName, user.middleName, user.lastName].filter(Boolean).join(' ')
@@ -146,6 +156,10 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null, onAccountUpda
   const [termEditError, setTermEditError] = useState('')
   const [termEditSuccess, setTermEditSuccess] = useState('')
   const [isSavingTerm, setIsSavingTerm] = useState(false)
+  const [editingYearId, setEditingYearId] = useState(null)
+  const [yearDraft, setYearDraft] = useState({ startDate: '', endDate: '', reason: '' })
+  const [yearDatesError, setYearDatesError] = useState('')
+  const [isSavingYearDates, setIsSavingYearDates] = useState(false)
   const [archiveEligibility, setArchiveEligibility] = useState({})
   const [checkingArchiveYearId, setCheckingArchiveYearId] = useState('')
   const [archiveYearPending, setArchiveYearPending] = useState(null)
@@ -419,6 +433,70 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null, onAccountUpda
     return () => { active = false }
   }, [isEditingSchoolProfile, schoolProfileDraft.cityMunicipalityCode])
 
+  const openYearDatesEditor = (academicYear) => {
+    setEditingYearId(academicYear.academicYearId ?? academicYear.yearId)
+    setYearDraft({
+      startDate: String(academicYear.startDate ?? '').slice(0, 10),
+      endDate: String(academicYear.endDate ?? '').slice(0, 10),
+      reason: '',
+    })
+    setYearDatesError('')
+    setTermEditSuccess('')
+  }
+
+  const cancelYearDatesEditor = () => {
+    if (isSavingYearDates) return
+    setEditingYearId(null)
+    setYearDatesError('')
+  }
+
+  const saveYearDates = async (event, yearName) => {
+    event.preventDefault()
+    const reason = yearDraft.reason.trim()
+
+    if (!yearDraft.startDate || !yearDraft.endDate) {
+      setYearDatesError('Enter both the start and end dates.')
+      return
+    }
+    if (yearDraft.endDate <= yearDraft.startDate) {
+      setYearDatesError('The end date must be later than the start date.')
+      return
+    }
+    if (reason.length < 5 || reason.length > 255) {
+      setYearDatesError('Enter a reason between 5 and 255 characters.')
+      return
+    }
+
+    setIsSavingYearDates(true)
+    setYearDatesError('')
+    setTermEditSuccess('')
+    try {
+      await updateAcademicYearDatesV3(
+        editingYearId,
+        { startDate: yearDraft.startDate, endDate: yearDraft.endDate, reason },
+        token,
+      )
+      setEditingYearId(null)
+      setTermEditSuccess(`School year ${yearName} dates updated successfully.`)
+      await loadAcademicCalendar()
+    } catch (saveError) {
+      const messages = {
+        TERM_EDIT_LIMIT_REACHED: getDateEditLimitMessage(saveError.errors),
+        ACADEMIC_YEAR_LOCKED: 'This school year is locked and its dates cannot change.',
+        ACADEMIC_YEAR_UPDATE_CONFLICT: 'The school year changed before it was saved. Refresh and try again.',
+      }
+      const fieldError =
+        saveError.errors?.endDate ||
+        saveError.errors?.startDate ||
+        saveError.errors?.reason
+      setYearDatesError(
+        fieldError || messages[saveError.code] || saveError.message || 'Unable to update the school-year dates.',
+      )
+    } finally {
+      setIsSavingYearDates(false)
+    }
+  }
+
   const openTermEditor = (academicYear, term) => {
     setEditingTerm({
       academicYearId: academicYear.academicYearId ?? academicYear.yearId,
@@ -474,13 +552,8 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null, onAccountUpda
       setTermEditSuccess(`${updatedTermName} dates updated successfully.`)
       await loadAcademicCalendar()
     } catch (saveError) {
-      const editCount = Number(saveError.errors?.editCount)
-      const maxEdits = Number(saveError.errors?.maxEdits)
-      const editLimitMessage = Number.isFinite(editCount) && Number.isFinite(maxEdits)
-        ? `This term has used ${editCount} of ${maxEdits} allowed date edits. No edits remain.`
-        : 'This term has reached its date-edit limit.'
       const messages = {
-        TERM_EDIT_LIMIT_REACHED: editLimitMessage,
+        TERM_EDIT_LIMIT_REACHED: getDateEditLimitMessage(saveError.errors),
         TERM_HAS_ASSESSMENTS_OUTSIDE:
           'The new dates would leave existing assessments outside the term.',
         TERM_PERIOD_LOCKED: 'This term period is locked and cannot be edited.',
@@ -964,6 +1037,7 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null, onAccountUpda
               const eligibility = archiveEligibility[academicYearId]
               const isCheckingEligibility =
                 String(checkingArchiveYearId) === String(academicYearId)
+              const isEditingYearDates = String(editingYearId) === String(academicYearId)
               const editingTermRecord =
                 String(editingTerm?.academicYearId) === String(academicYearId)
                   ? termPeriods.find(
@@ -1002,7 +1076,88 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null, onAccountUpda
                         {isCheckingEligibility ? 'Checking...' : 'Check archive readiness'}
                       </button>
                     ) : null}
+                    {['active', 'planned'].includes(academicYear.status) && !isEditingYearDates ? (
+                      <button
+                        type="button"
+                        className="principal-term-edit"
+                        onClick={() => openYearDatesEditor(academicYear)}
+                        disabled={Boolean(editingTerm) || editingYearId !== null}
+                      >
+                        <Pencil size={14} aria-hidden="true" />
+                        Edit school-year dates
+                      </button>
+                    ) : null}
                   </div>
+
+                  {isEditingYearDates ? (
+                    <form
+                      className="principal-term-edit-form"
+                      onSubmit={(event) => saveYearDates(event, academicYear.yearName || 'this school year')}
+                    >
+                      <p className="principal-term-edit-note">
+                        Changing the school year's dates needs a reason (5 to 255 characters). The terms must
+                        stay inside the new dates, and a school year allows 3 date changes in total, its own
+                        dates and its terms' together.
+                      </p>
+                      <label>
+                        <span>School year starts</span>
+                        <input
+                          type="date"
+                          value={yearDraft.startDate}
+                          onChange={(event) => {
+                            setYearDraft((current) => ({ ...current, startDate: event.target.value }))
+                            setYearDatesError('')
+                          }}
+                          required
+                        />
+                      </label>
+                      <label>
+                        <span>School year ends</span>
+                        <input
+                          type="date"
+                          value={yearDraft.endDate}
+                          onChange={(event) => {
+                            setYearDraft((current) => ({ ...current, endDate: event.target.value }))
+                            setYearDatesError('')
+                          }}
+                          required
+                        />
+                      </label>
+                      <label className="principal-term-edit-reason">
+                        <span>Reason</span>
+                        <input
+                          value={yearDraft.reason}
+                          maxLength={255}
+                          onChange={(event) => {
+                            setYearDraft((current) => ({ ...current, reason: event.target.value }))
+                            setYearDatesError('')
+                          }}
+                          placeholder="Reason for changing the school-year dates"
+                          required
+                        />
+                      </label>
+                      {yearDatesError ? (
+                        <p className="form-message form-message-error" role="alert">
+                          {yearDatesError}
+                        </p>
+                      ) : null}
+                      <div className="principal-term-edit-actions">
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          onClick={cancelYearDatesEditor}
+                          disabled={isSavingYearDates}
+                        >
+                          <X size={15} aria-hidden="true" />
+                          Cancel
+                        </button>
+                        <button type="submit" className="primary-button" disabled={isSavingYearDates}>
+                          <Save size={15} aria-hidden="true" />
+                          {isSavingYearDates ? 'Saving...' : 'Save dates'}
+                        </button>
+                      </div>
+                    </form>
+                  ) : null}
 
                   {eligibility ? (
                     <div
@@ -1103,7 +1258,11 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null, onAccountUpda
                               type="button"
                               className="principal-term-edit"
                               onClick={() => openTermEditor(academicYear, term)}
-                              disabled={Boolean(editingTerm) || ['completed', 'archived'].includes(academicYear.status)}
+                              disabled={
+                                Boolean(editingTerm) ||
+                                editingYearId !== null ||
+                                ['completed', 'archived'].includes(academicYear.status)
+                              }
                               aria-label={`Edit ${term.termName} dates`}
                             >
                               <Pencil size={14} aria-hidden="true" />
@@ -1119,9 +1278,9 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null, onAccountUpda
                   {editingTermRecord ? (
                     <form className="principal-term-edit-form" onSubmit={saveTermDates}>
                       <p className="principal-term-edit-note">
-                        Changing {editingTermRecord.termName} dates needs a reason (5 to 255 characters). Each term's
-                        dates can be changed up to 3 times, and the new dates must not overlap another
-                        term.
+                        Changing {editingTermRecord.termName} dates needs a reason (5 to 255 characters). The new
+                        dates must not overlap another term, and a school year allows 3 date changes in total,
+                        its own dates and its terms' together.
                       </p>
                       <label>
                         <span>Starts (Philippine time)</span>

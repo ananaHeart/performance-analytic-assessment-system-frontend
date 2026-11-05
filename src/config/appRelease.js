@@ -13,10 +13,3 @@ export const APP_RELEASE = {
 export function hasAppDownload() {
   return Boolean(APP_RELEASE.url)
 }
-
-
-
-
-
-
-

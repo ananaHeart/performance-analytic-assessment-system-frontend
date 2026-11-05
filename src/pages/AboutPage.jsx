@@ -106,6 +106,29 @@ function AboutPage({ onNavigate, scrollTarget, isSignedIn }) {
           </p>
         </section>
 
+        {/* R2-3: the GeoNames CC BY 4.0 license requires this attribution. */}
+        <section className="site-card public-text-card" aria-labelledby="about-data-sources">
+          <h2 id="about-data-sources">Data sources</h2>
+          <p>
+            Philippine regions, provinces, cities, municipalities, and barangays follow the Philippine Standard
+            Geographic Code (PSGC) of the Philippine Statistics Authority. Postal codes are checked against postal
+            code data from{' '}
+            <a className="public-inline-link" href="https://www.geonames.org/" target="_blank" rel="noopener noreferrer">
+              GeoNames
+            </a>
+            , used under the{' '}
+            <a
+              className="public-inline-link"
+              href="https://creativecommons.org/licenses/by/4.0/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Creative Commons Attribution 4.0 License
+            </a>
+            .
+          </p>
+        </section>
+
         <section className="site-card public-text-card public-anchor" id="contact" aria-labelledby="about-contact">
           <h2 id="about-contact">Contact</h2>
           {CONTACT_EMAIL ? (

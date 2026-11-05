@@ -26,6 +26,8 @@ import {
   getAssessmentReferenceDataV3,
   getAssessmentEditEligibilityV3,
   getAssessmentV3,
+  getAssessmentsV3,
+  previewAssessmentEditImpactV3,
   updateAssessmentDetailsV3,
   updateAssessmentV3,
 } from '@/api/apiV3Client'
@@ -50,6 +52,7 @@ import {
 } from '@/components/ui/select'
 import AssessmentRulesDialog from '@/components/AssessmentRulesDialog'
 import { dismissAssessmentRules, hasDismissedAssessmentRules, isPastDateTime } from '@/utils/assessmentRules'
+import { getAssessmentStatusBadge } from '@/utils/assessmentStatus'
 
 const TEST_TYPES = [
   ['quiz', 'Quiz'],
@@ -1684,6 +1687,19 @@ function V2AssessmentEditorPage({
     }
   }, [token])
 
+  // R2-8: the badge uses the same list record (with the backend's displayStatus) as the dashboard
+  // and the class list, so an assessment reads the same everywhere.
+  const [statusSummary, setStatusSummary] = useState(null)
+  const refreshStatusSummary = useCallback(async (classAssignmentId, assessmentId) => {
+    if (!classAssignmentId || !assessmentId) return
+    try {
+      const records = await getAssessmentsV3(token, classAssignmentId)
+      setStatusSummary(records.find((record) => String(record.testId) === String(assessmentId)) ?? null)
+    } catch {
+      // The badge falls back to the editor's own draft/active status.
+    }
+  }, [token])
+
   const refreshEditEligibility = useCallback(async (assessmentId) => {
     if (!assessmentId) {
       setEditEligibility(null)
@@ -1739,6 +1755,7 @@ function V2AssessmentEditorPage({
           setCurrentTestAssignmentId(assessment.testAssignmentId ?? null)
           refreshAnswerSheetEligibility(assessment.testAssignmentId ?? null)
           refreshEditEligibility(assessment.testId ?? assessment.id ?? testId)
+          refreshStatusSummary(assessment.classAssignmentId, assessment.testId ?? testId)
           return
         }
 
@@ -1783,7 +1800,14 @@ function V2AssessmentEditorPage({
 
     initialize()
     return () => { active = false }
-  }, [initialClassAssignmentId, testId, token, refreshAnswerSheetEligibility, refreshEditEligibility])
+  }, [
+    initialClassAssignmentId,
+    testId,
+    token,
+    refreshAnswerSheetEligibility,
+    refreshEditEligibility,
+    refreshStatusSummary,
+  ])
 
   const selectedAssignment = useMemo(
     () => assignments.find((assignment) => String(assignment.classAssignmentId) === form.classAssignmentId),
@@ -1853,6 +1877,11 @@ function V2AssessmentEditorPage({
   const answerKeyLocked = !isDraft && !editEligibility?.canCorrectAnswerKey
   const canEditSchedule = isDraft || Boolean(editEligibility?.canEditSchedule)
   const pendingResultCount = editEligibility?.pendingResultCount ?? 0
+  const statusBadge = getAssessmentStatusBadge(
+    statusSummary && String(statusSummary.testStatus ?? statusSummary.status ?? '').toLowerCase() === assessmentStatus
+      ? statusSummary
+      : { status: assessmentStatus },
+  )
   // R2-9: for an active assessment with unsaved edits, tell the teacher whether the printed
   // answer sheet still matches (no reprint) or the layout changed (reprint before scanning).
   const savedPayload = parsePayloadSnapshot(savedPayloadSnapshot)
@@ -2114,11 +2143,39 @@ function V2AssessmentEditorPage({
         // This advisory check must not replace the backend's save validation.
       }
 
+      // R2-9: ask the backend what this edit would do before saving an active assessment.
+      // It is refused (canSave false), or needs a reprint or rescoring that the teacher confirms.
+      if (isEditing && !isDraft) {
+        let impact = null
+        try {
+          impact = await previewAssessmentEditImpactV3(currentTestId, payload, token)
+        } catch {
+          // A backend without the preview still validates the save itself.
+        }
+
+        if (impact && !impact.canSave) {
+          setMessage({ type: 'error', text: impact.message || 'This change cannot be saved.' })
+          window.scrollTo({ top: 0, behavior: 'smooth' })
+          return
+        }
+
+        if (
+          impact
+          && (impact.reprintRequired || Number(impact.rescoreResultCount) > 0)
+          && !window.confirm(`${impact.message || 'This change affects printed sheets or captured results.'}
+
+Save these changes?`)
+        ) {
+          return
+        }
+      }
+
       const saved = isEditing
         ? await updateAssessmentV3(currentTestId, payload, token)
         : await createAssessmentV3(payload, token)
       setCurrentTestId(saved.testId)
       setAssessmentStatus(String(saved.status ?? 'draft').toLowerCase())
+      refreshStatusSummary(payload.classAssignmentId, saved.testId)
       setSavedPayloadSnapshot(JSON.stringify(payload))
       setLastSavedAt(new Date())
       setMessage({
@@ -2305,6 +2362,7 @@ function V2AssessmentEditorPage({
     try {
       const activated = await activateAssessmentV3(currentTestId, token)
       setAssessmentStatus(String(activated.status ?? 'active').toLowerCase())
+      refreshStatusSummary(form.classAssignmentId, currentTestId)
       setAnswerSheetVersion(null)
       refreshAnswerSheetEligibility(activated.testAssignmentId ?? currentTestAssignmentId)
       refreshEditEligibility(currentTestId)
@@ -2359,9 +2417,7 @@ function V2AssessmentEditorPage({
             {isEditing ? form.testName || 'Edit assessment' : 'Create draft assessment'}
           </h1>
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={assessmentStatus === 'active' ? 'default' : 'secondary'}>
-              {assessmentStatus === 'active' ? 'Active' : 'Draft'}
-            </Badge>
+            <span className={`assessment-status-badge ${statusBadge.toneClass}`}>{statusBadge.label}</span>
             {lastSavedAt ? (
               <span className="text-xs font-medium text-muted-foreground" role="status">
                 Saved at {lastSavedAt.toLocaleTimeString('en-PH', {
@@ -3054,9 +3110,7 @@ function V2AssessmentEditorPage({
                 <div>
                   <dt>Status</dt>
                   <dd>
-                    <Badge variant={assessmentStatus === 'active' ? 'default' : 'secondary'}>
-                      {assessmentStatus === 'active' ? 'Active' : 'Draft'}
-                    </Badge>
+                    <span className={`assessment-status-badge ${statusBadge.toneClass}`}>{statusBadge.label}</span>
                   </dd>
                 </div>
                 <div>

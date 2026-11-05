@@ -543,11 +543,61 @@
   font-size: var(--font-size-lg);
 }
 
+/* R2-10: three password fields, then the emailed code, then the actions. */
 .account-password-form {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  gap: var(--space-4);
+}
+
+.account-password-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--space-3);
+}
+
+.account-password-error {
+  color: var(--status-danger-text);
+  font-size: var(--font-size-xs);
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.account-password-code {
+  display: grid;
+  grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
   align-items: end;
   gap: var(--space-3);
+}
+
+.account-password-code input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface-strong);
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.3em;
+}
+
+.account-password-code .teacher-verification-expiry {
+  margin: 0 0 10px;
+}
+
+.account-password-step-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--font-size-xs);
+}
+
+.account-password-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }
 
 .account-password-field {
@@ -593,19 +643,20 @@
   color: var(--muted);
 }
 
-.account-password-form > button {
+.account-password-actions > button {
   min-height: 40px;
   gap: 6px;
   white-space: nowrap;
 }
 
 @media (max-width: 960px) {
-  .account-password-form {
+  .account-password-fields,
+  .account-password-code {
     grid-template-columns: 1fr;
   }
 
-  .account-password-form > button {
-    width: 100%;
+  .account-password-actions > button {
+    flex: 1 1 auto;
   }
 }
 
