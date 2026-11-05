@@ -848,6 +848,40 @@ function toPayload(form) {
   }
 }
 
+// What a save means for paper that is already printed. The bubble answer sheet's layout is the
+// parts, their question types, item counts and written-response box sizes; answer keys, points,
+// skills and the schedule are not printed on it. Question wording is only on the questionnaire.
+function getAnswerSheetLayoutSignature(payload) {
+  return JSON.stringify((payload?.parts ?? []).map((part) => [
+    part.questionTypeCode,
+    part.numberOfItems,
+    (part.questions ?? []).map((question) => question.responseRegionSize ?? ''),
+  ]))
+}
+
+function parsePayloadSnapshot(snapshot) {
+  if (!snapshot) return null
+  try {
+    return JSON.parse(snapshot)
+  } catch {
+    return null
+  }
+}
+
+function getQuestionnaireTextSignature(payload) {
+  return JSON.stringify([
+    payload?.testName,
+    payload?.instructions,
+    (payload?.parts ?? []).map((part) => [
+      part.partName,
+      (part.questions ?? []).map((question) => [
+        question.questionText,
+        (question.options ?? []).map((option) => option.optionText),
+      ]),
+    ]),
+  ])
+}
+
 function assignmentLabel(assignment = {}) {
   const className = [assignment.gradeLevelName, assignment.sectionName].filter(Boolean).join(' - ')
   const details = [assignment.subjectName, assignment.yearName].filter(Boolean).join(' | ')
@@ -1807,7 +1841,8 @@ function V2AssessmentEditorPage({
 
     return count
   }, [form.parts])
-  const currentPayloadSnapshot = JSON.stringify(toPayload(form))
+  const currentPayload = toPayload(form)
+  const currentPayloadSnapshot = JSON.stringify(currentPayload)
   const hasUnsavedChanges = Boolean(
     currentTestId && savedPayloadSnapshot !== currentPayloadSnapshot,
   )
@@ -1818,6 +1853,17 @@ function V2AssessmentEditorPage({
   const answerKeyLocked = !isDraft && !editEligibility?.canCorrectAnswerKey
   const canEditSchedule = isDraft || Boolean(editEligibility?.canEditSchedule)
   const pendingResultCount = editEligibility?.pendingResultCount ?? 0
+  // R2-9: for an active assessment with unsaved edits, tell the teacher whether the printed
+  // answer sheet still matches (no reprint) or the layout changed (reprint before scanning).
+  const savedPayload = parsePayloadSnapshot(savedPayloadSnapshot)
+  const activeEditImpact = !isDraft && hasUnsavedChanges && savedPayload
+    ? {
+        layoutChanged:
+          getAnswerSheetLayoutSignature(savedPayload) !== getAnswerSheetLayoutSignature(currentPayload),
+        questionnaireChanged:
+          getQuestionnaireTextSignature(savedPayload) !== getQuestionnaireTextSignature(currentPayload),
+      }
+    : null
   const reviewError = validateDraft(form, rubrics, selectedTerm)
   const termStartDateTime = toDateTimeLocal(selectedTerm?.startAt)
   const termEndDateTime = toDateTimeLocal(selectedTerm?.endAt)
@@ -2418,21 +2464,25 @@ function V2AssessmentEditorPage({
           <p className="col-span-full m-0 text-sm text-destructive">{questionnaireError}</p>
         ) : null}
         {!isDraft && !editEligibilityLoading && !editEligibility?.canEditDetails && editEligibility?.reason ? (
-          <p className="col-span-full m-0 text-sm text-muted-foreground">
-            Details cannot be edited: {editEligibility.reason}
-          </p>
+          <div className="col-span-full rounded-md border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-warning" role="status">
+            <strong className="block font-semibold">Details can't be edited</strong>
+            {editEligibility.reason}
+          </div>
         ) : null}
         {!isDraft && !editEligibilityLoading && contentEditMode === 'same_layout' ? (
-          <p className="col-span-full m-0 text-sm text-muted-foreground" role="status">
-            Printed layout is locked. You can still edit text, answer keys, objective points,
-            accepted answers, competency mappings, and the schedule.
-          </p>
+          <div className="col-span-full rounded-md border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-warning" role="status">
+            <strong className="block font-semibold">Layout locked: answer sheets have already been scanned</strong>
+            You can still change question text, answer keys, objective points, accepted answers, skill
+            mappings, and the schedule. You can't add or remove parts or items, or change a part's
+            question type.
+          </div>
         ) : null}
         {!isDraft && !editEligibilityLoading && contentEditMode === 'full' ? (
-          <p className="col-span-full m-0 text-sm text-muted-foreground" role="status">
-            No sheets have been scanned. All fields are editable, but structural changes require
-            a newly generated and printed answer sheet.
-          </p>
+          <div className="col-span-full rounded-md border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground" role="status">
+            <strong className="block font-semibold text-foreground">This assessment is active, but no sheets have been scanned yet</strong>
+            Everything can still be edited. If you add or remove parts or items, or change a question
+            type, you will need to print the answer sheet again before scanning.
+          </div>
         ) : null}
         {!isDraft && !editEligibilityLoading && answerKeyLocked && canEditContent ? (
           <p className="col-span-full m-0 text-sm font-medium text-amber-700" role="status">
@@ -2441,6 +2491,41 @@ function V2AssessmentEditorPage({
           </p>
         ) : null}
       </header>
+
+      {/* Sticky under the top bar so the reprint advice stays in view while editing parts lower down. */}
+      {activeEditImpact ? (
+        <div
+          className="sticky z-20 rounded-md bg-background shadow-md"
+          style={{ top: 'calc(var(--workspace-bar-height, 52px) + 8px)' }}
+        >
+          {activeEditImpact.layoutChanged ? (
+            <div
+              role="alert"
+              className="rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+            >
+              <strong className="block font-semibold">You made major changes. Please reprint the answer sheet.</strong>
+              Parts or items were added, removed, or changed type, so the answer sheet you already printed
+              no longer matches this assessment. After you save, print the new answer sheet and use it for
+              scanning.
+            </div>
+          ) : null}
+          {!activeEditImpact.layoutChanged ? (
+            <div
+              role="status"
+              className="rounded-md border border-success/20 bg-success-soft px-4 py-3 text-sm text-success"
+            >
+              <strong className="block font-semibold">No answer sheet reprint needed</strong>
+              These changes keep the same layout, so the answer sheet you already printed still works.
+              {contentEditMode === 'same_layout'
+                ? ' Objective results already captured are recalculated automatically when you save.'
+                : ''}
+              {activeEditImpact.questionnaireChanged
+                ? ' You changed question wording, so print the Test Questionnaire again if you already printed it.'
+                : ''}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {message && (
         <div

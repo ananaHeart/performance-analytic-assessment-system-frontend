@@ -29,7 +29,7 @@ const RULES = [
   },
   {
     title: 'Printing',
-    text: 'Save before you print. Print the Bubble Answer Sheet on the paper size it was made for and don’t trim the edges, or the app can’t scan it.',
+    text: 'Save as a draft while you work, then activate the assessment (it needs at least 5 items). Only an active assessment can print its Bubble Answer Sheet. Print it on the paper size it was made for and don’t trim the edges, or the app can’t scan it.',
   },
 ]
 

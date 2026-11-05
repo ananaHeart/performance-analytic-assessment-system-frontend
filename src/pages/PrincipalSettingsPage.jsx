@@ -964,6 +964,12 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null, onAccountUpda
               const eligibility = archiveEligibility[academicYearId]
               const isCheckingEligibility =
                 String(checkingArchiveYearId) === String(academicYearId)
+              const editingTermRecord =
+                String(editingTerm?.academicYearId) === String(academicYearId)
+                  ? termPeriods.find(
+                      (term) => String(term.termPeriodId ?? term.id) === String(editingTerm?.termPeriodId),
+                    ) ?? null
+                  : null
 
               return (
                 <article
@@ -1065,112 +1071,130 @@ function PrincipalSettingsPage({ user, token, scrollTarget = null, onAccountUpda
                         String(editingTerm?.academicYearId) === String(academicYearId)
 
                       return (
-                        <div className="principal-term-item" key={termId}>
-                          <div className="principal-term-row">
-                            <span>{term.termOrder}</span>
+                        // Each term is its own card. The card being edited is highlighted, and its
+                        // date form opens full width under the cards instead of inside the card.
+                        <div className={`principal-term-item${isEditing ? ' is-editing' : ''}`} key={termId}>
+                          <div className="principal-term-head">
+                            <span className="principal-term-number">{term.termOrder}</span>
+                            <strong>{term.termName}</strong>
+                            <span className={`status-pill status-${term.status || 'inactive'}`}>
+                              {term.status || 'Status unavailable'}
+                            </span>
+                          </div>
+
+                          <dl className="principal-term-dates">
                             <div>
-                              <strong>{term.termName}</strong>
-                              <small>
-                                {formatTermDate(term.startAt, { threeTermCalendar })} -{' '}
+                              <dt>Starts</dt>
+                              <dd>{formatTermDate(term.startAt, { threeTermCalendar })}</dd>
+                            </div>
+                            <div>
+                              <dt>Ends</dt>
+                              <dd>
                                 {formatTermDate(term.endAt, {
                                   threeTermCalendar,
                                   exclusiveEnd: true,
                                 })}
-                              </small>
+                              </dd>
                             </div>
-                            <span className={`status-pill status-${term.status || 'inactive'}`}>
-                              {term.status || 'Status unavailable'}
-                            </span>
+                          </dl>
+
+                          {!isEditing ? (
                             <button
                               type="button"
                               className="principal-term-edit"
                               onClick={() => openTermEditor(academicYear, term)}
                               disabled={Boolean(editingTerm) || ['completed', 'archived'].includes(academicYear.status)}
-                              title={`Edit ${term.termName} dates`}
                               aria-label={`Edit ${term.termName} dates`}
                             >
-                              <Pencil size={15} aria-hidden="true" />
+                              <Pencil size={14} aria-hidden="true" />
+                              Edit dates
                             </button>
-                          </div>
-
-                          {isEditing ? (
-                            <form className="principal-term-edit-form" onSubmit={saveTermDates}>
-                              <label>
-                                <span>Starts (Philippine time)</span>
-                                <input
-                                  type="datetime-local"
-                                  value={termDraft.startAt}
-                                  onChange={(event) => {
-                                    setTermDraft((current) => ({
-                                      ...current,
-                                      startAt: event.target.value,
-                                    }))
-                                    setTermEditError('')
-                                  }}
-                                  required
-                                />
-                              </label>
-                              <label>
-                                <span>Ends (Philippine time)</span>
-                                <input
-                                  type="datetime-local"
-                                  value={termDraft.endAt}
-                                  onChange={(event) => {
-                                    setTermDraft((current) => ({
-                                      ...current,
-                                      endAt: event.target.value,
-                                    }))
-                                    setTermEditError('')
-                                  }}
-                                  required
-                                />
-                              </label>
-                              <label className="principal-term-edit-reason">
-                                <span>Reason</span>
-                                <input
-                                  value={termDraft.reason}
-                                  maxLength={255}
-                                  onChange={(event) => {
-                                    setTermDraft((current) => ({
-                                      ...current,
-                                      reason: event.target.value,
-                                    }))
-                                    setTermEditError('')
-                                  }}
-                                  placeholder="Reason for changing the term dates"
-                                  required
-                                />
-                              </label>
-                              {termEditError ? (
-                                <p className="form-message form-message-error" role="alert">
-                                  {termEditError}
-                                </p>
-                              ) : null}
-                              <div className="principal-term-edit-actions">
-                                <button
-                                  type="button"
-                                  className="secondary-button"
-                                  onClick={cancelTermEditor}
-                                  disabled={isSavingTerm}
-                                >
-                                  <X size={15} aria-hidden="true" />
-                                  Cancel
-                                </button>
-                                <button
-                                  type="submit"
-                                  className="primary-button"
-                                  disabled={isSavingTerm}
-                                >
-                                  <Save size={15} aria-hidden="true" />
-                                  {isSavingTerm ? 'Saving...' : 'Save dates'}
-                                </button>
-                              </div>
-                            </form>
                           ) : null}
+
                         </div>
                       )
                     })}
                   </div>
+
+                  {editingTermRecord ? (
+                    <form className="principal-term-edit-form" onSubmit={saveTermDates}>
+                      <p className="principal-term-edit-note">
+                        Changing {editingTermRecord.termName} dates needs a reason (5 to 255 characters). Each term's
+                        dates can be changed up to 3 times, and the new dates must not overlap another
+                        term.
+                      </p>
+                      <label>
+                        <span>Starts (Philippine time)</span>
+                        <input
+                          type="datetime-local"
+                          value={termDraft.startAt}
+                          onChange={(event) => {
+                            setTermDraft((current) => ({
+                              ...current,
+                              startAt: event.target.value,
+                            }))
+                            setTermEditError('')
+                          }}
+                          required
+                        />
+                      </label>
+                      <label>
+                        <span>Ends (Philippine time)</span>
+                        <input
+                          type="datetime-local"
+                          value={termDraft.endAt}
+                          onChange={(event) => {
+                            setTermDraft((current) => ({
+                              ...current,
+                              endAt: event.target.value,
+                            }))
+                            setTermEditError('')
+                          }}
+                          required
+                        />
+                      </label>
+                      <label className="principal-term-edit-reason">
+                        <span>Reason</span>
+                        <input
+                          value={termDraft.reason}
+                          maxLength={255}
+                          onChange={(event) => {
+                            setTermDraft((current) => ({
+                              ...current,
+                              reason: event.target.value,
+                            }))
+                            setTermEditError('')
+                          }}
+                          placeholder="Reason for changing the term dates"
+                          required
+                        />
+                      </label>
+                      {termEditError ? (
+                        <p className="form-message form-message-error" role="alert">
+                          {termEditError}
+                        </p>
+                      ) : null}
+                      <div className="principal-term-edit-actions">
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          onClick={cancelTermEditor}
+                          disabled={isSavingTerm}
+                        >
+                          <X size={15} aria-hidden="true" />
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="primary-button"
+                          disabled={isSavingTerm}
+                        >
+                          <Save size={15} aria-hidden="true" />
+                          {isSavingTerm ? 'Saving...' : 'Save dates'}
+                        </button>
+                      </div>
+                    </form>
+                  ) : null}
                 </article>
               )
             })}

@@ -13,6 +13,7 @@ import {
   RefreshCw,
   ShieldCheck,
   UserRound,
+  X,
 } from 'lucide-react'
 import {
   checkTeacherRegistrationAvailabilityV3,
@@ -175,6 +176,42 @@ function getYearsOfTeaching(monthValue, currentDateValue) {
   return years === 0 ? 'Less than 1 year' : `${years} year${years === 1 ? '' : 's'}`
 }
 
+// Shown under "Teaching start month and year", e.g. "2 years and 2 months of teaching".
+function formatTeachingLength(monthValue, currentDateValue) {
+  const startMatch = /^(\d{4})-(\d{2})$/.exec(String(monthValue ?? ''))
+  const currentMatch = /^(\d{4})-(\d{2})-\d{2}$/.exec(String(currentDateValue ?? ''))
+
+  if (!startMatch || !currentMatch) return ''
+
+  const totalMonths =
+    (Number(currentMatch[1]) - Number(startMatch[1])) * 12 +
+    (Number(currentMatch[2]) - Number(startMatch[2]))
+
+  if (totalMonths < 0) return ''
+
+  const years = Math.floor(totalMonths / 12)
+  const months = totalMonths % 12
+  const parts = [
+    years ? `${years} year${years === 1 ? '' : 's'}` : '',
+    months ? `${months} month${months === 1 ? '' : 's'}` : '',
+  ].filter(Boolean)
+
+  return parts.length ? `${parts.join(' and ')} of teaching` : 'Less than a month of teaching'
+}
+
+function getAgeInYears(birthDate, today) {
+  let age = today.getFullYear() - birthDate.getFullYear()
+  const birthdayPassed =
+    today.getMonth() > birthDate.getMonth() ||
+    (today.getMonth() === birthDate.getMonth() && today.getDate() >= birthDate.getDate())
+  if (!birthdayPassed) age -= 1
+  return age
+}
+
+function formatMonthYear(date) {
+  return date.toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })
+}
+
 function isValidEmail(value) {
   const email = String(value ?? '').trim()
   return /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/.test(email)
@@ -184,17 +221,73 @@ function isValidContactNumber(value) {
   return /^(09\d{9}|\+639\d{9})$/.test(String(value ?? '').trim())
 }
 
+// REG-5 rules, shared by the password guide (shown before typing) and the step validation,
+// so the checklist and the error message can never disagree. Matches the backend rule:
+// 10-128 characters, upper, lower, number, special character, no spaces.
+const PASSWORD_RULES = [
+  { label: '10 to 128 characters', missing: '10 to 128 characters', test: (value) => value.length >= 10 && value.length <= 128 },
+  { label: 'An uppercase letter (A-Z)', missing: 'an uppercase letter', test: (value) => /[A-Z]/.test(value) },
+  { label: 'A lowercase letter (a-z)', missing: 'a lowercase letter', test: (value) => /[a-z]/.test(value) },
+  { label: 'A number (0-9)', missing: 'a number', test: (value) => /\d/.test(value) },
+  { label: 'A symbol, such as ! @ # $ % & *', missing: 'a symbol', test: (value) => /[^A-Za-z0-9\s]/.test(value) },
+  { label: 'No spaces', missing: 'no spaces', test: (value) => value.length > 0 && !/\s/.test(value) },
+]
+
+const PASSWORD_EXAMPLES = [
+  { value: 'Tg7#rQm2!vLx', note: 'Random mix of letters, numbers, and symbols', good: true },
+  { value: 'Maria1996!', note: 'Uses a name and a birth year', good: false },
+  { value: 'Password123', note: 'Common word, easy to guess', good: false },
+  { value: '04121996', note: 'A birth date, numbers only', good: false },
+]
+
 function getPasswordErrors(value) {
   const password = String(value ?? '')
-  const errors = []
+  return PASSWORD_RULES.filter((rule) => !rule.test(password)).map((rule) => rule.missing)
+}
 
-  if (password.length < 10) errors.push('at least 10 characters')
-  if (!/[A-Z]/.test(password)) errors.push('uppercase letter')
-  if (!/[a-z]/.test(password)) errors.push('lowercase letter')
-  if (!/\d/.test(password)) errors.push('number')
-  if (!/[^A-Za-z0-9]/.test(password)) errors.push('special character')
+function PasswordGuide({ password }) {
+  const hasTyped = password.length > 0
 
-  return errors
+  return (
+    <section className="teacher-password-guide" aria-label="Password guide">
+      <div className="teacher-password-guide-rules">
+        <h4>Your password needs</h4>
+        <ul>
+          {PASSWORD_RULES.map((rule) => {
+            const isMet = hasTyped && rule.test(password)
+            return (
+              <li key={rule.label} className={isMet ? 'is-met' : ''}>
+                <span aria-hidden="true">{isMet ? <Check size={13} strokeWidth={3} /> : null}</span>
+                {rule.label}
+                <span className="teacher-visually-hidden">{isMet ? ' (done)' : ''}</span>
+              </li>
+            )
+          })}
+        </ul>
+        <p>Avoid your name, birth date, email, or school name. Don't reuse a password from another site.</p>
+      </div>
+
+      <div className="teacher-password-guide-examples">
+        <h4>Secure passwords are random</h4>
+        <ul>
+          {PASSWORD_EXAMPLES.map((example) => (
+            <li key={example.value} className={example.good ? 'is-good' : 'is-bad'}>
+              <span aria-hidden="true">
+                {example.good ? <Check size={14} strokeWidth={3} /> : <X size={14} strokeWidth={3} />}
+              </span>
+              <div>
+                <code>{example.value}</code>
+                <small>
+                  <span className="teacher-visually-hidden">{example.good ? 'Strong: ' : 'Weak: '}</span>
+                  {example.note}
+                </small>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  )
 }
 
 function pickValue(record, keys) {
@@ -749,7 +842,10 @@ function TeacherSignUpPage({ onNavigate }) {
       } else if (birthDate >= today) {
         errors.birthDate = 'Birthdate cannot be today or a future date.'
       } else if (addYears(birthDate, 18) > today) {
-        errors.birthDate = 'Teacher must be at least 18 years old.'
+        const age = getAgeInYears(birthDate, today)
+        errors.birthDate = `Teachers must be at least 18 years old to register. This birthdate makes you ${age} year${
+          age === 1 ? '' : 's'
+        } old; check the year you entered.`
       }
     }
 
@@ -761,7 +857,9 @@ function TeacherSignUpPage({ onNavigate }) {
       } else if (teachingStartDate >= today) {
         errors.teachingStartMonth = 'Teaching start cannot be today or a future date.'
       } else if (birthDate && teachingStartDate < addYears(birthDate, 18)) {
-        errors.teachingStartMonth = 'Teaching start cannot be before the teacher turned 18.'
+        errors.teachingStartMonth = `Teaching start must be ${formatMonthYear(
+          addYears(birthDate, 18),
+        )} or later, the month you turned 18 based on your birthdate.`
       }
 
       if (!isValidEmail(form.email)) errors.email = 'Enter a complete email address.'
@@ -806,7 +904,7 @@ function TeacherSignUpPage({ onNavigate }) {
       const passwordErrors = getPasswordErrors(form.password)
 
       if (passwordErrors.length) {
-        errors.password = `Password must include ${passwordErrors.join(', ')}.`
+        errors.password = `Password still needs: ${passwordErrors.join(', ')}.`
       }
       if (form.confirmPassword !== form.password) {
         errors.confirmPassword = 'Passwords do not match.'
@@ -1242,8 +1340,14 @@ function TeacherSignUpPage({ onNavigate }) {
                     value={form.teachingStartMonth}
                     onChange={(event) => updateField('teachingStartMonth', event.target.value)}
                     aria-invalid={Boolean(fieldErrors.teachingStartMonth)}
+                    aria-describedby="teacher-start-month-length"
                   />
                   <ErrorText message={fieldErrors.teachingStartMonth} />
+                  {!fieldErrors.teachingStartMonth && formatTeachingLength(form.teachingStartMonth, todayDate) ? (
+                    <span id="teacher-start-month-length" className="teacher-registration-field-hint">
+                      {formatTeachingLength(form.teachingStartMonth, todayDate)}
+                    </span>
+                  ) : null}
                 </label>
 
                 <label className="public-auth-field" htmlFor="teacher-contact">
@@ -1530,6 +1634,7 @@ function TeacherSignUpPage({ onNavigate }) {
 
             {step === 3 ? (
               <div className="teacher-registration-account-step">
+                <PasswordGuide password={form.password} />
                 <input
                   type="email"
                   name="username"

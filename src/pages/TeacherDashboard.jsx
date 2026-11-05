@@ -13,6 +13,7 @@ import {
   getTeacherClassStudentsV3,
 } from '../api/apiV3Client'
 import TeacherStudentSupport from '../components/TeacherStudentSupport'
+import { getAssessmentStatusBadge } from '../utils/assessmentStatus'
 
 function formatClassName(assignment) {
   return [
@@ -46,11 +47,6 @@ function getClassSectionKey(assignment) {
   ]
     .map(normalizeMatchText)
     .join('|')
-}
-
-function formatStatus(value) {
-  const status = String(value ?? 'draft').trim().toLowerCase()
-  return status ? status.replaceAll('_', ' ').replace(/^./, (letter) => letter.toUpperCase()) : 'Draft'
 }
 
 function formatLocalDateTime(value) {
@@ -95,22 +91,6 @@ function getAssessmentTimestamp(assessment) {
 
 function isArchivedAssessment(assessment) {
   return String(assessment?.status ?? assessment?.testStatus ?? '').toLowerCase() === 'archived'
-}
-
-function getAssessmentActivityBadge(assessment, status) {
-  const learnerCount = Number(assessment.learnerCount)
-  const uploadedCount = Number(assessment.uploadedCount)
-  const hasCounts = Number.isFinite(learnerCount) && Number.isFinite(uploadedCount)
-
-  if (status === 'active' && hasCounts) {
-    if (learnerCount > 0 && uploadedCount >= learnerCount) {
-      return { label: 'Completed', toneClass: 'is-completed' }
-    }
-    if (uploadedCount > 0) {
-      return { label: `Active · ${uploadedCount}/${learnerCount} uploaded`, toneClass: 'is-active' }
-    }
-  }
-  return { label: formatStatus(status), toneClass: `is-${status}` }
 }
 
 function isActiveClassAssignment(assignment) {
@@ -338,10 +318,7 @@ function TeacherDashboard({ user, token, onNavigate }) {
             <ul className="teacher-dashboard-assessment-list">
               {recentAssessments.map((assessment) => {
                 const assignment = assignmentById.get(String(assessment.classAssignmentId))
-                const status = String(
-                  assessment.status ?? assessment.testStatus ?? 'draft',
-                ).toLowerCase()
-                const activityBadge = getAssessmentActivityBadge(assessment, status)
+                const activityBadge = getAssessmentStatusBadge(assessment)
 
                 return (
                   <li key={assessment.testId}>
@@ -358,7 +335,7 @@ function TeacherDashboard({ user, token, onNavigate }) {
                         </span>
                         <small>{getAssessmentSchedule(assessment)}</small>
                       </span>
-                      <span className={`teacher-dashboard-assessment-status ${activityBadge.toneClass}`}>
+                      <span className={`assessment-status-badge ${activityBadge.toneClass}`}>
                         {activityBadge.label}
                       </span>
                       <ArrowRight size={16} aria-hidden="true" />

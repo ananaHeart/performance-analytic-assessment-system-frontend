@@ -1944,7 +1944,7 @@ textarea:focus,
     grid-template-columns: 36px minmax(0, 1fr);
   }
 
-  .teacher-assessment-row .status-pill {
+  .teacher-assessment-row .assessment-status-badge {
     grid-column: 2;
     justify-self: start;
   }
@@ -2024,7 +2024,7 @@ textarea:focus,
   font-weight: 700;
 }
 
-.teacher-assessment-row .status-pill {
+.teacher-assessment-row .assessment-status-badge {
   justify-self: end;
   min-width: 96px;
 }
@@ -2056,7 +2056,7 @@ textarea:focus,
     padding: var(--space-3) var(--space-4);
   }
 
-  .teacher-assessment-row .status-pill {
+  .teacher-assessment-row .assessment-status-badge {
     grid-column: 2;
     justify-self: start;
     min-width: auto;

@@ -931,8 +931,7 @@ h3 {
 
 .principal-academic-calendar-header,
 .principal-academic-calendar-header > div:first-of-type,
-.principal-academic-year-summary,
-.principal-term-row {
+.principal-academic-year-summary {
   display: flex;
   align-items: center;
 }
@@ -1039,61 +1038,94 @@ h3 {
   margin: 0;
 }
 
+/* Term periods: one card per term with labelled dates; the edit form opens under the cards. */
 .principal-term-grid {
   display: grid;
-  grid-template-columns: repeat(var(--term-count, 4), minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 14px;
+}
+
+.principal-term-item {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
-  overflow: hidden;
+  background: var(--surface);
 }
 
-.principal-term-row {
-  min-width: 0;
+.principal-term-item.is-editing {
+  border-color: var(--primary-border);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+.principal-term-head {
+  display: flex;
+  align-items: center;
   gap: 10px;
-  padding: 14px;
-  border-right: 1px solid var(--border);
+  min-width: 0;
 }
 
-.principal-term-row:last-child {
-  border-right: 0;
-}
-
-.principal-term-row > span:first-child {
+.principal-term-number {
   width: 30px;
   height: 30px;
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-card);
+  border-radius: var(--radius-control);
   background: var(--primary-soft);
   color: var(--primary-dark);
   font-weight: 900;
 }
 
-.principal-term-row > div {
+.principal-term-head strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.95rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.principal-term-head .status-pill {
+  margin-left: auto;
+  padding: 5px 10px;
+  font-size: 0.7rem;
+  text-transform: capitalize;
+}
+
+.principal-term-dates {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 12px;
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+}
+
+.principal-term-dates div {
   min-width: 0;
   display: grid;
   gap: 3px;
 }
 
-.principal-term-row strong,
-.principal-term-row small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.principal-term-row small {
+.principal-term-dates dt {
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
-.principal-term-row .status-pill {
-  margin-left: auto;
-  padding: 5px 8px;
-  font-size: 0.7rem;
-  text-transform: capitalize;
+.principal-term-dates dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 750;
 }
 
 .status-planned,
@@ -1101,24 +1133,6 @@ h3 {
 .status-archived {
   background: var(--surface-sunken);
   color: var(--muted);
-}
-
-@media (max-width: 1100px) {
-  .principal-term-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .principal-term-row:nth-child(2n) {
-    border-right: 0;
-  }
-
-  .principal-term-row:last-child:nth-child(odd) {
-    grid-column: 1 / -1;
-  }
-
-  .principal-term-row:nth-child(-n + 2) {
-    border-bottom: 1px solid var(--border);
-  }
 }
 
 @media (max-width: 720px) {
@@ -1137,19 +1151,8 @@ h3 {
     justify-content: space-between;
   }
 
-  .principal-academic-year-summary,
-  .principal-term-grid {
+  .principal-academic-year-summary {
     grid-template-columns: 1fr;
-  }
-
-  .principal-term-row,
-  .principal-term-row:nth-child(2n) {
-    border-right: 0;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .principal-term-row:last-child {
-    border-bottom: 0;
   }
 }
 
@@ -5177,12 +5180,6 @@ h3 {
   font-size: 0.78rem;
 }
 
-.teacher-assessment-row .status-pill {
-  justify-self: start;
-  padding: 5px 16px;
-  font-size: 0.7rem;
-}
-
 .teacher-assessment-empty {
   margin: 0;
   padding: 22px;
@@ -7603,7 +7600,7 @@ h3 {
   white-space: nowrap;
 }
 
-.teacher-dashboard-assessment-status {
+.assessment-status-badge {
   min-width: 66px;
   min-height: 25px;
   padding: 3px 9px;
@@ -7619,27 +7616,27 @@ h3 {
   text-align: center;
 }
 
-.teacher-dashboard-assessment-status.is-active {
+.assessment-status-badge.is-active {
   border-color: var(--primary-border);
   background: var(--status-success-bg);
   color: var(--primary-dark);
 }
 
-.teacher-dashboard-assessment-status.is-completed {
+.assessment-status-badge.is-completed {
   border-color: var(--primary-border);
   background: var(--status-success-bg, var(--status-success-bg));
   color: var(--status-success-text, var(--primary-dark));
   font-weight: 800;
 }
 
-.teacher-dashboard-assessment-status.is-draft {
+.assessment-status-badge.is-draft {
   border-color: var(--border);
   background: var(--surface-sunken);
   color: var(--muted);
 }
 
-.teacher-dashboard-assessment-status.is-archived,
-.teacher-dashboard-assessment-status.is-closed {
+.assessment-status-badge.is-archived,
+.assessment-status-badge.is-closed {
   border-color: var(--border);
   background: var(--surface-sunken);
   color: var(--muted);
@@ -8665,7 +8662,7 @@ h3 {
     grid-template-columns: 36px minmax(0, 1fr);
   }
 
-  .teacher-dashboard-assessment-status {
+  .assessment-status-badge {
     grid-column: 2;
     justify-self: start;
   }
@@ -8699,7 +8696,7 @@ h3 {
     grid-template-columns: 32px minmax(0, 1fr);
   }
 
-  .teacher-records-page .teacher-assessment-row .status-pill {
+  .teacher-records-page .teacher-assessment-row .assessment-status-badge {
     grid-column: 2;
   }
 

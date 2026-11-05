@@ -40,6 +40,7 @@ import {
   updateClassAssignmentStatusV3,
 } from '../api/apiV3Client'
 import V3Sf1ImportPanel from '../components/V3Sf1ImportPanel'
+import { getAssessmentStatusBadge } from '../utils/assessmentStatus'
 
 const initialAssignmentForm = {
   classId: '',
@@ -463,24 +464,6 @@ function formatDate(dateValue) {
     month: 'short',
     day: 'numeric',
   })
-}
-
-function getAssessmentStatusClass(status) {
-  const normalizedStatus = String(status ?? '').toLowerCase()
-
-  if (normalizedStatus.includes('archived')) {
-    return 'status-archived'
-  }
-
-  if (normalizedStatus.includes('active') || normalizedStatus.includes('complete')) {
-    return 'status-active'
-  }
-
-  if (normalizedStatus.includes('draft')) {
-    return 'status-warning'
-  }
-
-  return 'status-pending'
 }
 
 function isArchivedAssessment(assessment) {
@@ -2220,17 +2203,15 @@ function ClassRecordsPage({
                             <div className="teacher-assessment-copy">
                               <strong>{assessment.testName || 'Untitled assessment'}</strong>
                               <small>
-                                {String(assessment.testType || 'Assessment').replace(/_/g, ' ')} ·{' '}
+                                {formatStatus(assessment.testType || 'Assessment')} ·{' '}
                                 {formatDate(assessment.testDate)}
                               </small>
                             </div>
                             <div className="teacher-assessment-row-actions">
                               <span
-                                className={`status-pill ${getAssessmentStatusClass(
-                                  assessment.testStatus,
-                                )}`}
+                                className={`assessment-status-badge ${getAssessmentStatusBadge(assessment).toneClass}`}
                               >
-                                {assessment.testStatus || 'Status not set'}
+                                {getAssessmentStatusBadge(assessment).label}
                               </span>
                               <button
                                 type="button"
