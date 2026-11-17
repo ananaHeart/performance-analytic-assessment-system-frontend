@@ -403,6 +403,12 @@
   color: var(--status-danger-text);
 }
 
+.public-auth-message.is-warning {
+  border-color: var(--status-warning-border);
+  background: var(--status-warning-soft);
+  color: var(--status-warning-text);
+}
+
 .public-auth-message.is-success {
   border-color: var(--primary-border);
   background: var(--primary-soft);

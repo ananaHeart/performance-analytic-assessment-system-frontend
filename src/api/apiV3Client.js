@@ -33,6 +33,7 @@ export const V3_AUTH_EXPIRED_EVENT = 'smart:v3-auth-expired'
 const PUBLIC_AUTH_PATHS = new Set([
   '/api/v3/auth/teacher-registration/reference-data',
   '/api/v3/auth/teacher-registration/availability',
+  '/api/v3/auth/postal-code-check',
   '/api/v3/auth/register-teacher',
   '/api/v3/auth/verify-teacher-email',
   '/api/v3/auth/resend-teacher-verification',
@@ -992,6 +993,20 @@ export async function getTeacherAccountsV3(token, status = 'pending_approval') {
 export async function getTeacherAccountV3(teacherUserId, token) {
   const payload = await requestV3(`/api/v3/users/teachers/${teacherUserId}`, { token })
   return normalizeV3User(extractData(payload) ?? {})
+}
+
+// R2-3: does this ZIP code belong to the chosen city/municipality? Public, used on the sign-up
+// Address step; register-teacher repeats the same check as the final guard.
+export async function checkPostalCodeV3({ postalCode, cityMunicipalityCode, cityMunicipalityName }) {
+  const payload = await requestV3(
+    `/api/v3/auth/postal-code-check${buildQuery({ postalCode, cityMunicipalityCode, cityMunicipalityName })}`,
+  )
+  const data = extractData(payload) ?? {}
+  return {
+    valid: data.valid !== false,
+    message: typeof data.message === 'string' ? data.message : '',
+    cityPostalCodes: Array.isArray(data.cityPostalCodes) ? data.cityPostalCodes : [],
+  }
 }
 
 export async function checkTeacherRegistrationAvailabilityV3(fields = {}) {

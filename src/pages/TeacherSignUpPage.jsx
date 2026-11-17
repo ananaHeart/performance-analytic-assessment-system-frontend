@@ -15,6 +15,7 @@ import {
   UserRound,
 } from 'lucide-react'
 import {
+  checkPostalCodeV3,
   checkTeacherRegistrationAvailabilityV3,
   getTeacherRegistrationReferenceDataV3,
   registerTeacherV3,
@@ -273,6 +274,35 @@ function normalizeBackendFieldErrors(error) {
   }, {})
 }
 
+// Input ids of the fields the backend can reject, so the first one can be focused after the
+// form jumps back to its step (R2-3: a postal code that does not belong to the city).
+const FIELD_INPUT_IDS = {
+  firstName: 'teacher-first-name',
+  lastName: 'teacher-last-name',
+  birthDate: 'teacher-birth-date',
+  genderId: 'teacher-gender',
+  teachingStartMonth: 'teacher-start-month',
+  email: 'teacher-email',
+  contactNumber: 'teacher-contact',
+  majorId: 'teacher-major',
+  educationalAttainmentId: 'teacher-attainment',
+  regionCode: 'teacher-region',
+  provinceCode: 'teacher-province',
+  cityMunicipalityCode: 'teacher-city',
+  barangayCode: 'teacher-barangay',
+  addressLine: 'teacher-address-line',
+  postalCode: 'teacher-postal-code',
+  password: 'teacher-password',
+}
+
+function focusFirstErrorField(fieldErrors, stepIndex) {
+  const field = (REGISTRATION_STEP_FIELDS[stepIndex] ?? []).find((name) => fieldErrors[name])
+  const inputId = FIELD_INPUT_IDS[field]
+  if (!inputId) return
+  // Wait for the step to render before focusing.
+  window.setTimeout(() => document.getElementById(inputId)?.focus(), 50)
+}
+
 function getFirstRegistrationErrorStep(fieldErrors) {
   return REGISTRATION_STEP_FIELDS.findIndex((fields) =>
     fields.some((field) => fieldErrors[field]),
@@ -371,6 +401,8 @@ function TeacherSignUpPage({ onNavigate }) {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false)
   const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isCheckingPostalCode, setIsCheckingPostalCode] = useState(false)
+  const postalCheckKeyRef = useRef('')
   const [accountTouched, setAccountTouched] = useState({
     password: false,
     confirmPassword: false,
@@ -639,6 +671,47 @@ function TeacherSignUpPage({ onNavigate }) {
     }
   }
 
+  // R2-3: ask the backend whether the postal code belongs to the chosen city/municipality.
+  // Returns the problem text, or '' when it fits or the check could not run (the final submit
+  // still checks it, so a network hiccup must not block the teacher here).
+  const checkPostalCode = async () => {
+    const postalCode = form.postalCode.trim()
+    if (!/^\d{4}$/.test(postalCode) || !form.cityMunicipalityCode) return ''
+
+    const checkKey = `${postalCode}|${form.cityMunicipalityCode}`
+    postalCheckKeyRef.current = checkKey
+    try {
+      const result = await checkPostalCodeV3({
+        postalCode,
+        cityMunicipalityCode: form.cityMunicipalityCode,
+        cityMunicipalityName: form.cityMunicipalityName,
+      })
+      if (postalCheckKeyRef.current !== checkKey) return ''
+      if (result.valid) {
+        clearFieldError('postalCode')
+        return ''
+      }
+      const message = result.message || 'This postal code does not belong to the selected city or municipality.'
+      setFieldErrors((current) => ({ ...current, postalCode: message }))
+      return message
+    } catch (error) {
+      if (postalCheckKeyRef.current !== checkKey) return ''
+      const fieldMessage = error.errors?.postalCode || error.errors?.cityMunicipalityCode
+      if (fieldMessage) {
+        setFieldErrors((current) => ({
+          ...current,
+          ...(error.errors?.postalCode ? { postalCode: error.errors.postalCode } : {}),
+          ...(error.errors?.cityMunicipalityCode ? { cityMunicipalityCode: error.errors.cityMunicipalityCode } : {}),
+        }))
+        return fieldMessage
+      }
+      if (error.code === 'POSTAL_CODE_CHECK_RATE_LIMITED') {
+        setRequestError('Too many postal code checks. Wait a minute, then select Continue again.')
+      }
+      return ''
+    }
+  }
+
   const toggleSubject = (field, subjectId) => {
     setForm((current) => {
       const values = current[field]
@@ -856,8 +929,9 @@ function TeacherSignUpPage({ onNavigate }) {
     return errors
   }
 
-  const goToNextStep = (event) => {
+  const goToNextStep = async (event) => {
     event.preventDefault()
+    if (isCheckingPostalCode) return
 
     if (referenceLoadFailed) {
       setRequestError(
@@ -876,6 +950,17 @@ function TeacherSignUpPage({ onNavigate }) {
 
     if (Object.keys(errors).length > 0) {
       return
+    }
+
+    // The Address step only moves on when the postal code belongs to the chosen city.
+    if (step === 2) {
+      setIsCheckingPostalCode(true)
+      const postalProblem = await checkPostalCode()
+      setIsCheckingPostalCode(false)
+      if (postalProblem) {
+        focusFirstErrorField({ postalCode: postalProblem }, 2)
+        return
+      }
     }
 
     if (step === 2) {
@@ -1041,6 +1126,7 @@ function TeacherSignUpPage({ onNavigate }) {
         setStep(firstBackendErrorStep)
         setRequestError('Review the highlighted field before sending the verification code.')
         window.scrollTo({ top: 0, behavior: 'smooth' })
+        focusFirstErrorField(backendFieldErrors, firstBackendErrorStep)
       } else {
         setRequestError(error.message || 'Unable to submit teacher registration.')
       }
@@ -1549,6 +1635,7 @@ function TeacherSignUpPage({ onNavigate }) {
                       'postalCode',
                       event.target.value.replace(/\D/g, '').slice(0, 4),
                     )}
+                    onBlur={() => void checkPostalCode()}
                     autoComplete="postal-code"
                     inputMode="numeric"
                     maxLength="4"
@@ -1800,9 +1887,9 @@ function TeacherSignUpPage({ onNavigate }) {
                 type="button"
                 className="public-auth-submit"
                 onClick={goToNextStep}
-                disabled={loadingReferences || referenceLoadFailed || loadingAddress.regions}
+                disabled={loadingReferences || referenceLoadFailed || loadingAddress.regions || isCheckingPostalCode}
               >
-                <span>Continue</span>
+                <span>{isCheckingPostalCode ? 'Checking postal code...' : 'Continue'}</span>
                 <ArrowRight size={18} strokeWidth={2.3} aria-hidden="true" />
               </button>
             ) : (

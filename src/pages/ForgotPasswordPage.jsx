@@ -44,6 +44,21 @@ function getResetError(error, fallback) {
   return messages[error?.code] || error?.message || fallback
 }
 
+// A server or network failure is not the user's fault: show a calm warning that says what to do,
+// instead of the technical "HTTP 500" text.
+function isServiceProblem(error) {
+  return Number(error?.status) >= 500 || error?.code === 'V3_NETWORK_ERROR'
+}
+
+const SERVICE_WARNING = {
+  request:
+    "We couldn't send a reset code right now. Please wait a few minutes and try again. If it still doesn't work, ask the school principal for help.",
+  resend:
+    "We couldn't send a new code right now. Please wait a few minutes and try again.",
+  confirm:
+    "We couldn't update your password right now. Please wait a few minutes and try again. Your current password still works.",
+}
+
 function ResetPasswordField({ field, label, value, onChange, visible, onToggle }) {
   const VisibilityIcon = visible ? EyeOff : Eye
   return (
@@ -84,6 +99,7 @@ function ForgotPasswordPage({ onNavigate }) {
   const [expiry, setExpiry] = useState(null)
   const [busyAction, setBusyAction] = useState('')
   const [error, setError] = useState('')
+  const [warning, setWarning] = useState('')
   const [status, setStatus] = useState('')
 
   useEffect(() => {
@@ -111,12 +127,17 @@ function ForgotPasswordPage({ onNavigate }) {
     event.preventDefault()
     const normalizedIdentifier = identifier.trim()
     if (!normalizedIdentifier) {
-      setError('Enter the email address or contact number connected to the account.')
+      setError('Enter the email address of your Marka account.')
+      return
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedIdentifier)) {
+      setError('Enter a complete email address, for example name@school.edu.ph.')
       return
     }
 
     setBusyAction('request')
     setError('')
+    setWarning('')
     setStatus('')
     try {
       const nextChallenge = await requestPasswordResetV3(normalizedIdentifier)
@@ -124,7 +145,8 @@ function ForgotPasswordPage({ onNavigate }) {
       setStep('confirm')
       setStatus(`If an account matches, a code was sent to ${nextChallenge?.destinationMasked || 'the registered contact method'}.`)
     } catch (requestError) {
-      setError(getResetError(requestError, 'Unable to start password recovery.'))
+      if (isServiceProblem(requestError)) setWarning(SERVICE_WARNING.request)
+      else setError(getResetError(requestError, 'Unable to start password recovery.'))
     } finally {
       setBusyAction('')
     }
@@ -134,6 +156,7 @@ function ForgotPasswordPage({ onNavigate }) {
     if (!challenge?.challengeUuid || cooldown > 0) return
     setBusyAction('resend')
     setError('')
+    setWarning('')
     setStatus('')
     try {
       const nextChallenge = await resendPasswordResetV3(challenge.challengeUuid)
@@ -143,7 +166,8 @@ function ForgotPasswordPage({ onNavigate }) {
       if (requestError.code === 'VERIFICATION_RESEND_COOLDOWN') {
         setCooldown(secondsUntil(requestError.errors?.resendAvailableAt))
       }
-      setError(getResetError(requestError, 'Unable to resend the verification code.'))
+      if (isServiceProblem(requestError)) setWarning(SERVICE_WARNING.resend)
+      else setError(getResetError(requestError, 'Unable to resend the verification code.'))
     } finally {
       setBusyAction('')
     }
@@ -171,6 +195,7 @@ function ForgotPasswordPage({ onNavigate }) {
 
     setBusyAction('confirm')
     setError('')
+    setWarning('')
     setStatus('')
     try {
       await confirmPasswordResetV3(challenge.challengeUuid, code, newPassword)
@@ -186,23 +211,25 @@ function ForgotPasswordPage({ onNavigate }) {
       const suffix = Number.isInteger(remaining)
         ? ` ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`
         : ''
-      setError(`${getResetError(requestError, 'Unable to reset the password.')}${suffix}`)
+      if (isServiceProblem(requestError)) setWarning(SERVICE_WARNING.confirm)
+      else setError(`${getResetError(requestError, 'Unable to reset the password.')}${suffix}`)
     } finally {
       setBusyAction('')
     }
   }
 
   return (
-    <PublicAuthShell variant="login" eyebrow="Account recovery" title="Reset your password." description="Use the verified email address or contact number connected to your account." trustMessage="A reset code expires and can only be used once." onNavigate={onNavigate}>
+    <PublicAuthShell variant="login" eyebrow="Account recovery" title="Reset your password." description="Use the verified email address connected to your account." trustMessage="A reset code expires and can only be used once." onNavigate={onNavigate}>
       <div className="public-auth-form-content forgot-password-content">
-        <div className="public-auth-form-heading"><p>Password recovery</p><h1>{step === 'complete' ? 'Password updated' : step === 'confirm' ? 'Enter the reset code' : 'Find your account'}</h1><span>{step === 'confirm' ? 'Enter the code and choose a new password.' : step === 'complete' ? 'Sign in again using the new password.' : 'Use your account email or Philippine contact number.'}</span></div>
+        <div className="public-auth-form-heading"><p>Password recovery</p><h1>{step === 'complete' ? 'Password updated' : step === 'confirm' ? 'Enter the reset code' : 'Find your account'}</h1><span>{step === 'confirm' ? 'Enter the code and choose a new password.' : step === 'complete' ? 'Sign in again using the new password.' : 'Enter the email address of your Marka account.'}</span></div>
 
         {status ? <p className="public-auth-message is-success" role="status">{status}</p> : null}
         {error ? <p className="public-auth-message is-error" role="alert">{error}</p> : null}
+        {warning ? <p className="public-auth-message is-warning" role="alert"><strong>Please try again later.</strong> {warning}</p> : null}
 
         {step === 'request' ? (
           <form className="public-auth-form" onSubmit={requestReset}>
-            <label className="public-auth-field" htmlFor="resetIdentifier"><span>Email or contact number</span><div className="public-auth-input-wrap"><Mail size={18} aria-hidden="true" /><input id="resetIdentifier" value={identifier} onChange={(event) => { setIdentifier(event.target.value); setError('') }} autoComplete="username" placeholder="name@school.edu or 09XXXXXXXXX" required /></div></label>
+            <label className="public-auth-field" htmlFor="resetIdentifier"><span>Email address</span><div className="public-auth-input-wrap"><Mail size={18} aria-hidden="true" /><input id="resetIdentifier" value={identifier} onChange={(event) => { setIdentifier(event.target.value); setError(''); setWarning('') }} type="email" inputMode="email" autoComplete="username" placeholder="name@school.edu.ph" required /></div></label>
             <button type="submit" className="public-auth-submit" disabled={Boolean(busyAction)}>{busyAction === 'request' ? 'Sending...' : 'Send reset code'}{!busyAction ? <ArrowRight size={18} aria-hidden="true" /> : null}</button>
           </form>
         ) : null}
