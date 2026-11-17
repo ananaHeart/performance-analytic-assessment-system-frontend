@@ -55,9 +55,13 @@ function PrincipalDashboard({ token, onNavigate }) {
           referenceData.teachers.map((teacher) => [String(teacher.teacherUserId), teacher.fullName]),
         )
 
-        const activeAssessments = referenceData.assessments.filter(
-          (assessment) => !isArchivedAssessment(assessment),
-        )
+        // Archived = soft delete: an archived teacher's class assignments are archived with them,
+        // so assessments under a non-active class assignment are left out of the principal's view.
+        const activeAssessments = referenceData.assessments.filter((assessment) => {
+          const classAssignment = classAssignmentById.get(String(assessment.classAssignmentId))
+          const assignmentStatus = String(classAssignment?.status ?? '').trim().toLowerCase()
+          return !isArchivedAssessment(assessment) && (!assignmentStatus || assignmentStatus === 'active')
+        })
 
         const resultReports = await Promise.allSettled(
           activeAssessments.map((assessment) =>

@@ -220,7 +220,13 @@ async function requestV3(
       ? await response.json().catch(() => null)
       : await response.text().catch(() => '')
     const code = extractErrorCode(errorPayload)
-    const requestError = new Error(extractMessage(errorPayload))
+    // A 5xx carries only the server's generic text ("An unexpected error occurred."), which reads
+    // as if the page is at fault; say what happened and keep the status for the report.
+    const requestError = new Error(
+      response.status >= 500
+        ? `The Marka server could not complete this request (HTTP ${response.status}). Please try again in a moment; if it keeps happening, report it to the school.`
+        : extractMessage(errorPayload),
+    )
     requestError.status = response.status
     requestError.code = code
     requestError.errors = errorPayload?.errors ?? errorPayload?.data ?? null

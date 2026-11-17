@@ -168,6 +168,10 @@ function isArchivedAssessment(assessment) {
   return normalizeText(assessment?.testStatus ?? assessment?.status) === 'archived'
 }
 
+function isArchivedTeacher(teacher) {
+  return normalizeText(teacher?.status ?? teacher?.statusName ?? teacher?.accountStatus) === 'archived'
+}
+
 function isActiveClassAssignment(assignment) {
   const status = normalizeText(assignment?.status)
   return !status || status === 'active'
@@ -265,9 +269,19 @@ function selectInitialTerm(termPeriods, academicYearId) {
   )
 }
 
-function selectNewestUploadedAssessment(assessments) {
+// Archived = soft delete: a teacher's or class assignment's data must not surface for the
+// principal, so only assessments under a still-active class assignment are considered.
+function selectNewestUploadedAssessment(assessments, classAssignments = []) {
+  const activeAssignmentIds = new Set(
+    classAssignments.filter(isActiveClassAssignment).map((assignment) => String(assignment.classAssignmentId)),
+  )
   return assessments
-    .filter((assessment) => !isArchivedAssessment(assessment) && hasId(assessment.lastUploadedAt))
+    .filter(
+      (assessment) =>
+        !isArchivedAssessment(assessment) &&
+        hasId(assessment.lastUploadedAt) &&
+        activeAssignmentIds.has(String(assessment.classAssignmentId)),
+    )
     .sort((left, right) => new Date(right.lastUploadedAt) - new Date(left.lastUploadedAt))[0] ?? null
 }
 
@@ -287,8 +301,15 @@ function getLoadFailure(error, fallback) {
     return { ...baseState, status: 'authorization' }
   }
 
+  // The backend answers 404 (*_NOT_FOUND) for an assessment under an archived teacher or class
+  // assignment (soft delete), e.g. from a saved filter or a dashboard link.
   if (error?.status === 404) {
-    return { ...baseState, status: 'not-found' }
+    return {
+      ...baseState,
+      message:
+        'This report is no longer available. The assessment, teacher, or class assignment may have been archived. Choose another one in Filters, or select Refresh filters to update the lists.',
+      status: 'not-found',
+    }
   }
 
   if (error?.status === 422) {
@@ -509,7 +530,10 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
           setSelectedReportType(presetFilters.reportType)
         }
       } else if (effectiveRole === 'principal') {
-        const newestUploaded = selectNewestUploadedAssessment(referenceData.assessments ?? [])
+        const newestUploaded = selectNewestUploadedAssessment(
+          referenceData.assessments ?? [],
+          referenceData.classAssignments ?? [],
+        )
         const uploadedAssignment = newestUploaded
           ? referenceData.classAssignments.find((assignment) =>
               sameId(assignment.classAssignmentId, newestUploaded.classAssignmentId),
@@ -684,7 +708,7 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
 
   const principalTeacherOptions = useMemo(() => {
     const teacherIds = new Set(
-      sourceData.classAssignments
+      scopedAssignments
         .filter(
           (assignment) =>
             sameId(assignment.academicYearId, filters.academicYearId) &&
@@ -703,14 +727,14 @@ function ReportsPage({ user, role, token, initialFilters = null }) {
   }, [
     filters.academicYearId,
     filters.classId,
-    sourceData.classAssignments,
+    scopedAssignments,
     sourceData.teachers,
   ])
 
   const syncActivityTeacherOptions = useMemo(
     () =>
       uniqueOptions(
-        sourceData.teachers,
+        sourceData.teachers.filter((teacher) => !isArchivedTeacher(teacher)),
         (teacher) => teacher.teacherUserId,
         (teacher) => toTitleCase(teacher.fullName),
       ),
